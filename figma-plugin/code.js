@@ -45,12 +45,13 @@ figma.ui.onmessage = async (msg) => {
  * @returns {object} Import statistics
  */
 async function importDesignSystem(data) {
-  const { metadata, colors, typography } = data;
+  const { metadata, colors, typography, logo, favicons } = data;
 
   // Statistics
   const stats = {
     colorStyles: 0,
     textStyles: 0,
+    logoImages: 0,
     pages: 0
   };
 
@@ -74,9 +75,14 @@ async function importDesignSystem(data) {
     stats.pages++;
   }
 
-  // Create placeholder pages for future features
-  await createPlaceholderPage('♦︎ Logo', 'Logo assets will appear here when extracted');
-  stats.pages++;
+  // Create Logo page
+  if ((logo && logo.url) || (favicons && favicons.length > 0)) {
+    stats.logoImages = await createLogoDocumentationPage(logo, favicons, metadata);
+    stats.pages++;
+  } else {
+    await createPlaceholderPage('♦︎ Logo', 'Logo assets will appear here when extracted');
+    stats.pages++;
+  }
 
   await createPlaceholderPage('♦︎ Icons', 'Icon library will appear here when extracted');
   stats.pages++;
@@ -91,7 +97,12 @@ async function importDesignSystem(data) {
     figma.viewport.scrollAndZoomIntoView(figma.currentPage.children);
   }
 
-  figma.notify(`✓ Imported ${stats.colorStyles} colors and ${stats.textStyles} text styles`);
+  const notificationParts = [];
+  if (stats.colorStyles > 0) notificationParts.push(`${stats.colorStyles} colors`);
+  if (stats.textStyles > 0) notificationParts.push(`${stats.textStyles} text styles`);
+  if (stats.logoImages > 0) notificationParts.push(`${stats.logoImages} logo assets`);
+
+  figma.notify(`✓ Imported ${notificationParts.join(', ')}`);
 
   return stats;
 }
@@ -281,6 +292,7 @@ async function createColorDocumentationPage(colors, metadata) {
   const swatchSize = 120;
   const gap = 40;
   const maxPerRow = 5;
+  const swatchGroupHeight = swatchSize + 60; // Height for swatch + labels
 
   let displayedCount = 0;
   for (let i = 0; i < colors.length; i++) {
@@ -291,11 +303,21 @@ async function createColorDocumentationPage(colors, metadata) {
       continue;
     }
 
-    // Create color rectangle
+    // Create a frame to group the swatch and its labels
+    const swatchFrame = figma.createFrame();
+    swatchFrame.name = `Color: ${color.name}`;
+    swatchFrame.resize(swatchSize, swatchGroupHeight);
+    swatchFrame.x = xPos;
+    swatchFrame.y = yPos;
+    swatchFrame.fills = []; // Transparent background
+    swatchFrame.clipsContent = false; // Allow labels to extend beyond if needed
+
+    // Create color rectangle (inside the frame)
     const rect = figma.createRectangle();
+    rect.name = 'Swatch';
     rect.resize(swatchSize, swatchSize);
-    rect.x = xPos;
-    rect.y = yPos;
+    rect.x = 0; // Relative to frame
+    rect.y = 0; // Relative to frame
     rect.fills = [{
       type: 'SOLID',
       color: {
@@ -316,30 +338,41 @@ async function createColorDocumentationPage(colors, metadata) {
       blendMode: 'NORMAL'
     }];
 
-    // Create label
+    // Add rectangle to frame
+    swatchFrame.appendChild(rect);
+
+    // Create label (inside the frame)
     const label = figma.createText();
     await figma.loadFontAsync({ family: 'Inter', style: 'Medium' });
+    label.name = 'Color Name';
     label.fontName = { family: 'Inter', style: 'Medium' };
     label.fontSize = 12;
     label.characters = color.name;
-    label.x = xPos;
-    label.y = yPos + swatchSize + 12;
+    label.x = 0; // Relative to frame
+    label.y = swatchSize + 12; // Below the swatch
 
-    // Create hex value label
+    // Add label to frame
+    swatchFrame.appendChild(label);
+
+    // Create hex value label (inside the frame)
     const hexLabel = figma.createText();
     await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+    hexLabel.name = 'Hex Value';
     hexLabel.fontName = { family: 'Inter', style: 'Regular' };
     hexLabel.fontSize = 11;
     hexLabel.characters = color.hex.toUpperCase();
     hexLabel.fills = [{ type: 'SOLID', color: { r: 0.6, g: 0.6, b: 0.6 } }];
-    hexLabel.x = xPos;
-    hexLabel.y = yPos + swatchSize + 32;
+    hexLabel.x = 0; // Relative to frame
+    hexLabel.y = swatchSize + 32; // Below the color name
+
+    // Add hex label to frame
+    swatchFrame.appendChild(hexLabel);
 
     // Move to next position
     displayedCount++;
     if (displayedCount % maxPerRow === 0) {
       xPos = 100;
-      yPos += swatchSize + 80;
+      yPos += swatchGroupHeight + 40; // Add more vertical spacing between rows
     } else {
       xPos += swatchSize + gap;
     }
@@ -387,7 +420,7 @@ async function createTypographyDocumentationPage(typography, metadata) {
 
   // Create typography samples
   let yPos = 210;
-  const lineHeight = 80;
+  const baseXPos = 100;
 
   for (const typo of typography) {
     // Try to load the font
@@ -412,26 +445,239 @@ async function createTypographyDocumentationPage(typography, metadata) {
 
     if (!fontLoaded) continue;
 
-    // Create sample text
-    const sample = figma.createText();
-    sample.fontName = loadedFont;
-    sample.fontSize = Math.min(typo.fontSize, 48); // Cap at 48px for display
-    sample.characters = typo.name;
-    sample.x = 100;
-    sample.y = yPos;
+    // Calculate display font size (capped at 48px)
+    const displayFontSize = Math.min(typo.fontSize, 48);
 
-    // Create details label
+    // Calculate frame height based on actual text size
+    const detailsHeight = 16; // Space for details text
+    const gapBetweenTextAndDetails = 8;
+    const frameHeight = displayFontSize + gapBetweenTextAndDetails + detailsHeight;
+
+    // Create a frame to group the typography sample and its details
+    const typoFrame = figma.createFrame();
+    typoFrame.name = `Text Style: ${typo.name}`;
+    typoFrame.resize(800, frameHeight); // Wide frame to accommodate text
+    typoFrame.x = baseXPos;
+    typoFrame.y = yPos;
+    typoFrame.fills = []; // Transparent background
+    typoFrame.clipsContent = false; // Allow text to extend beyond if needed
+
+    // Create sample text (inside the frame)
+    const sample = figma.createText();
+    sample.name = 'Sample';
+    sample.fontName = loadedFont;
+    sample.fontSize = displayFontSize;
+    sample.characters = typo.name;
+    sample.x = 0; // Relative to frame
+    sample.y = 0; // Relative to frame
+
+    // Add sample to frame
+    typoFrame.appendChild(sample);
+
+    // Create details label (inside the frame)
     const details = figma.createText();
     await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+    details.name = 'Details';
     details.fontName = { family: 'Inter', style: 'Regular' };
     details.fontSize = 11;
     details.characters = `${typo.fontFamily} ${typo.fontStyle} • ${typo.fontSize}px • ${typo.fontWeight}`;
     details.fills = [{ type: 'SOLID', color: { r: 0.6, g: 0.6, b: 0.6 } }];
-    details.x = 100;
-    details.y = yPos + Math.min(typo.fontSize, 48) + 8;
+    details.x = 0; // Relative to frame
+    details.y = displayFontSize + gapBetweenTextAndDetails; // Below the sample
 
-    yPos += lineHeight;
+    // Add details to frame
+    typoFrame.appendChild(details);
+
+    // Move to next position with calculated spacing
+    yPos += frameHeight + 32; // Add spacing between typography samples
   }
+}
+
+/**
+ * Create a visual documentation page for logo and favicons
+ * @param {object} logo - Logo data
+ * @param {array} favicons - Array of favicon objects
+ * @param {object} metadata - Metadata from dembrandt
+ * @returns {number} Number of images created
+ */
+async function createLogoDocumentationPage(logo, favicons, metadata) {
+  const page = figma.createPage();
+  page.name = '♦︎ Logo';
+  figma.currentPage = page;
+
+  let imagesCreated = 0;
+
+  // Create title
+  const title = figma.createText();
+  await figma.loadFontAsync({ family: 'Inter', style: 'Bold' });
+  title.fontName = { family: 'Inter', style: 'Bold' };
+  title.fontSize = 32;
+  title.characters = metadata.sourceDomain;
+  title.x = 100;
+  title.y = 100;
+
+  // Create subtitle
+  const subtitle = figma.createText();
+  await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+  subtitle.fontName = { family: 'Inter', style: 'Regular' };
+  subtitle.fontSize = 16;
+  subtitle.characters = 'Logo & Brand Assets';
+  subtitle.fills = [{ type: 'SOLID', color: { r: 0.4, g: 0.4, b: 0.4 } }];
+  subtitle.x = 100;
+  subtitle.y = 145;
+
+  let yPos = 200;
+  const xPos = 100;
+
+  // Create main logo section if available
+  if (logo && logo.url) {
+    // Create section header
+    const logoHeader = figma.createText();
+    await figma.loadFontAsync({ family: 'Inter', style: 'Medium' });
+    logoHeader.fontName = { family: 'Inter', style: 'Medium' };
+    logoHeader.fontSize = 18;
+    logoHeader.characters = 'Primary Logo';
+    logoHeader.x = xPos;
+    logoHeader.y = yPos;
+
+    yPos += 40;
+
+    // Create a frame for the logo
+    const logoFrame = figma.createFrame();
+    logoFrame.name = 'Logo';
+    logoFrame.resize(400, 200);
+    logoFrame.x = xPos;
+    logoFrame.y = yPos;
+    logoFrame.fills = [{ type: 'SOLID', color: { r: 0.98, g: 0.98, b: 0.98 } }];
+    logoFrame.cornerRadius = 8;
+
+    // Add placeholder rectangle for the logo image
+    const logoPlaceholder = figma.createRectangle();
+    logoPlaceholder.name = 'Logo Image Placeholder';
+    logoPlaceholder.resize(logo.width || 200, logo.height || 100);
+    // Center the placeholder in the frame
+    logoPlaceholder.x = (400 - (logo.width || 200)) / 2;
+    logoPlaceholder.y = (200 - (logo.height || 100)) / 2;
+    logoPlaceholder.fills = [{ type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.85 } }];
+    logoFrame.appendChild(logoPlaceholder);
+
+    // Add info text about the logo URL
+    const logoInfo = figma.createText();
+    await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+    logoInfo.fontName = { family: 'Inter', style: 'Regular' };
+    logoInfo.fontSize = 11;
+    logoInfo.characters = `Source: ${logo.source}\nURL: ${logo.url}\nSize: ${logo.width}×${logo.height}px`;
+    logoInfo.fills = [{ type: 'SOLID', color: { r: 0.6, g: 0.6, b: 0.6 } }];
+    logoInfo.x = xPos;
+    logoInfo.y = yPos + 220;
+
+    // Add safe zone info if available
+    if (logo.safeZone && (logo.safeZone.top || logo.safeZone.right || logo.safeZone.bottom || logo.safeZone.left)) {
+      const safeZoneInfo = figma.createText();
+      await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+      safeZoneInfo.fontName = { family: 'Inter', style: 'Regular' };
+      safeZoneInfo.fontSize = 11;
+      safeZoneInfo.characters = `Safe Zone: ${logo.safeZone.top}px (top) ${logo.safeZone.right}px (right) ${logo.safeZone.bottom}px (bottom) ${logo.safeZone.left}px (left)`;
+      safeZoneInfo.fills = [{ type: 'SOLID', color: { r: 0.6, g: 0.6, b: 0.6 } }];
+      safeZoneInfo.x = xPos;
+      safeZoneInfo.y = yPos + 270;
+      yPos += 50;
+    }
+
+    yPos += 280;
+    imagesCreated++;
+  }
+
+  // Create favicons section if available
+  if (favicons && favicons.length > 0) {
+    // Create section header
+    const faviconHeader = figma.createText();
+    await figma.loadFontAsync({ family: 'Inter', style: 'Medium' });
+    faviconHeader.fontName = { family: 'Inter', style: 'Medium' };
+    faviconHeader.fontSize = 18;
+    faviconHeader.characters = 'Favicons & Icons';
+    faviconHeader.x = xPos;
+    faviconHeader.y = yPos;
+
+    yPos += 40;
+
+    // Group favicons by type
+    const faviconsByType = {};
+    for (const favicon of favicons) {
+      if (!faviconsByType[favicon.type]) {
+        faviconsByType[favicon.type] = [];
+      }
+      faviconsByType[favicon.type].push(favicon);
+    }
+
+    // Display favicons grouped by type
+    let faviconXPos = xPos;
+    let faviconYPos = yPos;
+    const iconSize = 80;
+    const iconGap = 24;
+    const maxPerRow = 6;
+    let count = 0;
+
+    for (const [type, icons] of Object.entries(faviconsByType)) {
+      for (const favicon of icons) {
+        // Create a frame for each favicon
+        const faviconFrame = figma.createFrame();
+        faviconFrame.name = `${type}${favicon.sizes ? ` (${favicon.sizes})` : ''}`;
+        faviconFrame.resize(iconSize, iconSize + 50);
+        faviconFrame.x = faviconXPos;
+        faviconFrame.y = faviconYPos;
+        faviconFrame.fills = [];
+        faviconFrame.clipsContent = false;
+
+        // Create placeholder for the icon
+        const iconPlaceholder = figma.createRectangle();
+        iconPlaceholder.name = 'Icon Placeholder';
+        iconPlaceholder.resize(iconSize, iconSize);
+        iconPlaceholder.x = 0;
+        iconPlaceholder.y = 0;
+        iconPlaceholder.fills = [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9 } }];
+        iconPlaceholder.cornerRadius = 8;
+        faviconFrame.appendChild(iconPlaceholder);
+
+        // Add label
+        const iconLabel = figma.createText();
+        await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+        iconLabel.name = 'Label';
+        iconLabel.fontName = { family: 'Inter', style: 'Regular' };
+        iconLabel.fontSize = 9;
+        iconLabel.characters = favicon.sizes || type;
+        iconLabel.fills = [{ type: 'SOLID', color: { r: 0.6, g: 0.6, b: 0.6 } }];
+        iconLabel.x = 0;
+        iconLabel.y = iconSize + 8;
+        faviconFrame.appendChild(iconLabel);
+
+        count++;
+        imagesCreated++;
+
+        // Move to next position
+        if (count % maxPerRow === 0) {
+          faviconXPos = xPos;
+          faviconYPos += iconSize + 70;
+        } else {
+          faviconXPos += iconSize + iconGap;
+        }
+      }
+    }
+
+    yPos = faviconYPos + iconSize + 100;
+  }
+
+  // Add note about image fetching
+  const note = figma.createText();
+  await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+  note.fontName = { family: 'Inter', style: 'Regular' };
+  note.fontSize = 12;
+  note.characters = 'Note: Due to Figma plugin limitations, actual images cannot be automatically fetched.\nPlease manually download images from the URLs provided and replace the placeholders.';
+  note.fills = [{ type: 'SOLID', color: { r: 0.7, g: 0.5, b: 0.3 } }];
+  note.x = xPos;
+  note.y = yPos;
+
+  return imagesCreated;
 }
 
 /**
