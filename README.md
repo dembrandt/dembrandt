@@ -34,6 +34,15 @@ Dembrandt analyzes live websites and extracts their complete design system:
 - **Icons** — Icon system detection (Font Awesome, Material Icons, SVG)
 - **Frameworks** — CSS framework detection (Tailwind, Bootstrap, Material-UI, Chakra)
 
+### 🎨 Figma Integration
+
+Import extracted design systems directly into Figma with the included plugin:
+
+- **Automatic Style Creation** — Generates Figma color and text styles from extracted tokens
+- **Visual Documentation** — Creates organized pages showing your design system
+- **Smart Naming** — Intelligently names styles based on semantic meaning
+- **One-Click Import** — Simply paste JSON into the plugin to create your design system
+
 Perfect for competitive analysis, brand audits, or rebuilding a brand when you don't have design guidelines.
 
 ## Why It Matters
@@ -173,6 +182,26 @@ dembrandt stripe.com --mobile
 ```
 
 Simulates a mobile device viewport for responsive design token extraction.
+
+**`--figma`** - Generate Figma plugin-ready JSON output
+
+```bash
+dembrandt stripe.com --figma
+```
+
+Creates a Figma-compatible JSON file that can be imported into Figma using the Dembrandt Design System Importer plugin. This generates color styles, text styles, and visual documentation pages automatically.
+
+The plugin-ready JSON is saved alongside the regular output with a `-figma.json` suffix.
+
+📦 **Figma Plugin Setup:**
+1. Clone or download this repository to access the [figma-plugin](./figma-plugin) folder
+2. In Figma Desktop: **Plugins** → **Development** → **Import plugin from manifest...**
+3. Navigate to the `figma-plugin` folder and select `manifest.json`
+4. Run dembrandt with `--figma` flag: `dembrandt stripe.com --figma`
+5. In Figma: **Plugins** → **Development** → **Dembrandt Design System Importer**
+6. Copy and paste the generated `-figma.json` file content
+
+See [figma-plugin/README.md](./figma-plugin/README.md) for detailed setup and usage documentation.
 
 ## Output
 
@@ -364,11 +393,17 @@ dembrandt/
 ├── index.js              # CLI entry point, command handling
 ├── lib/
 │   ├── extractors.js     # Core extraction logic with stealth mode
-│   └── display.js        # Terminal output formatting
+│   ├── display.js        # Terminal output formatting
+│   └── figma-exporter.js # Figma format transformer
+├── figma-plugin/         # Figma plugin (not published to npm)
+│   ├── manifest.json     # Plugin configuration
+│   ├── code.js           # Plugin logic
+│   ├── ui.html           # Plugin UI
+│   └── README.md         # Plugin documentation
 ├── output/               # Auto-saved JSON extractions (gitignored)
 │   ├── stripe.com/
 │   │   ├── 2025-11-22T14-30-45.json
-│   │   └── 2025-11-22T15-12-33.json
+│   │   └── 2025-11-22T14-30-45-figma.json
 │   └── github.com/
 │       └── 2025-11-22T14-35-12.json
 ├── package.json

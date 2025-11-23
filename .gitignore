@@ -19,10 +19,11 @@ npm-debug.log*
 # Output
 output/
 
-# Don't commit example outputs (but allow examples/ directory)
+# Don't commit JSON outputs
 *.json
 !package*.json
-!examples/*.json
+!package-lock.json
+!figma-plugin/manifest.json
 
 # Coverage
 coverage/

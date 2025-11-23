@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Dembrandt Design System Importer</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 12px;
+      color: #333;
+      background: #fff;
+    }
+
+    h2 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: #000;
+    }
+
+    p {
+      margin: 0 0 12px 0;
+      line-height: 1.5;
+      color: #666;
+    }
+
+    .input-section {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #999;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 200px;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 11px;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    textarea:focus {
+      border-color: #18a0fb;
+    }
+
+    textarea.error {
+      border-color: #f24822;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    button {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      outline: none;
+    }
+
+    button.primary {
+      background: #18a0fb;
+      color: white;
+    }
+
+    button.primary:hover {
+      background: #0d8ae0;
+    }
+
+    button.primary:active {
+      background: #0c7dc9;
+    }
+
+    button.primary:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    button.secondary {
+      background: #f5f5f5;
+      color: #333;
+    }
+
+    button.secondary:hover {
+      background: #e5e5e5;
+    }
+
+    .status {
+      margin-top: 12px;
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .status.info {
+      background: #e6f4ff;
+      color: #0d8ae0;
+    }
+
+    .status.success {
+      background: #e6f7ed;
+      color: #00a86b;
+    }
+
+    .status.error {
+      background: #ffe6e6;
+      color: #f24822;
+    }
+
+    .status.hidden {
+      display: none;
+    }
+
+    .stats {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(0,0,0,0.1);
+      font-size: 10px;
+      opacity: 0.8;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(24,160,251,0.3);
+      border-top-color: #18a0fb;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .example-link {
+      color: #18a0fb;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .example-link:hover {
+      text-decoration: underline;
+    }
+
+    code {
+      padding: 2px 4px;
+      background: #f5f5f5;
+      border-radius: 3px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>📦 Import Design System</h2>
+  <p>Paste the JSON output from <code>dembrandt --figma</code> below to create color and text styles.</p>
+
+  <div class="input-section">
+    <label for="jsonInput">Dembrandt JSON Data</label>
+    <textarea
+      id="jsonInput"
+      placeholder='{"version":"1.0.0","metadata":{...},"colors":[...],"typography":[...]}'
+    ></textarea>
+  </div>
+
+  <div class="button-row">
+    <button class="secondary" id="cancelBtn">Cancel</button>
+    <button class="primary" id="importBtn">Import Design System</button>
+  </div>
+
+  <div id="status" class="status hidden"></div>
+
+  <script>
+    const jsonInput = document.getElementById('jsonInput');
+    const importBtn = document.getElementById('importBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const status = document.getElementById('status');
+
+    // Handle import button click
+    importBtn.onclick = async () => {
+      const jsonText = jsonInput.value.trim();
+
+      if (!jsonText) {
+        showStatus('error', 'Please paste JSON data first.');
+        return;
+      }
+
+      // Validate JSON
+      let data;
+      try {
+        data = JSON.parse(jsonText);
+      } catch (err) {
+        showStatus('error', `Invalid JSON: ${err.message}`);
+        jsonInput.classList.add('error');
+        return;
+      }
+
+      jsonInput.classList.remove('error');
+
+      // Validate structure
+      if (!data.version || !data.colors || !data.typography) {
+        showStatus('error', 'Invalid dembrandt JSON structure. Expected version, colors, and typography fields.');
+        return;
+      }
+
+      // Disable button and show loading
+      importBtn.disabled = true;
+      showStatus('info', '<span class="spinner"></span>Importing design system...');
+
+      // Send to plugin code
+      parent.postMessage({
+        pluginMessage: {
+          type: 'import',
+          data: data
+        }
+      }, '*');
+    };
+
+    // Handle cancel button click
+    cancelBtn.onclick = () => {
+      parent.postMessage({
+        pluginMessage: {
+          type: 'cancel'
+        }
+      }, '*');
+    };
+
+    // Receive messages from plugin code
+    window.onmessage = (event) => {
+      const msg = event.data.pluginMessage;
+
+      if (msg.type === 'import-complete') {
+        importBtn.disabled = false;
+        showStatus('success', `
+          ✓ Successfully imported!
+          <div class="stats">
+            ${msg.stats.colorStyles} color styles created<br>
+            ${msg.stats.textStyles} text styles created<br>
+            ${msg.stats.pages} pages created
+          </div>
+        `);
+
+        // Auto-close after 2 seconds
+        setTimeout(() => {
+          parent.postMessage({
+            pluginMessage: { type: 'cancel' }
+          }, '*');
+        }, 2000);
+      } else if (msg.type === 'import-error') {
+        importBtn.disabled = false;
+        showStatus('error', `Error: ${msg.error}`);
+      }
+    };
+
+    function showStatus(type, message) {
+      status.className = `status ${type}`;
+      status.innerHTML = message;
+    }
+
+    // Auto-focus textarea
+    jsonInput.focus();
+  </script>
+</body>
+</html>

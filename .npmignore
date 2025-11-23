@@ -28,8 +28,8 @@ npm-debug.log*
 # Output
 output/
 
-# Examples (users should check repo for these)
-examples/
+# Figma plugin (distributed via GitHub, not npm)
+figma-plugin/
 
 # Media (not needed in npm package)
 showcase.png

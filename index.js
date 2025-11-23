@@ -13,6 +13,7 @@ import ora from "ora";
 import { chromium } from "playwright";
 import { extractBranding } from "./lib/extractors.js";
 import { displayResults } from "./lib/display.js";
+import { transformToFigmaFormat } from "./lib/figma-exporter.js";
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 
@@ -26,6 +27,7 @@ program
   .option("--verbose-colors", "Show medium and low confidence colors")
   .option("--dark-mode", "Extract colors from dark mode")
   .option("--mobile", "Extract from mobile viewport")
+  .option("--figma", "Generate Figma plugin-ready JSON output")
   .action(async (input, opts) => {
     let url = input;
     if (!url.match(/^https?:\/\//)) url = "https://" + url;
@@ -114,6 +116,39 @@ program
               )}`
             )
           );
+
+          // Generate Figma plugin JSON if --figma flag is present
+          if (opts.figma) {
+            try {
+              const figmaData = transformToFigmaFormat(result);
+              const figmaFilename = `${timestamp}-figma.json`;
+              const figmaFilepath = join(outputDir, figmaFilename);
+              writeFileSync(figmaFilepath, JSON.stringify(figmaData, null, 2));
+
+              console.log(
+                chalk.dim(
+                  `🎨 Figma JSON saved to: ${chalk.cyan(
+                    `output/${domain}/${figmaFilename}`
+                  )}`
+                )
+              );
+              console.log(chalk.green("\n✨ Ready for Figma import!"));
+              console.log(
+                chalk.dim(
+                  "   To use: Open Figma → Plugins → Dembrandt Design System Importer"
+                )
+              );
+              console.log(
+                chalk.dim(
+                  `   Or paste the JSON content from: output/${domain}/${figmaFilename}`
+                )
+              );
+            } catch (err) {
+              console.log(
+                chalk.yellow(`⚠ Could not generate Figma JSON: ${err.message}`)
+              );
+            }
+          }
         } catch (err) {
           console.log(
             chalk.yellow(`⚠ Could not save JSON file: ${err.message}`)
