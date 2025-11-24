@@ -14,6 +14,7 @@
 - Enhanced retry logic for empty content
 - Better SPA hydration detection
 - Test suite refocused on SPA and interactive sites
+- Lowered content validation threshold from 500 to 100 chars for minimal-text sites
 
 ## [0.2.0] - 2025-11-22
 
