@@ -4,16 +4,12 @@
 import { execSync } from "child_process";
 
 const sites = [
-  "linkedin.com/jobs",
-  "amazon.com/Best-Sellers/zgbs",
-  "instagram.com/explore",
-  "x.com/explore",
-  "tiktok.com/discover",
-  "reddit.com",
-  "youtube.com/feed/trending",
-  "airbnb.com/s/homes",
-  "booking.com/searchresults.html?dest_type=city&dest_id=-1746443",
-  "imdb.com/chart/top",
+  "tesla.com/model3/design#overview", // SPA, WebGL/3D, bot protection
+  "dribbble.com", // interactive previews, heavy JS
+  "soundcloud.com/discover", // SPA, media streaming, async loading
+  "airtable.com/templates", // SaaS grids, dynamic content
+  "producthunt.com", // SPA, async product listings
+  "behance.net", // portfolios, AJAX-loaded content
 ];
 
 let passed = 0;

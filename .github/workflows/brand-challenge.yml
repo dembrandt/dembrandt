@@ -43,13 +43,26 @@ jobs:
           echo "## Dembrandt Global Challenge Result" >> $GITHUB_STEP_SUMMARY
           echo "### Score: **${{ env.SCORE }}**" >> $GITHUB_STEP_SUMMARY
           if [[ "${{ env.SCORE }}" == "100/100" ]]; then
-            echo "LEGENDARY — You beat the 10 hardest public sites on Earth!" >> $GITHUB_STEP_SUMMARY
+            echo "🏆 **LEGENDARY** — You beat the 10 hardest public sites on Earth!" >> $GITHUB_STEP_SUMMARY
           elif [[ "${{ env.SCORE }}" == "90/100" ]]; then
-            echo "ELITE — World-class extractor" >> $GITHUB_STEP_SUMMARY
+            echo "⭐ **ELITE** — World-class extractor" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ env.SCORE }}" =~ ^[7-9][0-9]/100$ ]]; then
+            echo "💪 **STRONG** — Better than 99% of public tools" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "🔧 **IMPROVING** — Keep going!" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "<details><summary>Click to see full log</summary>" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`text" >> $GITHUB_STEP_SUMMARY
-          cat challenge-report.txt >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "</details>" >> $GITHUB_STEP_SUMMARY
+
+          # Extract summary stats only (not full verbose output)
+          echo "### Results by Site" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Site | Status | Time |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|------|" >> $GITHUB_STEP_SUMMARY
+
+          # Parse results from the report
+          grep -E "\[([0-9]+)/([0-9]+)\] Testing →|SUCCESS|FAILED" challenge-report.txt | \
+          awk '/Testing →/ {site=$NF; getline; getline; if(/SUCCESS/) {print "| " site " | ✅ Success | " $3 " |"} else if(/FAILED/) {print "| " site " | ❌ Failed | " $3 " |"}}' \
+          >> $GITHUB_STEP_SUMMARY || echo "| - | - | - |" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 **Full report available in artifacts** (download above)" >> $GITHUB_STEP_SUMMARY
