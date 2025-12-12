@@ -1,4 +1,4 @@
-# 🎨 Dembrandt
+# Dembrandt.
 
 [![npm version](https://img.shields.io/npm/v/dembrandt.svg)](https://www.npmjs.com/package/dembrandt)
 [![npm downloads](https://img.shields.io/npm/dm/dembrandt.svg)](https://www.npmjs.com/package/dembrandt)

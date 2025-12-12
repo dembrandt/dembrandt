@@ -19,7 +19,7 @@ import { join } from "path";
 program
   .name("dembrandt")
   .description("Extract design tokens from any website")
-  .version("0.4.0")
+  .version("0.5.0")
   .argument("<url>")
   .option("--json-only", "Output raw JSON")
   .option("--save-output", "Save JSON file to output folder")
