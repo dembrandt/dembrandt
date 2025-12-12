@@ -35,6 +35,7 @@ Requires Node.js 18+
 dembrandt <url>                    # Basic extraction (terminal display only)
 dembrandt bmw.de --json-only       # Output raw JSON to terminal (no formatted display, no file save)
 dembrandt bmw.de --save-output     # Save JSON to output/bmw.de/YYYY-MM-DDTHH-MM-SS.json
+dembrandt bmw.de --dtcg            # Export in W3C Design Tokens (DTCG) format (auto-saves as .tokens.json)
 dembrandt bmw.de --dark-mode       # Extract colors from dark mode variant
 dembrandt bmw.de --mobile          # Use mobile viewport (390x844, iPhone 12/13/14/15) for responsive analysis
 dembrandt bmw.de --slow            # 3x longer timeouts (24s hydration) for JavaScript-heavy sites
@@ -42,6 +43,24 @@ dembrandt bmw.de --no-sandbox      # Disable Chromium sandbox (required for Dock
 ```
 
 Default: formatted terminal display only. Use `--save-output` to persist results as JSON files. Browser automatically retries in visible mode if headless extraction fails.
+
+### W3C Design Tokens (DTCG) Format
+
+Use `--dtcg` to export in the standardized [W3C Design Tokens Community Group](https://www.designtokens.org/) format:
+
+```bash
+dembrandt stripe.com --dtcg
+# Saves to: output/stripe.com/TIMESTAMP.tokens.json
+```
+
+Transform DTCG tokens to platform-specific formats using [Style Dictionary](https://styledictionary.com):
+
+```bash
+# Generate CSS variables, SCSS, JavaScript, TypeScript
+npm run build:tokens
+```
+
+Outputs CSS custom properties, SCSS variables, ES6 modules, and TypeScript definitions. See [STYLE-DICTIONARY.md](STYLE-DICTIONARY.md) for details.
 
 ## Use Cases
 

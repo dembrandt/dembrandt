@@ -13,6 +13,7 @@ import ora from "ora";
 import { chromium } from "playwright-core";
 import { extractBranding } from "./lib/extractors.js";
 import { displayResults } from "./lib/display.js";
+import { toW3CFormat } from "./lib/w3c-exporter.js";
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 
@@ -23,6 +24,7 @@ program
   .argument("<url>")
   .option("--json-only", "Output raw JSON")
   .option("--save-output", "Save JSON file to output folder")
+  .option("--dtcg", "Export in W3C Design Tokens (DTCG) format")
   .option("--dark-mode", "Extract colors from dark mode")
   .option("--mobile", "Extract from mobile viewport")
   .option("--slow", "3x longer timeouts for slow-loading sites")
@@ -85,8 +87,11 @@ program
 
       console.log();
 
-      // Save JSON output only if --save-output is specified
-      if (opts.saveOutput && !opts.jsonOnly) {
+      // Convert to W3C format if requested
+      const outputData = opts.dtcg ? toW3CFormat(result) : result;
+
+      // Save JSON output if --save-output or --dtcg is specified
+      if ((opts.saveOutput || opts.dtcg) && !opts.jsonOnly) {
         try {
           const domain = new URL(url).hostname.replace("www.", "");
           const timestamp = new Date()
@@ -97,9 +102,10 @@ program
           const outputDir = join(process.cwd(), "output", domain);
           mkdirSync(outputDir, { recursive: true });
 
-          const filename = `${timestamp}.json`;
+          const suffix = opts.dtcg ? '.tokens' : '';
+          const filename = `${timestamp}${suffix}.json`;
           const filepath = join(outputDir, filename);
-          writeFileSync(filepath, JSON.stringify(result, null, 2));
+          writeFileSync(filepath, JSON.stringify(outputData, null, 2));
 
           console.log(
             chalk.dim(
@@ -117,7 +123,7 @@ program
 
       // Output to terminal
       if (opts.jsonOnly) {
-        console.log(JSON.stringify(result, null, 2));
+        console.log(JSON.stringify(outputData, null, 2));
       } else {
         console.log();
         displayResults(result);
