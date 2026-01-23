@@ -99,7 +99,7 @@ program
       const outputData = opts.dtcg ? toW3CFormat(result) : result;
 
       // Save JSON output if --save-output or --dtcg is specified
-      if ((opts.saveOutput || opts.dtcg) && !opts.jsonOnly) {
+      if (opts.saveOutput || opts.dtcg) {
         try {
           const domain = new URL(url).hostname.replace("www.", "");
           const timestamp = new Date()
