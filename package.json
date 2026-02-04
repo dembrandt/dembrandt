@@ -15,7 +15,8 @@
     "start": "node index.js",
     "brand-challenge": "node run-no-login-challenge.mjs",
     "brand-challenge:report": "node run-no-login-challenge.mjs || true",
-    "install-browser": "npx playwright install chromium firefox || echo 'Playwright browser installation failed. You may need to install system dependencies manually.'"
+    "install-browser": "npx playwright install chromium firefox || echo 'Playwright browser installation failed. You may need to install system dependencies manually.'",
+    "local-ui": "cd local-ui && npm start"
   },
   "keywords": [
     "design-tokens",
