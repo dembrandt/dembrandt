@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 interface ExtractionResult {
   url: string
@@ -97,12 +97,14 @@ const getHashRoute = () => {
 }
 
 function App() {
-  const [url, setUrl] = useState('')
-  const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<ExtractionResult | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [dropdownIndex, setDropdownIndex] = useState(0)
+  const [gridIndex, setGridIndex] = useState(0)
   const [savedFiles, setSavedFiles] = useState<SavedFileEntry[]>([])
   const [loadingSavedFiles, setLoadingSavedFiles] = useState(false)
+  const isLoadingRef = useRef(false)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('dembrandt_theme') as 'dark' | 'light') || 'dark'
@@ -118,6 +120,8 @@ function App() {
   // Handle hash changes for navigation
   useEffect(() => {
     const handleHashChange = async () => {
+      // Skip if loadSavedFile already handled this navigation
+      if (isLoadingRef.current) { isLoadingRef.current = false; return }
       const route = getHashRoute()
       if (route.view === 'home') {
         setResult(null)
@@ -128,6 +132,7 @@ function App() {
           try {
             const response = await fetch(`http://localhost:3001/api/saved-extractions/${match.domain}/${match.filename}`)
             const rawData = await response.json()
+            setSelectedFileId(match.id)
             setResult(normalizeResult(rawData))
           } catch (e) {
             console.error('Failed to load file:', e)
@@ -147,9 +152,88 @@ function App() {
 
   const navigateHome = useCallback(() => {
     setResult(null)
-    setUrl('')
+    setSelectedFileId(null)
     window.location.hash = ''
   }, [])
+
+  // Navigate to adjacent extraction
+  const navigateToAdjacent = useCallback((direction: 'prev' | 'next') => {
+    if (!result || savedFiles.length === 0) return
+    const currentDomain = getDomain(result.url)
+    const currentIndex = savedFiles.findIndex(f => getDomain(f.url) === currentDomain)
+    if (currentIndex === -1) return
+
+    const newIndex = direction === 'next'
+      ? (currentIndex + 1) % savedFiles.length
+      : (currentIndex - 1 + savedFiles.length) % savedFiles.length
+    loadSavedFile(savedFiles[newIndex])
+  }, [result, savedFiles])
+
+  // WASD + Arrow keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+
+      const key = e.key.toLowerCase()
+
+      // Dropdown navigation when open
+      if (dropdownOpen && savedFiles.length > 0) {
+        if (e.key === 'ArrowLeft' || key === 'a') {
+          e.preventDefault()
+          setDropdownIndex(prev => (prev - 1 + savedFiles.length) % savedFiles.length)
+        } else if (e.key === 'ArrowRight' || key === 'd') {
+          e.preventDefault()
+          setDropdownIndex(prev => (prev + 1) % savedFiles.length)
+        } else if (e.key === 'Enter') {
+          e.preventDefault()
+          loadSavedFile(savedFiles[dropdownIndex])
+          setDropdownOpen(false)
+        } else if (e.key === 'Escape') {
+          e.preventDefault()
+          setDropdownOpen(false)
+        }
+        return
+      }
+
+      // Landing page grid navigation (when no result selected)
+      if (!result && savedFiles.length > 0) {
+        if (key === 'a' || e.key === 'ArrowLeft') {
+          e.preventDefault()
+          setGridIndex(prev => (prev - 1 + savedFiles.length) % savedFiles.length)
+        } else if (key === 'd' || e.key === 'ArrowRight') {
+          e.preventDefault()
+          setGridIndex(prev => (prev + 1) % savedFiles.length)
+        } else if (key === 's' || e.key === 'ArrowDown' || e.key === 'Enter') {
+          e.preventDefault()
+          loadSavedFile(savedFiles[gridIndex])
+        }
+        return
+      }
+
+      // Global navigation when dropdown closed and result is shown
+      if (key === 'w') {
+        e.preventDefault()
+        navigateHome()
+      } else if (key === 's') {
+        e.preventDefault()
+        if (result) {
+          // Set initial index to current item
+          const currentIndex = savedFiles.findIndex(f => getDomain(f.url) === getDomain(result.url))
+          setDropdownIndex(currentIndex >= 0 ? currentIndex : 0)
+          setDropdownOpen(true)
+        }
+      } else if (key === 'a') {
+        e.preventDefault()
+        if (result) navigateToAdjacent('prev')
+      } else if (key === 'd') {
+        e.preventDefault()
+        if (result) navigateToAdjacent('next')
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [result, navigateToAdjacent, navigateHome, dropdownOpen, dropdownIndex, savedFiles])
 
 
 
@@ -167,13 +251,16 @@ function App() {
   }
 
   const loadSavedFile = async (file: SavedFileEntry) => {
+    setSelectedFileId(file.id)
+    isLoadingRef.current = true
+    // Clear stale data immediately — title updates before fetch completes
+    setResult({ url: file.url, extractedAt: file.extractedAt } as ExtractionResult)
     try {
       const response = await fetch(`http://localhost:3001/api/saved-extractions/${file.domain}/${file.filename}`)
       const rawData = await response.json()
       navigateToSite(normalizeResult(rawData))
     } catch (e) {
       console.error('Failed to load saved file:', e)
-      setError(e instanceof Error ? e.message : 'Failed to load file')
     }
   }
 
@@ -182,33 +269,6 @@ function App() {
     fetchSavedFiles()
   }, [])
 
-
-  const handleExtract = async () => {
-    if (!url.trim()) return
-    setLoading(true)
-    setError(null)
-    setResult(null)
-
-    try {
-      const response = await fetch('http://localhost:3001/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() })
-      })
-      const rawData = await response.json()
-      if (!response.ok) throw new Error(rawData.error || 'Extraction failed')
-      console.log('Extraction result:', rawData)
-      const data = normalizeResult(rawData)
-      // Refresh saved files list to show the new extraction
-      await fetchSavedFiles()
-      navigateToSite(data)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Extraction failed')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const colors = result?.colors?.palette || []
   const typography = result?.typography?.styles || []
   const fontFamily = typography[0]?.family || 'system-ui, sans-serif'
@@ -216,28 +276,135 @@ function App() {
   const spacing = result?.spacing?.commonValues || []
   const borderRadius = result?.borderRadius?.values || []
 
+  const navSections = result ? [
+    ...((result.logo || (result.favicons && result.favicons.length > 0)) ? [{ id: 'logo', label: 'Logo' }] : []),
+    ...(result.favicons && result.favicons.length > 0 ? [{ id: 'favicons', label: 'Favicons' }] : []),
+    { id: 'colors', label: 'Colors' },
+    { id: 'typography', label: 'Typography' },
+    { id: 'spacing', label: 'Spacing' },
+    { id: 'shadows', label: 'Shadows' },
+    { id: 'border-radius', label: 'Border Radius' },
+    ...(result.components?.buttons && result.components.buttons.length > 0 ? [{ id: 'buttons', label: 'Buttons' }] : []),
+    ...(result.components?.links && result.components.links.length > 0 ? [{ id: 'links', label: 'Links' }] : []),
+    ...(result.frameworks && result.frameworks.length > 0 ? [{ id: 'frameworks', label: 'Frameworks' }] : []),
+    ...(result.iconSystem && result.iconSystem.length > 0 ? [{ id: 'icon-systems', label: 'Icon Systems' }] : []),
+    ...(result.breakpoints && result.breakpoints.length > 0 ? [{ id: 'breakpoints', label: 'Breakpoints' }] : []),
+  ] : []
+
   return (
     <div className="min-h-screen bg-background text-primary">
       {/* Global Header - Always Dark */}
       <header className="border-b border-[#1a1a24] bg-[#0a0a0f] backdrop-blur-xl fixed top-0 left-0 right-0 z-50">
-        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+        <div className="max-w-[2560px] mx-auto px-6 h-14 flex items-center justify-between">
           {/* Left: Logo + Breadcrumbs */}
           <nav className="flex items-center gap-2 min-w-0">
             <button
               onClick={navigateHome}
-              className="flex items-center gap-2.5 text-white hover:opacity-80 transition-opacity shrink-0"
+              className="flex items-center gap-2.5 text-white hover:opacity-80 transition-opacity shrink-0 cursor-pointer"
             >
               <img src="/logo.png" alt="Dembrandt" className="h-5 w-auto" />
             </button>
 
-            {/* Breadcrumbs */}
+            {/* WASD Legend */}
+            <div className="hidden sm:flex items-center gap-1 text-xs text-[#a0a0b2] ml-2">
+              <kbd className="px-1.5 py-0.5 bg-[#1a1a24] border border-[#2a2a34] rounded text-[#c0c0cc]">W</kbd>
+              <span>home</span>
+              <kbd className="px-1.5 py-0.5 bg-[#1a1a24] border border-[#2a2a34] rounded text-[#c0c0cc] ml-2">S</kbd>
+              <span>select</span>
+              <kbd className="px-1.5 py-0.5 bg-[#1a1a24] border border-[#2a2a34] rounded text-[#c0c0cc] ml-2">A</kbd>
+              <kbd className="px-1.5 py-0.5 bg-[#1a1a24] border border-[#2a2a34] rounded text-[#c0c0cc]">D</kbd>
+              <span>nav</span>
+            </div>
+
+            {/* Dropdown selector */}
             {result && (
               <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[#6b6b7e] shrink-0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[#a0a0b2] shrink-0">
                   <path d="M9 6l6 6-6 6"/>
                 </svg>
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-[#8b8b9e] text-sm truncate">{getDomain(result.url)}</span>
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      if (!dropdownOpen) {
+                        const currentIndex = savedFiles.findIndex(f => getDomain(f.url) === getDomain(result.url))
+                        setDropdownIndex(currentIndex >= 0 ? currentIndex : 0)
+                      }
+                      setDropdownOpen(!dropdownOpen)
+                    }}
+                    className="flex items-center gap-2 text-white text-sm bg-[#1a1a24] border border-[#2a2a34] rounded-md px-3 py-1.5 hover:border-[#3a3a44] transition-colors min-w-[180px] cursor-pointer"
+                  >
+                    <img
+                      src={`https://www.google.com/s2/favicons?domain=${getDomain(result.url)}&sz=32`}
+                      alt=""
+                      className="w-4 h-4 rounded"
+                      onError={(e) => e.currentTarget.style.display = 'none'}
+                    />
+                    <span className="truncate flex-1 text-left">{getBrandName(result.url)}</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-[#a0a0b2] transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}>
+                      <path d="M6 9l6 6 6-6"/>
+                    </svg>
+                  </button>
+                  {dropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
+                      <div className="absolute top-full left-0 mt-1 bg-[#12121a] border border-[#2a2a34] rounded-md shadow-2xl z-50 min-w-[220px] max-h-[calc(100vh-80px)] overflow-y-auto py-1">
+                        {savedFiles.map((file, index) => {
+                          const isActive = file.id === selectedFileId
+                          const isFocused = index === dropdownIndex
+                          return (
+                            <button
+                              key={file.id}
+                              onClick={() => {
+                                loadSavedFile(file)
+                                setDropdownOpen(false)
+                              }}
+                              onMouseEnter={() => setDropdownIndex(index)}
+                              className={`w-full text-left px-2.5 py-2 text-sm flex items-center gap-2.5 transition-colors mx-1 rounded cursor-pointer ${
+                                isFocused
+                                  ? 'bg-[#1a1a24] text-white'
+                                  : 'text-[#a0a0b0] hover:text-white hover:bg-[#1a1a24]'
+                              } ${isActive ? 'font-bold' : ''}`}
+                              style={{ width: 'calc(100% - 8px)' }}
+                            >
+                              <img
+                                src={`https://www.google.com/s2/favicons?domain=${file.domain}&sz=32`}
+                                alt=""
+                                className="w-4 h-4 rounded"
+                                onError={(e) => e.currentTarget.style.display = 'none'}
+                              />
+                              <span className="truncate flex-1">{getBrandName(file.url)}</span>
+                              {isActive && (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-brand shrink-0">
+                                  <path d="M20 6L9 17l-5-5"/>
+                                </svg>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+                {/* Navigation buttons */}
+                <div className="flex items-center gap-1 ml-2">
+                  <button
+                    onClick={() => navigateToAdjacent('prev')}
+                    className="text-[#a0a0b2] hover:text-white p-2 rounded hover:bg-[#1a1a24] transition-colors cursor-pointer"
+                    title="Previous (A)"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M15 18l-6-6 6-6"/>
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => navigateToAdjacent('next')}
+                    className="text-[#a0a0b2] hover:text-white p-2 rounded hover:bg-[#1a1a24] transition-colors cursor-pointer"
+                    title="Next (D)"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M9 6l6 6-6 6"/>
+                    </svg>
+                  </button>
                 </div>
               </>
             )}
@@ -250,17 +417,17 @@ function App() {
                 href={result.url.startsWith('http') ? result.url : `https://${result.url}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[#8b8b9e] hover:text-white transition-colors p-1.5 rounded-md hover:bg-[#1a1a24]"
+                className="text-[#a0a0b2] hover:text-white transition-colors p-2 rounded-md hover:bg-[#1a1a24] cursor-pointer"
                 title="Open original site"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
                 </svg>
               </a>
             )}
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="text-[#8b8b9e] hover:text-white transition-colors p-1.5 rounded-md hover:bg-[#1a1a24]"
+              className="text-[#a0a0b2] hover:text-white transition-colors p-2 rounded-md hover:bg-[#1a1a24] cursor-pointer"
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {theme === 'dark' ? (
@@ -284,50 +451,9 @@ function App() {
           {/* Input Section */}
           {!result && (
             <div className="text-center py-16">
-              <div className="flex items-center justify-center mb-4">
-                <img src="/logo.png" alt="Dembrandt" className="h-10 w-auto" />
-              </div>
-              <p className="text-secondary mb-10 max-w-xl mx-auto">
-                Extract colors, typography, and brand assets from any website
+              <p className="text-secondary mb-12 max-w-xl mx-auto">
+                Run <code className="text-brand">dembrandt &lt;url&gt; --save-output</code> to add extractions
               </p>
-
-              <div className="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto mb-6">
-                <div className="relative flex-1">
-                  <input
-                    type="text"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="stripe.com"
-                    autoFocus
-                    className="w-full px-4 py-3.5 pr-10 rounded-lg bg-surface border border-border-strong text-primary placeholder:text-tertiary focus:outline-none focus:border-brand"
-                    onKeyDown={(e) => e.key === 'Enter' && handleExtract()}
-                  />
-                  {url && (
-                    <button
-                      onClick={() => setUrl('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-tertiary hover:text-secondary p-1"
-                      title="Clear"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M18 6L6 18M6 6l12 12"/>
-                      </svg>
-                    </button>
-                  )}
-                </div>
-                <button
-                  onClick={handleExtract}
-                  disabled={loading || !url.trim()}
-                  className="px-6 py-3.5 rounded-lg bg-brand hover:bg-brand/90 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? 'Extracting...' : 'Extract'}
-                </button>
-              </div>
-
-              {error && (
-                <div className="mt-6 p-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm max-w-lg mx-auto">
-                  {error}
-                </div>
-              )}
 
               {/* Saved Files from output/ directory */}
               {savedFiles.length > 0 && (
@@ -337,20 +463,23 @@ function App() {
                     <button
                       onClick={fetchSavedFiles}
                       disabled={loadingSavedFiles}
-                      className="text-tertiary hover:text-brand text-xs transition-colors disabled:opacity-50"
+                      className="text-tertiary hover:text-brand text-xs transition-colors disabled:opacity-50 cursor-pointer"
                     >
                       {loadingSavedFiles ? 'Loading...' : 'Refresh'}
                     </button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {savedFiles.map((file) => (
+                    {savedFiles.map((file, index) => (
                       <div
                         key={file.id}
-                        className="bg-card rounded-2xl p-5 cursor-pointer hover:bg-card-hover transition-colors group relative text-left"
+                        className={`bg-card rounded-2xl p-5 cursor-pointer hover:bg-card-hover transition-all group relative text-left ${
+                          index === gridIndex ? 'ring-2 ring-brand ring-offset-2 ring-offset-background' : ''
+                        }`}
                         onClick={() => loadSavedFile(file)}
+                        onMouseEnter={() => setGridIndex(index)}
                       >
                         <div className="mb-2">
-                          <img 
+                          <img
                              src={`https://www.google.com/s2/favicons?domain=${file.domain}&sz=64`}
                              alt=""
                              className="w-8 h-8 rounded-lg"
@@ -381,34 +510,79 @@ function App() {
               </div>
 
               {/* Sections */}
-              <div className="space-y-12 max-w-2xl mx-auto">
+              <div className="flex gap-8">
+                <div className="hidden lg:block w-32 shrink-0">
+                <nav className="sticky top-20 pt-1">
+                  {navSections.map(s => (
+                    <a
+                      key={s.id}
+                      href={`#${s.id}`}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }}
+                      className="block text-xs text-tertiary hover:text-primary transition-colors py-1 cursor-pointer"
+                    >
+                      {s.label}
+                    </a>
+                  ))}
+                </nav>
+                </div>
+                <div className="space-y-12 max-w-2xl w-full mx-auto lg:mx-0">
                 {/* Logo */}
-                {result.logo && (
-                  <section>
-                    <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Logo</h3>
-                    <div className="bg-card rounded-2xl p-6 inline-block">
-                      <img 
-                        src={result.logo.url} 
-                        alt="Brand logo" 
-                        className="max-w-full max-h-32 object-contain"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none'
-                          const parent = e.currentTarget.parentElement
-                          if (parent) {
-                            parent.innerHTML = '<p class="text-tertiary text-sm">Logo image unavailable</p>'
-                          }
-                        }}
-                      />
-                    </div>
-                    <p className="text-tertiary text-sm mt-3">
-                      {result.logo.width}×{result.logo.height}px • <a href={result.logo.url} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">View source</a>
-                    </p>
-                  </section>
-                )}
+                {(result.logo || (result.favicons && result.favicons.length > 0)) && (() => {
+                  // Check if logo URL is actually an image (not a homepage link)
+                  const logoUrl = result.logo?.url || ''
+                  const isImageUrl = logoUrl.match(/\.(svg|png|jpg|jpeg|gif|webp|ico)(\?|$)/i) || logoUrl.includes('/image') || logoUrl.includes('/logo')
+                  const hasValidLogo = result.logo && isImageUrl
+                  const bestFavicon = result.favicons?.find(f => f.sizes?.includes('192') || f.sizes?.includes('180')) || result.favicons?.[0]
+
+                  return (
+                    <section id="logo">
+                      <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Logo</h3>
+                      <div className="bg-card rounded-2xl p-6 inline-block">
+                        {hasValidLogo ? (
+                          <img
+                            src={`http://localhost:3001/api/proxy-image?url=${encodeURIComponent(logoUrl)}`}
+                            alt="Brand logo"
+                            width={result.logo!.width || 200}
+                            height={result.logo!.height || 60}
+                            className="max-w-full max-h-32 object-contain"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none'
+                              const parent = e.currentTarget.parentElement
+                              if (parent) {
+                                parent.innerHTML = '<p class="text-tertiary text-sm">Logo image unavailable</p>'
+                              }
+                            }}
+                          />
+                        ) : bestFavicon ? (
+                          <img
+                            src={`http://localhost:3001/api/proxy-image?url=${encodeURIComponent(bestFavicon.url)}`}
+                            alt="Brand favicon"
+                            className="w-24 h-24 object-contain"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none'
+                            }}
+                          />
+                        ) : (
+                          <p className="text-tertiary text-sm">No logo available</p>
+                        )}
+                      </div>
+                      {hasValidLogo ? (
+                        <p className="text-tertiary text-sm mt-3">
+                          {result.logo!.width}×{result.logo!.height}px • <a href={logoUrl} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">View source</a>
+                        </p>
+                      ) : (
+                        <p className="text-tertiary text-sm mt-3">Favicon (inline SVG logo)</p>
+                      )}
+                    </section>
+                  )
+                })()}
 
                 {/* Favicons */}
                 {result.favicons && result.favicons.length > 0 && (
-                  <section>
+                  <section id="favicons">
                     <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Favicons ({result.favicons.length})</h3>
                     <div className="flex flex-wrap gap-3">
                       {result.favicons.filter(f => f.url && !f.url.includes('og:') && !f.url.includes('twitter:')).slice(0, 6).map((f, i) => (
@@ -419,7 +593,7 @@ function App() {
                 )}
 
                 {/* Colors */}
-                <section>
+                <section id="colors">
                   <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Colors ({colors.length})</h3>
                   <div className="flex flex-wrap gap-3">
                     {colors.length > 0 ? colors.map((c, i) => (
@@ -434,6 +608,7 @@ function App() {
                             <div className="text-white font-mono mb-1">{c.normalized || c.color}</div>
                             {c.lch && <div className="text-[#8b8b9e] font-mono">{c.lch}</div>}
                             {c.oklch && <div className="text-[#8b8b9e] font-mono">{c.oklch}</div>}
+                            <div className="text-[#6b6b7e] mt-1.5">click to copy</div>
                           </div>
                         </div>
                       </div>
@@ -444,7 +619,7 @@ function App() {
                 </section>
 
                 {/* Typography */}
-                <section>
+                <section id="typography">
                   <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Typography ({typography.length})</h3>
                   <p className="text-primary font-medium font-mono text-lg mb-4">{fontFamily}</p>
                   <div className="space-y-4">
@@ -469,7 +644,7 @@ function App() {
                 </section>
 
                 {/* Spacing */}
-                <section>
+                <section id="spacing">
                   <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Spacing ({spacing.length})</h3>
                   <div className="flex flex-wrap gap-2">
                     {spacing.length > 0 ? spacing.map((s, i) => (
@@ -487,7 +662,7 @@ function App() {
                 </section>
 
                 {/* Shadows */}
-                <section>
+                <section id="shadows">
                   <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Shadows ({shadows.length})</h3>
                   {shadows.length > 0 ? (
                     <div className="bg-shadow-preview-bg rounded-xl p-6 flex flex-wrap gap-4">
@@ -507,7 +682,7 @@ function App() {
                 </section>
 
                 {/* Border Radius */}
-                <section>
+                <section id="border-radius">
                   <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Border Radius ({borderRadius.length})</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                     {borderRadius.length > 0 ? borderRadius.map((r: any, i) => (
@@ -530,7 +705,7 @@ function App() {
 
                 {/* Buttons */}
                 {result.components?.buttons && result.components.buttons.length > 0 && (
-                  <section>
+                  <section id="buttons">
                     <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Buttons ({result.components.buttons.length})</h3>
                     <div className="flex flex-wrap gap-4">
                       {result.components.buttons.map((b, i) => {
@@ -579,7 +754,7 @@ function App() {
 
                 {/* Links */}
                 {result.components?.links && result.components.links.length > 0 && (
-                  <section>
+                  <section id="links">
                     <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Links ({result.components.links.length})</h3>
                     <div className="flex flex-wrap gap-x-8 gap-y-4">
                       {result.components.links.map((l, i) => {
@@ -613,7 +788,7 @@ function App() {
 
                 {/* Frameworks */}
                 {result.frameworks && result.frameworks.length > 0 && (
-                  <section>
+                  <section id="frameworks">
                     <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Frameworks</h3>
                     <div className="flex flex-wrap gap-2">
                       {result.frameworks.map((f, i) => (
@@ -627,7 +802,7 @@ function App() {
 
                 {/* Icon Systems */}
                 {result.iconSystem && result.iconSystem.length > 0 && (
-                  <section>
+                  <section id="icon-systems">
                     <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Icon Systems</h3>
                     <div className="flex flex-wrap gap-2">
                       {result.iconSystem.map((ic, i) => (
@@ -641,7 +816,7 @@ function App() {
 
                 {/* Breakpoints */}
                 {result.breakpoints && result.breakpoints.length > 0 && (
-                  <section>
+                  <section id="breakpoints">
                     <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Breakpoints ({result.breakpoints.length})</h3>
                     <div className="flex flex-wrap gap-2">
                       {result.breakpoints.map((b, i) => (
@@ -652,6 +827,7 @@ function App() {
                     </div>
                   </section>
                 )}
+                </div>
               </div>
 
             </>

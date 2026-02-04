@@ -80,6 +80,36 @@ app.get('/api/saved-extractions/:domain/:filename', async (req, res) => {
 })
 
 
+// Proxy images to bypass CORS restrictions
+app.get('/api/proxy-image', async (req, res) => {
+  const imageUrl = req.query.url
+  if (!imageUrl) {
+    return res.status(400).json({ error: 'URL parameter required' })
+  }
+
+  try {
+    const response = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+      }
+    })
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Failed to fetch image' })
+    }
+
+    const contentType = response.headers.get('content-type')
+    res.setHeader('Content-Type', contentType || 'image/png')
+    res.setHeader('Cache-Control', 'public, max-age=86400')
+
+    const buffer = await response.arrayBuffer()
+    res.send(Buffer.from(buffer))
+  } catch (error) {
+    console.error('Proxy error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
 app.post('/extract', async (req, res) => {
   const { url, options = {} } = req.body
 

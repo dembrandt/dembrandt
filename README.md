@@ -82,6 +82,43 @@ dembrandt stripe.com --dtcg
 
 The DTCG format is an industry-standard JSON schema that can be consumed by design tools and token transformation libraries like [Style Dictionary](https://styledictionary.com).
 
+## Local UI
+
+Browse your extracted brands in a visual interface.
+
+### Setup
+
+```bash
+cd local-ui
+npm install
+```
+
+### Running
+
+Start both the API server and UI:
+
+```bash
+# Terminal 1: Start API server (port 3001)
+node server.js
+
+# Terminal 2: Start UI dev server (port 5173)
+npm run dev
+```
+
+Open http://localhost:5173 to browse saved extractions.
+
+### Features
+
+- Visual grid of all extracted brands
+- Color palettes with click-to-copy
+- Typography specimens
+- Spacing, shadows, border radius visualization
+- Button and link component previews
+- Dark/light theme toggle
+- Section nav links on extraction pages — jump directly to Colors, Typography, Shadows, etc. via a sticky sidebar
+
+Extractions are performed via CLI (`dembrandt <url> --save-output`) and automatically appear in the UI.
+
 ## Use Cases
 
 - Brand audits & competitive analysis
