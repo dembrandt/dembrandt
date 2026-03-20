@@ -21,7 +21,7 @@ import { join } from "path";
 program
   .name("dembrandt")
   .description("Extract design tokens from any website")
-  .version("0.6.1")
+  .version("0.7.0")
   .argument("<url>")
   .option("--browser <type>", "Browser to use (chromium|firefox)", "chromium")
   .option("--json-only", "Output raw JSON")
