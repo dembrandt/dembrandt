@@ -14,6 +14,7 @@ import { chromium, firefox } from "playwright-core";
 import { extractBranding } from "./lib/extractors.js";
 import { displayResults } from "./lib/display.js";
 import { toW3CFormat } from "./lib/w3c-exporter.js";
+import { generatePDF } from "./lib/pdf.js";
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 
@@ -29,6 +30,7 @@ program
   .option("--dark-mode", "Extract colors from dark mode")
   .option("--mobile", "Extract from mobile viewport")
   .option("--slow", "3x longer timeouts for slow-loading sites")
+  .option("--brand-guide", "Export a brand guide PDF")
   .option("--no-sandbox", "Disable browser sandbox (needed for Docker/CI)")
   .action(async (input, opts) => {
     let url = input;
@@ -125,6 +127,35 @@ program
         } catch (err) {
           console.log(
             chalk.hex('#FFB86C')(`⚠ Could not save JSON file: ${err.message}`)
+          );
+        }
+      }
+
+      // Generate PDF brand guide
+      if (opts.brandGuide) {
+        try {
+          const pdfDomain = new URL(url).hostname.replace("www.", "");
+          const now = new Date();
+          const pdfDate = now.toISOString().slice(0, 10);
+          const pdfTime = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
+          const pdfDir = join(process.cwd(), "output", pdfDomain);
+          mkdirSync(pdfDir, { recursive: true });
+          const pdfFilename = `${pdfDomain}-brand-guide-${pdfDate}-${pdfTime}.pdf`;
+          const pdfPath = join(pdfDir, pdfFilename);
+          spinner.start("Generating PDF brand guide...");
+          await generatePDF(result, pdfPath, browser);
+          spinner.stop();
+          console.log(
+            chalk.dim(
+              `PDF saved to: ${chalk.hex('#8BE9FD')(
+                `output/${pdfDomain}/${pdfFilename}`
+              )}`
+            )
+          );
+        } catch (err) {
+          spinner.stop();
+          console.log(
+            chalk.hex('#FFB86C')(`Could not generate PDF: ${err.message}`)
           );
         }
       }
