@@ -9,12 +9,24 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      # 1. Generate baselines from main branch code
+      - run: git checkout origin/main -- index.js lib/
       - run: npm ci
       - run: npx playwright install chromium
+      - run: node test/qa.mjs --baseline
+        name: Generate baselines from main
+
+      # 2. Restore PR branch code, diff against baselines
+      - run: git checkout HEAD -- index.js lib/
       - run: node test/qa.mjs --diff --ci
+        name: Diff PR vs main
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:

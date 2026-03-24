@@ -32,6 +32,8 @@ program
   .option("--slow", "3x longer timeouts for slow-loading sites")
   .option("--brand-guide", "Export a brand guide PDF")
   .option("--no-sandbox", "Disable browser sandbox (needed for Docker/CI)")
+  .option("--raw-colors", "Include all raw colors before filtering in JSON output")
+  .option("--screenshot <path>", "Save a screenshot to the given path")
   .action(async (input, opts) => {
     let url = input;
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
@@ -70,6 +72,8 @@ program
             darkMode: opts.darkMode,
             mobile: opts.mobile,
             slow: opts.slow,
+            screenshotPath: opts.screenshot || null,
+            includeRawColors: opts.rawColors || false,
           });
           break;
         } catch (err) {
