@@ -24,6 +24,8 @@ test-output/
 *.json
 !package*.json
 !examples/*.json
+!test/sites.json
+!test/golden/**/*.json
 
 # Coverage
 coverage/
@@ -36,3 +38,9 @@ build
 
 # Internal
 INTERNAL.md
+
+# QA toolchain
+test/report.html
+test/diff-report.md
+test/.tmp/
+test/report-assets/

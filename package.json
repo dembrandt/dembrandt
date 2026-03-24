@@ -19,7 +19,9 @@
     "local-ui": "cd local-ui && npm start",
     "qa:baseline": "node test/qa.mjs --baseline",
     "qa:diff": "node test/qa.mjs --diff",
-    "qa:site": "node test/qa.mjs --site"
+    "qa:site": "node test/qa.mjs --site",
+    "prerelease": "node test/qa.mjs --diff --ci && npm run brand-challenge",
+    "release": "npm run prerelease && npm publish"
   },
   "keywords": [
     "design-tokens",
