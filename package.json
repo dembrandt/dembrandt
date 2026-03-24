@@ -1,6 +1,6 @@
 {
   "name": "dembrandt",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Extract design tokens and brand assets from any website",
   "main": "index.js",
   "type": "module",
@@ -16,7 +16,10 @@
     "brand-challenge": "node run-no-login-challenge.mjs",
     "brand-challenge:report": "node run-no-login-challenge.mjs || true",
     "install-browser": "npx playwright install chromium firefox || echo 'Playwright browser installation failed. You may need to install system dependencies manually.'",
-    "local-ui": "cd local-ui && npm start"
+    "local-ui": "cd local-ui && npm start",
+    "qa:baseline": "node test/qa.mjs --baseline",
+    "qa:diff": "node test/qa.mjs --diff",
+    "qa:site": "node test/qa.mjs --site"
   },
   "keywords": [
     "design-tokens",
