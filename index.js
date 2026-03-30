@@ -15,6 +15,8 @@ import { extractBranding } from "./lib/extractors.js";
 import { displayResults } from "./lib/display.js";
 import { toW3CFormat } from "./lib/w3c-exporter.js";
 import { generatePDF } from "./lib/pdf.js";
+import { parseSitemap } from "./lib/discovery.js";
+import { mergeResults } from "./lib/merger.js";
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 
@@ -34,6 +36,12 @@ program
   .option("--no-sandbox", "Disable browser sandbox (needed for Docker/CI)")
   .option("--raw-colors", "Include pre-filter raw colors in JSON output")
   .option("--screenshot <path>", "Save a screenshot of the page")
+  .option("--pages <n>", "Analyze up to N total pages including start URL (default: 5)", (v) => {
+    const n = parseInt(v, 10);
+    if (isNaN(n) || n < 1) throw new Error(`--pages must be a positive integer, got: ${v}`);
+    return n;
+  })
+  .option("--sitemap", "Discover pages from sitemap.xml instead of DOM links")
   .action(async (input, opts) => {
     let url = input;
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
@@ -67,13 +75,73 @@ program
         });
 
         try {
+          const isMultiPage = opts.pages || opts.sitemap;
+          const maxPages = (opts.pages || 5) - 1; // -1 because homepage counts
           result = await extractBranding(url, spinner, browser, {
             navigationTimeout: 90000,
             darkMode: opts.darkMode,
             mobile: opts.mobile,
             slow: opts.slow,
             screenshotPath: opts.screenshot,
+            discoverLinks: isMultiPage && !opts.sitemap ? maxPages : null,
           });
+
+          // Multi-page crawl
+          if (isMultiPage && maxPages > 0) {
+            spinner.start("Discovering pages...");
+
+            let additionalUrls;
+            if (opts.sitemap) {
+              // Try post-redirect URL first, fall back to user-provided URL
+              // (sites like spotify.com redirect browser to open.spotify.com
+              // but sitemap lives at www.spotify.com)
+              additionalUrls = await parseSitemap(result.url, maxPages);
+              if (additionalUrls.length === 0 && result.url !== url) {
+                additionalUrls = await parseSitemap(url, maxPages);
+              }
+            } else {
+              additionalUrls = result._discoveredLinks || [];
+            }
+
+            delete result._discoveredLinks;
+
+            if (additionalUrls.length === 0) {
+              spinner.warn("No additional pages discovered");
+            } else {
+              spinner.stop();
+              console.log(chalk.dim(`  Found ${additionalUrls.length} page(s) to analyze`));
+
+              const allResults = [result];
+              for (let i = 0; i < additionalUrls.length; i++) {
+                const pageUrl = additionalUrls[i];
+                const pageNum = i + 2;
+                const total = additionalUrls.length + 1;
+                spinner.start(`Extracting page ${pageNum}/${total}: ${new URL(pageUrl).pathname}`);
+
+                // Polite delay between pages
+                await new Promise(r => setTimeout(r, 2000 + Math.random() * 3000));
+
+                try {
+                  const pageResult = await extractBranding(pageUrl, spinner, browser, {
+                    navigationTimeout: 90000,
+                    darkMode: opts.darkMode,
+                    mobile: opts.mobile,
+                    slow: opts.slow,
+                  });
+                  delete pageResult._discoveredLinks;
+                  allResults.push(pageResult);
+                } catch (err) {
+                  spinner.warn(`Skipping ${pageUrl}: ${String(err?.message || err).slice(0, 80)}`);
+                }
+              }
+
+              spinner.stop();
+              result = mergeResults(allResults);
+            }
+          } else {
+            delete result._discoveredLinks;
+          }
+
           break;
         } catch (err) {
           await browser.close();
