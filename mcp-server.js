@@ -35,6 +35,7 @@ const nullSpinner = {
  * Returns { ok, data?, error? } so tool handlers never throw.
  */
 async function runExtraction(url, options = {}) {
+  if (!/^https?:\/\//i.test(url)) url = "https://" + url;
   let browser;
   try {
     browser = await chromium.launch({
