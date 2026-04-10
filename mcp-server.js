@@ -31,6 +31,8 @@ const nullSpinner = {
   stop() { return this; },
   succeed(msg) { return this; },
   fail(msg) { return this; },
+  warn(msg) { return this; },
+  info(msg) { return this; },
 };
 
 /**
