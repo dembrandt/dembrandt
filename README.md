@@ -77,6 +77,7 @@ dembrandt bmw.de --dark-mode       # Extract colors from dark mode variant
 dembrandt bmw.de --mobile          # Use mobile viewport (390x844, iPhone 12/13/14/15) for responsive analysis
 dembrandt bmw.de --slow            # 3x longer timeouts (24s hydration) for JavaScript-heavy sites
 dembrandt bmw.de --brand-guide      # Generate a brand guide PDF
+dembrandt bmw.de --design-md        # Generate a DESIGN.md file for AI agents
 dembrandt bmw.de --pages 5         # Analyze 5 pages (homepage + 4 discovered pages), merges results
 dembrandt bmw.de --sitemap          # Discover pages from sitemap.xml instead of DOM links
 dembrandt bmw.de --pages 10 --sitemap # Combine: up to 10 pages discovered via sitemap
@@ -141,6 +142,15 @@ dembrandt stripe.com --dtcg
 ```
 
 The DTCG format is an industry-standard JSON schema that can be consumed by design tools and token transformation libraries like [Style Dictionary](https://styledictionary.com).
+
+### DESIGN.md
+
+Use `--design-md` to generate a [DESIGN.md](https://stitch.withgoogle.com/docs/design-md) file — a plain-text design system document readable by AI agents like Google Stitch.
+
+```bash
+dembrandt stripe.com --design-md
+# Saves to: output/stripe.com/DESIGN.md
+```
 
 ## Local UI
 

@@ -15,6 +15,7 @@ import { extractBranding } from "./lib/extractors.js";
 import { displayResults } from "./lib/display.js";
 import { toW3CFormat } from "./lib/w3c-exporter.js";
 import { generatePDF } from "./lib/pdf.js";
+import { generateDesignMd } from "./lib/design-md.js";
 import { parseSitemap } from "./lib/discovery.js";
 import { mergeResults } from "./lib/merger.js";
 import { writeFileSync, mkdirSync } from "fs";
@@ -33,6 +34,7 @@ program
   .option("--mobile", "Extract from mobile viewport")
   .option("--slow", "3x longer timeouts for slow-loading sites")
   .option("--brand-guide", "Export a brand guide PDF")
+  .option("--design-md", "Export a DESIGN.md file")
   .option("--no-sandbox", "Disable browser sandbox (needed for Docker/CI)")
   .option("--raw-colors", "Include pre-filter raw colors in JSON output")
   .option("--screenshot <path>", "Save a screenshot of the page")
@@ -238,6 +240,28 @@ program
           spinner.stop();
           console.log(
             chalk.hex('#FFB86C')(`Could not generate PDF: ${err.message}`)
+          );
+        }
+      }
+
+      // Generate DESIGN.md
+      if (opts.designMd) {
+        try {
+          const mdDomain = new URL(url).hostname.replace("www.", "");
+          const mdDir = join(process.cwd(), "output", mdDomain);
+          mkdirSync(mdDir, { recursive: true });
+          const mdPath = join(mdDir, "DESIGN.md");
+          writeFileSync(mdPath, generateDesignMd(result));
+          console.log(
+            chalk.dim(
+              `DESIGN.md saved to: ${chalk.hex('#8BE9FD')(
+                `output/${mdDomain}/DESIGN.md`
+              )}`
+            )
+          );
+        } catch (err) {
+          console.log(
+            chalk.hex('#FFB86C')(`Could not generate DESIGN.md: ${err.message}`)
           );
         }
       }
