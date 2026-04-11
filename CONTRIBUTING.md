@@ -1,8 +1,8 @@
 # Contributing to Dembrandt
 
-Dembrandt reveals any website’s brand the way Rembrandt revealed light from shadow... color, typography, tone, emotion, and drama in seconds.
+Dembrandt extracts publicly visible design information from websites — colors, typography, spacing, and component styles in seconds.
 
-De-em-brand-t is the smartest way to dissect a brand, design system and design tokens from any website. Useful for various use cases.
+Dembrandt analyzes CSS and DOM structure to help document design systems and design tokens. Useful for various use cases.
 
 I’m @thevangelist, and I welcome you to develop this creative tool with me. Be it stargazers, dreamers, bug hunters, or just local hobos.
 

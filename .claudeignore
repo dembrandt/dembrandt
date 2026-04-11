@@ -1,0 +1,10 @@
+# Ignore extraction outputs (contain third-party content)
+output/
+test-output/
+figma-plugin/output/
+
+# Large binary outputs
+*.png
+*.pdf
+*.jpg
+*.jpeg

@@ -5,7 +5,7 @@
 ### Added
 - `--slow` flag for slow-loading sites with 3x longer timeouts
 - Tailwind CSS exporter (`lib/exporters.js`)
-- Challenge test suite against a set of public SPA / heavy-JS sites
+- QA test suite for visual comparison and regression detection
 - GitHub Actions CI workflow for automated testing
 - Border detection with confidence scoring
 
