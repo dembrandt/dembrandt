@@ -93,10 +93,18 @@ program
         if (opts.noSandbox && opts.browser === 'chromium') {
           launchArgs.push("--no-sandbox", "--disable-setuid-sandbox");
         }
-        browser = await browserType.launch({
-          headless: !useHeaded,
-          args: launchArgs,
-        });
+        if (process.env.BROWSER_CDP_ENDPOINT) {
+          if (opts.browser !== "chromium") {
+            throw new Error("BROWSER_CDP_ENDPOINT is only supported with --browser chromium.");
+          }
+          spinner.text = "Connecting over CDP...";
+          browser = await browserType.connectOverCDP(process.env.BROWSER_CDP_ENDPOINT);
+        } else {
+          browser = await browserType.launch({
+            headless: !useHeaded,
+            args: launchArgs,
+          });
+        }
 
         try {
           const isMultiPage = opts.pages || opts.sitemap;
@@ -170,7 +178,7 @@ program
           await browser.close();
           browser = null;
 
-          if (useHeaded) throw err;
+          if (useHeaded || process.env.BROWSER_CDP_ENDPOINT) throw err;
 
           if (
             err.message.includes("Timeout") ||
