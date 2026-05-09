@@ -18,14 +18,18 @@ import { generatePDF } from "./lib/pdf.js";
 import { generateDesignMd } from "./lib/design-md.js";
 import { parseSitemap } from "./lib/discovery.js";
 import { mergeResults } from "./lib/merger.js";
-import { writeFileSync, mkdirSync } from "fs";
-import { join } from "path";
+import { writeFileSync, mkdirSync, readFileSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { checkRobotsTxt } from "./lib/robots.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const { version } = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"));
 
 program
   .name("dembrandt")
   .description("Extract design tokens from any website")
-  .version("0.11.0")
+  .version(version)
   .argument("<url>")
   .option("--browser <type>", "Browser to use (chromium|firefox); set BROWSER_CDP_ENDPOINT env var to connect to an existing Chromium instance via CDP", "chromium")
   .option("--json-only", "Output raw JSON")
