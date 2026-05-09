@@ -6,7 +6,7 @@
 
 Extract a website's design system into design tokens in a few seconds: logo, colors, typography, borders, and more. One command.
 
-![Dembrandt — Any website to design tokens](https://raw.githubusercontent.com/dembrandt/dembrandt/main/docs/images/banner.png)
+![Dembrandt: Any website to design tokens](https://raw.githubusercontent.com/dembrandt/dembrandt/main/docs/images/banner.png)
 
 ## Install
 
@@ -77,7 +77,7 @@ Default: formatted terminal display only. Use `--save-output` to persist results
 
 ### Multi-Page Extraction
 
-Analyze multiple pages to get a more complete picture of a site's design system. Results are merged into a single unified output with cross-page confidence boosting — tokens appearing on multiple pages get higher confidence scores.
+Analyze multiple pages to get a more complete picture of a site's design system. Results are merged into a single unified output with cross-page confidence boosting: tokens appearing on multiple pages get higher confidence scores.
 
 ```bash
 # Analyze homepage + 4 auto-discovered pages (default: 5 total)
@@ -133,7 +133,7 @@ The DTCG format is an industry-standard JSON schema that can be consumed by desi
 
 ### DESIGN.md
 
-Use `--design-md` to generate a [DESIGN.md](https://stitch.withgoogle.com/docs/design-md) file — a plain-text design system document readable by AI agents.
+Use `--design-md` to generate a [DESIGN.md](https://stitch.withgoogle.com/docs/design-md) file, a plain-text design system document readable by AI agents.
 
 ```bash
 dembrandt example.com --design-md
@@ -142,7 +142,7 @@ dembrandt example.com --design-md
 
 ### Brand Guide PDF
 
-Use `--brand-guide` to generate a printable PDF summarizing the extracted design system — colors, typography, components, and logo on a single document.
+Use `--brand-guide` to generate a printable PDF summarizing the extracted design system: colors, typography, components, and logo on a single document.
 
 ```bash
 dembrandt example.com --brand-guide
@@ -176,7 +176,7 @@ Opens http://localhost:5173 with API on port 3002.
 - Spacing, shadows, border radius visualization
 - Button and link component previews
 - Dark/light theme toggle
-- Section nav links on extraction pages — jump directly to Colors, Typography, Shadows, etc. via a sticky sidebar
+- Section nav links on extraction pages, jump directly to Colors, Typography, Shadows, etc. via a sticky sidebar
 
 Extractions are performed via CLI (`dembrandt <url> --save-output`) and automatically appear in the UI.
 
@@ -204,9 +204,9 @@ Uses Playwright to render the page, reads computed styles from the DOM, analyzes
 
 ### Color Confidence
 
-- High — Logo, primary interactive elements
-- Medium — Secondary interactive elements, icons, navigation
-- Low — Generic UI components (filtered from display)
+- High: Logo, primary interactive elements
+- Medium: Secondary interactive elements, icons, navigation
+- Low: Generic UI components (filtered from display)
 - Only shows high and medium confidence colors in terminal. Full palette in JSON.
 
 ## Limitations
@@ -228,12 +228,10 @@ Dembrandt does not host, redistribute, or claim rights to any third-party brand 
 
 ## Contributing
 
-Bugs, weird sites, pull requests — all welcome.
+Bugs, weird sites, pull requests. All welcome.
 
 Open an [Issue](https://github.com/dembrandt/dembrandt/issues) or PR.
 
 @thevangelist
 
----
-
-MIT — do whatever you want with it.
+MIT. Do whatever you want with it.

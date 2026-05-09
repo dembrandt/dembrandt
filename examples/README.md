@@ -6,7 +6,7 @@ The two included samples target publicly documented, open-source design systems 
 
 ## Examples
 
-### 1. [material.io.json](material.io.json) — Material Design (open-source design system)
+### 1. [material.io.json](material.io.json) - Material Design (open-source design system)
 
 Sample extraction against the public Material Design documentation site.
 
@@ -19,7 +19,7 @@ Sample extraction against the public Material Design documentation site.
 - CSS variables for theming
 - Six responsive breakpoints
 
-### 2. [carbon.design.json](carbon.design.json) — Carbon Design System (open-source design system)
+### 2. [carbon.design.json](carbon.design.json) - Carbon Design System (open-source design system)
 
 Sample extraction against the public Carbon Design System documentation site.
 

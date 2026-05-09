@@ -1,6 +1,6 @@
 # Contributing to Dembrandt
 
-Dembrandt extracts publicly visible design information from websites — colors, typography, spacing, and component styles in seconds.
+Dembrandt extracts publicly visible design information from websites: colors, typography, spacing, and component styles in seconds.
 
 Dembrandt analyzes CSS and DOM structure to help document design systems and design tokens. Useful for various use cases.
 
