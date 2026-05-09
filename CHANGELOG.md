@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0] - 2026-05-10
+
+### Fixed
+- Link and text colors (e.g. `#0070e0`) were incorrectly filtered out when they never appeared as background colors — chromatic text-only colors with sufficient semantic context are now retained
+- Header and single-instance brand background colors were dropped on large sites where element count pushed the frequency threshold too high — high-scoring colors now bypass the count threshold
+- Modern CSS color functions (`oklab`, `oklch`, `lch`, `lab`, `color()`) were leaking into the palette as unparseable strings — these are now rejected at all extraction paths including hover/focus state merging
+
 ## [0.11.0] - 2026-04-11
 
 ### Changed
