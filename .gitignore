@@ -36,3 +36,12 @@ build
 
 # Internal
 INTERNAL.md
+
+# Test artifacts
+test/golden/
+test/report-assets/
+test/report.html
+test/diff-report.md
+*.png
+*.jpg
+*.jpeg
