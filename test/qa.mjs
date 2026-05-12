@@ -140,6 +140,7 @@ function deltaE(hex1, hex2) {
     z = z > 0.008856 ? z ** (1/3) : 7.787 * z + 16/116;
     return { L: 116 * y - 16, a: 500 * (x - y), b: 200 * (y - z) };
   }
+  if (hex1 === hex2) return 0;
   const rgb1 = hexToRgb(hex1), rgb2 = hexToRgb(hex2);
   if (!rgb1 || !rgb2) return 999;
   const lab1 = toLab(rgb1), lab2 = toLab(rgb2);
@@ -148,9 +149,14 @@ function deltaE(hex1, hex2) {
 
 const PERCEPTUAL_THRESHOLD = 15; // Same as extractor uses
 
+function normalizeColorString(c) {
+  if (!c || c.startsWith('#')) return c;
+  return c.replace(/-?[\d]+\.[\d]+/g, n => parseFloat(parseFloat(n).toFixed(4)).toString());
+}
+
 function diffColors(goldenPalette, currentPalette) {
-  const golden = (goldenPalette || []).map(c => c.normalized);
-  const current = (currentPalette || []).map(c => c.normalized);
+  const golden = (goldenPalette || []).map(c => normalizeColorString(c.normalized));
+  const current = (currentPalette || []).map(c => normalizeColorString(c.normalized));
 
   // Match colors perceptually — two colors within delta-E 15 are "the same"
   const goldenMatched = new Set();
