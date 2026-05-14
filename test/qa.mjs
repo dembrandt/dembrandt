@@ -29,12 +29,17 @@ const isDiff = args.includes("--diff");
 const siteIdx = args.indexOf("--site");
 const singleSite = siteIdx !== -1 ? args[siteIdx + 1] : null;
 const isCI = args.includes("--ci");
+const sitesFileIdx = args.indexOf("--sites-file");
+const sitesFile = sitesFileIdx !== -1 ? args[sitesFileIdx + 1] : "sites.json";
 
 // Load site list
 const sites = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "sites.json"), "utf8")
+  fs.readFileSync(path.join(__dirname, sitesFile), "utf8")
 );
 const targetSites = singleSite ? [singleSite] : sites;
+
+const EXTRACTION_TIMEOUT = isCI ? 90 * 1000 : 5 * 60 * 1000;
+const SLOW_FLAG = isCI ? "" : "--slow";
 
 function extractSite(domain) {
   const goldenDir = path.join(GOLDEN_DIR, domain);
@@ -47,11 +52,11 @@ function extractSite(domain) {
 
   try {
     const stdout = execSync(
-      `node index.js ${domain} --json-only --raw-colors --slow --screenshot "${screenshotPath}"`,
+      `node index.js ${domain} --json-only --raw-colors ${SLOW_FLAG} --screenshot "${screenshotPath}"`,
       {
         cwd: ROOT,
         encoding: "utf8",
-        timeout: 5 * 60 * 1000,
+        timeout: EXTRACTION_TIMEOUT,
         stdio: ["pipe", "pipe", "pipe"],
       }
     );
@@ -88,11 +93,11 @@ function extractToTemp(domain) {
 
   try {
     const stdout = execSync(
-      `node index.js ${domain} --json-only --raw-colors --slow --screenshot "${screenshotPath}"`,
+      `node index.js ${domain} --json-only --raw-colors ${SLOW_FLAG} --screenshot "${screenshotPath}"`,
       {
         cwd: ROOT,
         encoding: "utf8",
-        timeout: 5 * 60 * 1000,
+        timeout: EXTRACTION_TIMEOUT,
         stdio: ["pipe", "pipe", "pipe"],
       }
     );

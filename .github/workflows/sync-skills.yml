@@ -1,0 +1,89 @@
+name: Sync downstream repos
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to simulate (e.g. v0.12.0)"
+        required: true
+        default: "v0.12.0"
+
+jobs:
+  sync-skills:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout dembrandt-skills
+        uses: actions/checkout@v4
+        with:
+          repository: dembrandt/dembrandt-skills
+          token: ${{ secrets.SKILLS_REPO_PAT }}
+          path: dembrandt-skills
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Bump skills version and update SKILL.md
+        env:
+          DEMBRANDT_VERSION: ${{ github.event.release.tag_name || github.event.inputs.tag }}
+        run: |
+          cd dembrandt-skills
+          VERSION="${DEMBRANDT_VERSION#v}"
+          npm version patch --no-git-tag-version
+          find skills -name "SKILL.md" -exec \
+            sed -i "s/dembrandt@[0-9][0-9.]*/dembrandt@${VERSION}/g" {} \;
+
+      - name: Create PR in dembrandt-skills
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.SKILLS_REPO_PAT }}
+          path: dembrandt-skills
+          commit-message: "chore: sync with dembrandt ${{ github.event.release.tag_name || github.event.inputs.tag }}"
+          branch: "sync/dembrandt-${{ github.event.release.tag_name || github.event.inputs.tag }}"
+          title: "chore: sync with dembrandt ${{ github.event.release.tag_name || github.event.inputs.tag }}"
+          body: |
+            Automated sync triggered by [dembrandt ${{ github.event.release.tag_name || github.event.inputs.tag }}](${{ github.event.release.html_url || 'manual trigger' }}).
+
+            - Bumped `dembrandt-skills` patch version
+            - Updated CLI version references in skill files
+          labels: automated
+
+  sync-next:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout dembrandt-next
+        uses: actions/checkout@v4
+        with:
+          repository: dembrandt/dembrandt-next
+          token: ${{ secrets.NEXT_REPO_PAT }}
+          path: dembrandt-next
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Update dembrandt version in package.json
+        env:
+          DEMBRANDT_VERSION: ${{ github.event.release.tag_name || github.event.inputs.tag }}
+        run: |
+          cd dembrandt-next
+          VERSION="${DEMBRANDT_VERSION#v}"
+          npm pkg set dependencies.dembrandt="${VERSION}"
+
+      - name: Create PR in dembrandt-next
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.NEXT_REPO_PAT }}
+          path: dembrandt-next
+          commit-message: "chore: bump dembrandt to ${{ github.event.release.tag_name || github.event.inputs.tag }}"
+          branch: "sync/dembrandt-${{ github.event.release.tag_name || github.event.inputs.tag }}"
+          title: "chore: bump dembrandt to ${{ github.event.release.tag_name || github.event.inputs.tag }}"
+          body: |
+            Automated bump triggered by [dembrandt ${{ github.event.release.tag_name || github.event.inputs.tag }}](${{ github.event.release.html_url || 'manual trigger' }}).
+
+            Updates `dembrandt` npm dependency to latest release. Run `npm install` after merging.
+          labels: automated

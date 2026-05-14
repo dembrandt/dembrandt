@@ -1,9 +1,60 @@
 [
   "dembrandt.com",
+
   "stripe.com",
   "linear.app",
   "vercel.com",
   "tailwindcss.com",
   "github.com",
-  "resend.com"
+  "resend.com",
+  "figma.com",
+  "notion.so",
+  "slack.com",
+
+  "apple.com",
+  "nike.com",
+  "coca-cola.com",
+  "mcdonalds.com",
+  "ikea.com",
+  "lego.com",
+  "spotify.com",
+  "netflix.com",
+  "airbnb.com",
+  "uber.com",
+
+  "tesla.com",
+  "bmwgroup.com",
+  "louisvuitton.com",
+  "rolex.com",
+
+  "salesforce.com",
+  "oracle.com",
+  "ibm.com",
+  "sap.com",
+
+  "bbc.com",
+  "nytimes.com",
+  "lemonde.fr",
+  "spiegel.de",
+
+  "amazon.co.jp",
+  "flipkart.com",
+  "mercadolibre.com",
+  "aliexpress.com",
+
+  "gov.uk",
+  "usa.gov",
+  "canada.ca",
+
+  "wordpress.com",
+  "squarespace.com",
+  "webflow.com",
+  "framer.com",
+
+  "developer.mozilla.org",
+  "stackoverflow.com",
+
+  "craigslist.org",
+  "wikipedia.org",
+  "dribbble.com"
 ]

@@ -24,6 +24,7 @@ test-output/
 *.json
 !package*.json
 !examples/*.json
+!test/sites*.json
 
 # Coverage
 coverage/
@@ -45,3 +46,4 @@ test/diff-report.md
 *.png
 *.jpg
 *.jpeg
+test/sites-chunk.json

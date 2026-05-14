@@ -1,0 +1,83 @@
+name: Nightly Full QA
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  full-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        chunk: [0, 1, 2, 3]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Split sites and extract chunk ${{ matrix.chunk }}
+        run: |
+          node -e "
+            const sites = JSON.parse(require('fs').readFileSync('test/sites.json','utf8'));
+            const chunk = sites.filter((_, i) => i % 4 === ${{ matrix.chunk }});
+            require('fs').writeFileSync('test/sites-chunk.json', JSON.stringify(chunk));
+            console.log('Chunk ${{ matrix.chunk }}:', chunk.join(', '));
+          "
+          node test/qa.mjs --baseline --ci --sites-file sites-chunk.json
+        env:
+          CI: true
+
+      - name: Upload chunk results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-chunk-${{ matrix.chunk }}
+          path: test/golden/
+          retention-days: 30
+
+  report:
+    runs-on: ubuntu-latest
+    needs: full-qa
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nightly-chunk-*
+          merge-multiple: true
+          path: test/golden/
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate diff report
+        run: node test/qa.mjs --diff --ci
+        continue-on-error: true
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-report
+          path: test/report.html
+          retention-days: 30
