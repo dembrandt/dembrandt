@@ -43,6 +43,7 @@ program
   .option("--no-sandbox", "Disable browser sandbox (needed for Docker/CI)")
   .option("--raw-colors", "Include pre-filter raw colors in JSON output")
   .option("--screenshot <path>", "Save a screenshot of the page")
+  .option("--wcag", "Analyze WCAG contrast ratios between palette colors")
   .option("--pages <n>", "Analyze up to N total pages including start URL (default: 5)", (v) => {
     const n = parseInt(v, 10);
     if (isNaN(n) || n < 1) throw new Error(`--pages must be a positive integer, got: ${v}`);
@@ -120,6 +121,7 @@ program
             slow: opts.slow,
             screenshotPath: opts.screenshot,
             discoverLinks: isMultiPage && !opts.sitemap ? maxPages : null,
+            wcag: opts.wcag,
           });
 
           // Multi-page crawl
