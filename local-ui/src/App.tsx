@@ -57,6 +57,8 @@ interface ExtractionResult {
   breakpoints?: Array<{ px: number }>
   iconSystem?: Array<{ name: string; type: string }>
   frameworks?: Array<{ name: string; confidence: string; evidence?: string }>
+  logoInstances?: Array<{ source: string; url: string; context: string; type?: string; reversed?: boolean; background?: string | null; width?: number; height?: number }>
+  wcag?: Array<{ fg: string; bg: string; ratio: number; aa: boolean; aaLarge: boolean; aaa: boolean; count: number }>
 }
 
 interface SavedFileEntry {
@@ -104,6 +106,7 @@ function App() {
   const [gridIndex, setGridIndex] = useState(0)
   const [savedFiles, setSavedFiles] = useState<SavedFileEntry[]>([])
   const [loadingSavedFiles, setLoadingSavedFiles] = useState(false)
+  const [activeSection, setActiveSection] = useState<string>('')
   const isLoadingRef = useRef(false)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') {
@@ -169,71 +172,79 @@ function App() {
     loadSavedFile(savedFiles[newIndex])
   }, [result, savedFiles])
 
-  // WASD + Arrow keyboard navigation
+  // Arrow key navigation (WASD as aliases)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
 
-      const key = e.key.toLowerCase()
+      const key = e.key
+      const isLeft  = key === 'ArrowLeft'  || key === 'a'
+      const isRight = key === 'ArrowRight' || key === 'd'
+      const isUp    = key === 'ArrowUp'    || key === 'w'
+      const isDown  = key === 'ArrowDown'  || key === 's'
+      const isEnter = key === 'Enter'
+      const isEsc   = key === 'Escape'
 
-      // Dropdown navigation when open
+      // Dropdown open: up/down scroll list, Enter confirm, Esc close
       if (dropdownOpen && savedFiles.length > 0) {
-        if (e.key === 'ArrowLeft' || key === 'a') {
+        if (isUp || isLeft) {
           e.preventDefault()
           setDropdownIndex(prev => (prev - 1 + savedFiles.length) % savedFiles.length)
-        } else if (e.key === 'ArrowRight' || key === 'd') {
+        } else if (isDown || isRight) {
           e.preventDefault()
           setDropdownIndex(prev => (prev + 1) % savedFiles.length)
-        } else if (e.key === 'Enter') {
+        } else if (isEnter) {
           e.preventDefault()
           loadSavedFile(savedFiles[dropdownIndex])
           setDropdownOpen(false)
-        } else if (e.key === 'Escape') {
+        } else if (isEsc) {
           e.preventDefault()
           setDropdownOpen(false)
         }
         return
       }
 
-      // Landing page grid navigation (when no result selected)
+      // Home grid: arrows move focus, Enter/down opens
       if (!result && savedFiles.length > 0) {
-        if (key === 'a' || e.key === 'ArrowLeft') {
+        const cols = window.innerWidth >= 768 ? 3 : window.innerWidth >= 640 ? 2 : 1
+        if (isLeft) {
           e.preventDefault()
           setGridIndex(prev => (prev - 1 + savedFiles.length) % savedFiles.length)
-        } else if (key === 'd' || e.key === 'ArrowRight') {
+        } else if (isRight) {
           e.preventDefault()
           setGridIndex(prev => (prev + 1) % savedFiles.length)
-        } else if (key === 's' || e.key === 'ArrowDown' || e.key === 'Enter') {
+        } else if (isUp) {
+          e.preventDefault()
+          setGridIndex(prev => (prev - cols + savedFiles.length) % savedFiles.length)
+        } else if (isDown || isEnter) {
           e.preventDefault()
           loadSavedFile(savedFiles[gridIndex])
         }
         return
       }
 
-      // Global navigation when dropdown closed and result is shown
-      if (key === 'w') {
-        e.preventDefault()
-        navigateHome()
-      } else if (key === 's') {
-        e.preventDefault()
-        if (result) {
-          // Set initial index to current item
+      // Site view: up = home, down = open switcher, left/right = prev/next
+      if (result) {
+        if (isUp) {
+          e.preventDefault()
+          navigateHome()
+        } else if (isDown) {
+          e.preventDefault()
           const currentIndex = savedFiles.findIndex(f => getDomain(f.url) === getDomain(result.url))
           setDropdownIndex(currentIndex >= 0 ? currentIndex : 0)
           setDropdownOpen(true)
+        } else if (isLeft) {
+          e.preventDefault()
+          navigateToAdjacent('prev')
+        } else if (isRight) {
+          e.preventDefault()
+          navigateToAdjacent('next')
         }
-      } else if (key === 'a') {
-        e.preventDefault()
-        if (result) navigateToAdjacent('prev')
-      } else if (key === 'd') {
-        e.preventDefault()
-        if (result) navigateToAdjacent('next')
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [result, navigateToAdjacent, navigateHome, dropdownOpen, dropdownIndex, savedFiles])
+  }, [result, navigateToAdjacent, navigateHome, dropdownOpen, dropdownIndex, gridIndex, savedFiles])
 
 
 
@@ -264,6 +275,24 @@ function App() {
     }
   }
 
+  // Track active section via IntersectionObserver
+  useEffect(() => {
+    if (!result) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter(e => e.isIntersecting)
+        if (visible.length > 0) {
+          const topmost = visible.reduce((a, b) => a.boundingClientRect.top < b.boundingClientRect.top ? a : b)
+          setActiveSection(topmost.target.id)
+        }
+      },
+      { rootMargin: '-20% 0px -60% 0px', threshold: 0 }
+    )
+    const sections = document.querySelectorAll('section[id]')
+    sections.forEach(s => observer.observe(s))
+    return () => observer.disconnect()
+  }, [result])
+
   // Load saved files on mount
   useEffect(() => {
     fetchSavedFiles()
@@ -289,6 +318,7 @@ function App() {
     ...(result.frameworks && result.frameworks.length > 0 ? [{ id: 'frameworks', label: 'Frameworks' }] : []),
     ...(result.iconSystem && result.iconSystem.length > 0 ? [{ id: 'icon-systems', label: 'Icon Systems' }] : []),
     ...(result.breakpoints && result.breakpoints.length > 0 ? [{ id: 'breakpoints', label: 'Breakpoints' }] : []),
+    ...(result.wcag && result.wcag.length > 0 ? [{ id: 'wcag', label: 'WCAG' }] : []),
   ] : []
 
   return (
@@ -305,14 +335,14 @@ function App() {
               <img src="/logo.png" alt="Dembrandt" className="h-5 w-auto" />
             </button>
 
-            {/* WASD Legend */}
-            <div className="hidden sm:flex items-center gap-1 text-xs text-[#a0a0b2] ml-2">
-              <kbd className="px-1.5 py-0.5 bg-[#1a1a24] border border-[#2a2a34] rounded text-[#c0c0cc]">W</kbd>
+            {/* Arrow / WASD Legend */}
+            <div className="hidden sm:flex items-center gap-1.5 text-sm text-[#c0c0cc] ml-2">
+              <kbd className="px-1.5 py-0.5 bg-[#22222e] border border-[#3a3a4a] rounded text-white text-xs">↑</kbd>
               <span>home</span>
-              <kbd className="px-1.5 py-0.5 bg-[#1a1a24] border border-[#2a2a34] rounded text-[#c0c0cc] ml-2">S</kbd>
-              <span>select</span>
-              <kbd className="px-1.5 py-0.5 bg-[#1a1a24] border border-[#2a2a34] rounded text-[#c0c0cc] ml-2">A</kbd>
-              <kbd className="px-1.5 py-0.5 bg-[#1a1a24] border border-[#2a2a34] rounded text-[#c0c0cc]">D</kbd>
+              <kbd className="px-1.5 py-0.5 bg-[#22222e] border border-[#3a3a4a] rounded text-white text-xs ml-2">↓</kbd>
+              <span>open</span>
+              <kbd className="px-1.5 py-0.5 bg-[#22222e] border border-[#3a3a4a] rounded text-white text-xs ml-2">←</kbd>
+              <kbd className="px-1.5 py-0.5 bg-[#22222e] border border-[#3a3a4a] rounded text-white text-xs">→</kbd>
               <span>nav</span>
             </div>
 
@@ -425,6 +455,17 @@ function App() {
                 </svg>
               </a>
             )}
+            {result && (
+              <button
+                onClick={() => window.print()}
+                className="text-[#a0a0b2] hover:text-white transition-colors p-2 rounded-md hover:bg-[#1a1a24] cursor-pointer"
+                title="Download as PDF"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 15V3m0 12l-4-4m4 4l4-4M2 17l.621 2.485A2 2 0 004.561 21h14.878a2 2 0 001.94-1.515L22 17"/>
+                </svg>
+              </button>
+            )}
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               className="text-[#a0a0b2] hover:text-white transition-colors p-2 rounded-md hover:bg-[#1a1a24] cursor-pointer"
@@ -506,26 +547,47 @@ function App() {
               {/* Brand Header */}
               <div className="text-center mb-12">
                 <h2 className="text-5xl font-bold mb-2">{getBrandName(result.url)}</h2>
-                <p className="text-secondary">{getDomain(result.url)}</p>
+                <div className="flex items-center justify-center gap-3 mt-1">
+                  <span className="text-secondary text-sm">{getDomain(result.url)}</span>
+                  <a
+                    href={result.url.startsWith('http') ? result.url : `https://${result.url}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-[#666] hover:text-[#aaa] transition-colors border border-[#2a2a34] hover:border-[#3a3a44] rounded-md px-2.5 py-1"
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                    </svg>
+                    Inspect live
+                  </a>
+                </div>
               </div>
 
               {/* Sections */}
               <div className="flex gap-8">
-                <div className="hidden lg:block w-32 shrink-0">
-                <nav className="sticky top-20 pt-1">
-                  {navSections.map(s => (
-                    <a
-                      key={s.id}
-                      href={`#${s.id}`}
-                      onClick={(e) => {
-                        e.preventDefault()
-                        document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                      }}
-                      className="block text-xs text-tertiary hover:text-primary transition-colors py-1 cursor-pointer"
-                    >
-                      {s.label}
-                    </a>
-                  ))}
+                <div className="hidden lg:block w-36 shrink-0">
+                <nav className="sticky top-20 pt-1 space-y-0.5">
+                  {navSections.map(s => {
+                    const isActive = activeSection === s.id
+                    return (
+                      <a
+                        key={s.id}
+                        href={`#${s.id}`}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        }}
+                        className={`flex items-center gap-2 text-xs py-1.5 px-2 rounded-md transition-all cursor-pointer ${
+                          isActive
+                            ? 'text-white bg-[#1a1a2e] font-medium'
+                            : 'text-[#666] hover:text-[#aaa]'
+                        }`}
+                      >
+                        {isActive && <span className="w-1 h-1 rounded-full bg-brand shrink-0" />}
+                        {s.label}
+                      </a>
+                    )
+                  })}
                 </nav>
                 </div>
                 <div className="space-y-12 max-w-2xl w-full mx-auto lg:mx-0">
@@ -580,6 +642,42 @@ function App() {
                   )
                 })()}
 
+                {/* Logo Instances */}
+                {result.logoInstances && result.logoInstances.length > 1 && (
+                  <section>
+                    <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Logo Instances ({result.logoInstances.length})</h3>
+                    <div className="flex flex-wrap gap-4">
+                      {result.logoInstances.map((inst, i) => {
+                        const isImg = inst.source === 'img' && inst.url?.match(/\.(svg|png|jpg|jpeg|gif|webp)(\?|$)/i)
+                        return (
+                          <div key={i} className="flex flex-col gap-1.5">
+                            <div
+                              className="rounded-xl p-4 flex items-center justify-center min-w-[120px] min-h-[64px]"
+                              style={{ background: inst.background || (inst.reversed ? '#111' : '#f5f5f5') }}
+                            >
+                              {isImg ? (
+                                <img
+                                  src={`http://localhost:3002/api/proxy-image?url=${encodeURIComponent(inst.url)}`}
+                                  alt=""
+                                  className="max-h-12 max-w-[160px] object-contain"
+                                  onError={(e) => e.currentTarget.style.display = 'none'}
+                                />
+                              ) : (
+                                <span className="text-tertiary text-xs">SVG inline</span>
+                              )}
+                            </div>
+                            <div className="flex gap-1.5 flex-wrap">
+                              <span className="text-[10px] px-1.5 py-0.5 bg-surface border border-border rounded text-secondary">{inst.context}</span>
+                              {inst.type && <span className="text-[10px] px-1.5 py-0.5 bg-surface border border-border rounded text-tertiary">{inst.type}</span>}
+                              {inst.reversed && <span className="text-[10px] px-1.5 py-0.5 bg-[#1a1a24] border border-[#2a2a34] rounded text-[#a0a0b2]">reversed</span>}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </section>
+                )}
+
                 {/* Favicons */}
                 {result.favicons && result.favicons.length > 0 && (
                   <section id="favicons">
@@ -619,29 +717,42 @@ function App() {
                 </section>
 
                 {/* Typography */}
-                <section id="typography">
-                  <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Typography ({typography.length})</h3>
-                  <p className="text-primary font-medium font-mono text-lg mb-4">{fontFamily}</p>
-                  <div className="space-y-4">
-                    {typography.map((t, i) => (
-                      <div key={i} className="flex flex-col gap-1">
-                        <span className="text-brand font-medium text-xs uppercase tracking-tight">{t.context}</span>
-                        <span className="text-primary text-xl" style={{ fontFamily: t.family }}>The quick brown fox jumps over the lazy dog.</span>
-                        <div className="flex gap-2 text-xs text-secondary">
-                          <span>{t.size}</span>
-                          <span>/</span>
-                          <span>{t.weight}</span>
-                          {t.lineHeight && (
-                            <>
-                              <span>/</span>
-                              <span>LH: {t.lineHeight}</span>
-                            </>
-                          )}
-                        </div>
+                {(() => {
+                  const seen = new Set<string>()
+                  const deduped = typography.filter(t => {
+                    const key = `${t.family}|${t.context}`
+                    if (seen.has(key)) return false
+                    seen.add(key)
+                    return true
+                  }).slice(0, 12)
+                  const previewSize = (size: string) => {
+                    const px = parseFloat(size)
+                    if (!px) return '1.125rem'
+                    return `${Math.min(Math.max(px, 14), 36)}px`
+                  }
+                  return (
+                    <section id="typography">
+                      <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Typography ({deduped.length})</h3>
+                      <p className="text-tertiary font-mono text-xs mb-6">{fontFamily}</p>
+                      <div className="space-y-6">
+                        {deduped.map((t, i) => (
+                          <div key={i} className="flex flex-col gap-1">
+                            <span className="text-brand font-medium text-xs uppercase tracking-tight">{t.context}</span>
+                            <span className="text-primary leading-tight" style={{ fontFamily: t.family, fontSize: previewSize(t.size), fontWeight: t.weight }}>
+                              The quick brown fox
+                            </span>
+                            <div className="flex gap-2 text-xs text-tertiary font-mono mt-0.5">
+                              <span>{t.size}</span>
+                              <span>·</span>
+                              <span>{t.weight}</span>
+                              {t.lineHeight && <><span>·</span><span>{t.lineHeight}</span></>}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </section>
+                    </section>
+                  )
+                })()}
 
                 {/* Spacing */}
                 <section id="spacing">
@@ -707,44 +818,29 @@ function App() {
                 {result.components?.buttons && result.components.buttons.length > 0 && (
                   <section id="buttons">
                     <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Buttons ({result.components.buttons.length})</h3>
-                    <div className="flex flex-wrap gap-4">
-                      {result.components.buttons.map((b, i) => {
+                    <div className="flex flex-wrap gap-4 items-start">
+                      {result.components.buttons.map((b: any, i) => {
                         const s = b.states.default;
-                        const h = b.states.hover || s;
-                        const labels = ["Get Started", "Learn More", "Confirm", "Subscribe", "Log In", "Search", "Sign Up"];
+                        const label = b.text || ["Get Started", "Learn More", "Confirm", "Subscribe", "Log In", "Search", "Sign Up"][i % 7];
                         return (
-                          <div key={i} className="flex flex-col gap-2">
-                             <button
-                               className="transition-all duration-200 cursor-pointer text-sm font-medium whitespace-nowrap"
-                               style={{
-                                 backgroundColor: s.backgroundColor,
-                                 color: s.color,
-                                 borderRadius: s.borderRadius,
-                                 padding: s.padding,
-                                 border: s.border || 'none',
-                                 boxShadow: s.boxShadow,
-                                 fontWeight: b.fontWeight,
-                                 outline: 'none'
-                               }}
-                               onMouseEnter={(e) => {
-                                 const merged = { ...s, ...h };
-                                 Object.assign(e.currentTarget.style, merged);
-                               }}
-                               onMouseLeave={(e) => {
-                                 // Reset to original properties instead of just merging back
-                                 e.currentTarget.style.backgroundColor = s.backgroundColor;
-                                 e.currentTarget.style.color = s.color;
-                                 e.currentTarget.style.border = s.border || 'none';
-                                 e.currentTarget.style.boxShadow = s.boxShadow;
-                                 e.currentTarget.style.transform = s.transform || 'none';
-                                 e.currentTarget.style.opacity = s.opacity || '1';
-                               }}
-                             >
-                               {labels[i % labels.length]}
-                             </button>
-                             <div className="flex gap-2 text-[9px] text-tertiary font-mono uppercase">
-                               <span>{s.borderRadius}</span>
-                             </div>
+                          <div key={i} className="flex flex-col gap-1.5">
+                            <button
+                              className="transition-all duration-200 cursor-pointer whitespace-nowrap"
+                              style={{
+                                backgroundColor: s.backgroundColor,
+                                color: s.color,
+                                borderRadius: s.borderRadius,
+                                padding: s.padding,
+                                border: s.border || 'none',
+                                boxShadow: s.boxShadow,
+                                fontWeight: b.fontWeight,
+                                fontSize: b.fontSize,
+                                outline: 'none',
+                              }}
+                            >
+                              {label}
+                            </button>
+                            <span className="text-[10px] text-[#555] font-mono">{s.borderRadius}</span>
                           </div>
                         )
                       })}
@@ -824,6 +920,37 @@ function App() {
                           {b.px}px
                         </span>
                       ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* WCAG */}
+                {result.wcag && result.wcag.length > 0 && (
+                  <section id="wcag">
+                    <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">WCAG Contrast ({result.wcag.length} pairs)</h3>
+                    <div className="space-y-1.5">
+                      {result.wcag.slice(0, 20).map((pair, i) => {
+                        const grade = pair.aaa ? 'AAA' : pair.aa ? 'AA' : pair.aaLarge ? 'AA-Large' : 'fail'
+                        const gradeBg = pair.aaa ? '#1a3a2a' : pair.aa ? '#1a2a3a' : pair.aaLarge ? '#3a2a10' : '#3a1a1a'
+                        const gradeColor = pair.aaa ? '#6effa0' : pair.aa ? '#7dd3fc' : pair.aaLarge ? '#fbbf24' : '#f87171'
+                        return (
+                          <div key={i} className="flex items-center gap-3 bg-card rounded-xl px-4 py-3">
+                            {/* Color swatch: fg text on bg */}
+                            <div className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center text-sm font-bold" style={{ background: pair.bg, color: pair.fg, border: '1px solid rgba(255,255,255,0.08)' }}>
+                              Aa
+                            </div>
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                              <div className="flex gap-1.5 text-xs font-mono text-white">
+                                <span>{pair.fg}</span>
+                                <span className="text-[#555]">on</span>
+                                <span>{pair.bg}</span>
+                              </div>
+                              <span className="text-xs text-[#888]">{pair.ratio.toFixed(2)}:1 · ×{pair.count}</span>
+                            </div>
+                            <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded shrink-0" style={{ background: gradeBg, color: gradeColor }}>{grade}</span>
+                          </div>
+                        )
+                      })}
                     </div>
                   </section>
                 )}
