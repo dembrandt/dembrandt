@@ -71,6 +71,7 @@ dembrandt example.com --sitemap        # Discover pages from sitemap.xml instead
 dembrandt example.com --pages 10 --sitemap # Combine: up to 10 pages discovered via sitemap
 dembrandt example.com --no-sandbox     # Disable Chromium sandbox (required for Docker/CI)
 dembrandt example.com --browser=firefox # Use Firefox instead of Chromium (better for Cloudflare bypass)
+dembrandt example.com --wcag           # WCAG 2.1 contrast analysis — real DOM pairs, AA/AAA grades
 ```
 
 Default: formatted terminal display only. Use `--save-output` to persist results as JSON files. Browser automatically retries in visible mode if headless extraction fails.
@@ -139,6 +140,16 @@ Use `--design-md` to generate a [DESIGN.md](https://stitch.withgoogle.com/docs/d
 dembrandt example.com --design-md
 # Saves to: output/example.com/DESIGN.md
 ```
+
+### WCAG Contrast Analysis
+
+Use `--wcag` to check accessibility contrast ratios across the page. Unlike palette-based checkers, dembrandt walks the actual DOM and finds what color is rendered on top of what background — per element.
+
+```bash
+dembrandt stripe.com --wcag
+```
+
+Returns every text/background pair with contrast ratio and WCAG 2.1 grade (AA, AA-Large, AAA, or fail), sorted by how often each pair appears. Results are shown in terminal and included in JSON output as `wcag`.
 
 ### Brand Guide PDF
 
@@ -220,6 +231,11 @@ dembrandt stripe.com --dtcg --save-output
 ```bash
 dembrandt stripe.com --design-md
 # Point your agent at the output DESIGN.md
+```
+
+**Accessibility audit** — check contrast on any live URL
+```bash
+dembrandt stripe.com --wcag
 ```
 
 **Regression baseline** — snapshot now, catch drift later
