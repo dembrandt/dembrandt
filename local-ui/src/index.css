@@ -135,3 +135,12 @@ body {
   background: #5E6772;
   opacity: 0.6;
 }
+
+@media print {
+  header, nav, .hidden { display: none !important; }
+  main { padding-top: 0 !important; }
+  body { background: white !important; color: black !important; }
+  section { break-inside: avoid; page-break-inside: avoid; }
+  .bg-card, .bg-surface { background: #f8f8f8 !important; }
+  * { color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
