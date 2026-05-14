@@ -180,6 +180,59 @@ Opens http://localhost:5173 with API on port 3002.
 
 Extractions are performed via CLI (`dembrandt <url> --save-output`) and automatically appear in the UI.
 
+## Recipes
+
+**Quick brand scan**
+```bash
+dembrandt stripe.com
+```
+
+**Compare two sites**
+```bash
+dembrandt stripe.com --save-output
+dembrandt braintree.com --save-output
+# Compare output/stripe.com and output/braintree.com side by side
+```
+
+**Multi-page audit** — get a fuller picture across the whole site
+```bash
+dembrandt stripe.com --pages 10 --sitemap --save-output
+```
+
+**Spot-check a value** — verify a specific token fast
+```bash
+dembrandt stripe.com --json-only | grep -i "border-radius"
+```
+
+**Export for Tailwind** — get spacing and color values into your config
+```bash
+dembrandt stripe.com --dtcg --save-output
+# Use the .tokens.json with Style Dictionary to generate tailwind.config.js
+```
+
+**Export for Tokens Studio / Figma**
+```bash
+dembrandt stripe.com --dtcg --save-output
+# Import the .tokens.json directly into Tokens Studio
+```
+
+**Generate DESIGN.md for your AI agent**
+```bash
+dembrandt stripe.com --design-md
+# Point your agent at the output DESIGN.md
+```
+
+**Regression baseline** — snapshot now, catch drift later
+```bash
+dembrandt myapp.com --save-output --dtcg
+# Store output as baseline, re-run after deploys and diff
+```
+
+**CI / headless environments**
+```bash
+dembrandt myapp.com --no-sandbox --save-output
+```
+
 ## Use Cases
 
 - Design system documentation
