@@ -3,7 +3,7 @@ import cors from 'cors'
 import { spawn } from 'child_process'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
-import { readdir, readFile } from 'fs/promises'
+import { readdir, readFile, unlink } from 'fs/promises'
 import { existsSync } from 'fs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -38,6 +38,33 @@ app.get('/api/saved-extractions', async (req, res) => {
           const content = await readFile(filePath, 'utf-8')
           const data = JSON.parse(content)
           
+          const palette = data.colors?.palette || []
+          const getSatLum = (color) => {
+            const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)
+            if (!m) return null
+            const [r, g, b] = [+m[1], +m[2], +m[3]]
+            const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+            const max = Math.max(r, g, b), min = Math.min(r, g, b)
+            const sat = max === 0 ? 0 : (max - min) / max
+            return { lum, sat }
+          }
+          // Pass 1: vivid (sat > 0.15, not near black/white)
+          let brandColors = palette
+            .filter(c => { const s = getSatLum(c.color); return s && s.lum > 0.05 && s.lum < 0.88 && s.sat > 0.15 })
+            .slice(0, 2).map(c => c.color)
+          // Pass 2: any color with some saturation (relaxed — for monochrome brands like Vercel)
+          if (brandColors.length === 0) {
+            brandColors = palette
+              .filter(c => { const s = getSatLum(c.color); return s && s.lum > 0.03 && s.lum < 0.92 && s.sat > 0.03 })
+              .slice(0, 2).map(c => c.color)
+          }
+          // Pass 3: domain-hash fallback — deterministic hue from domain name
+          if (brandColors.length === 0) {
+            const hash = domainEntry.name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+            const hue = (hash * 137) % 360
+            brandColors = [`hsl(${hue}, 60%, 35%)`, `hsl(${(hue + 40) % 360}, 50%, 25%)`]
+          }
+
           extractions.push({
             id: `${domainEntry.name}-${file}`,
             domain: domainEntry.name,
@@ -45,7 +72,8 @@ app.get('/api/saved-extractions', async (req, res) => {
             url: data.url || `https://${domainEntry.name}`,
             extractedAt: data.extractedAt || file.replace('.json', ''),
             type: 'json',
-            path: `${domainEntry.name}/${file}`
+            path: `${domainEntry.name}/${file}`,
+            brandColors: brandColors.length > 0 ? brandColors : null,
           })
         }
       }
@@ -79,6 +107,20 @@ app.get('/api/saved-extractions/:domain/:filename', async (req, res) => {
   }
 })
 
+
+// Delete a saved extraction
+app.delete('/api/saved-extractions/:domain/:filename', async (req, res) => {
+  try {
+    const { domain, filename } = req.params
+    const filePath = join(__dirname, '..', 'output', domain, filename)
+    if (!existsSync(filePath)) return res.status(404).json({ error: 'File not found' })
+    await unlink(filePath)
+    res.json({ ok: true })
+  } catch (error) {
+    console.error('Error deleting extraction:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
 
 // Proxy images to bypass CORS restrictions
 app.get('/api/proxy-image', async (req, res) => {

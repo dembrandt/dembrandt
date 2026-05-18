@@ -69,6 +69,80 @@ interface SavedFileEntry {
   extractedAt: string
   type: 'json' | 'dtcg'
   path: string
+  brandColors?: string[] | null
+}
+
+interface BrandGroup {
+  domain: string
+  snapshots: SavedFileEntry[]
+  latest: SavedFileEntry
+}
+
+const parseRgb = (color: string): { r: number; g: number; b: number } | null => {
+  const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)
+  if (m) return { r: +m[1], g: +m[2], b: +m[3] }
+  const hex = color.match(/^#?([0-9a-f]{6})$/i)
+  if (hex) {
+    const v = parseInt(hex[1], 16)
+    return { r: (v >> 16) & 255, g: (v >> 8) & 255, b: v & 255 }
+  }
+  // hsl(h, s%, l%) fallback
+  const hsl = color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/)
+  if (hsl) {
+    const h = +hsl[1] / 360, s = +hsl[2] / 100, l = +hsl[3] / 100
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+    const p = 2 * l - q
+    const hue2rgb = (t: number) => {
+      if (t < 0) t += 1; if (t > 1) t -= 1
+      if (t < 1/6) return p + (q - p) * 6 * t
+      if (t < 1/2) return q
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6
+      return p
+    }
+    return { r: Math.round(hue2rgb(h + 1/3) * 255), g: Math.round(hue2rgb(h) * 255), b: Math.round(hue2rgb(h - 1/3) * 255) }
+  }
+  return null
+}
+
+const lighten = (c: { r: number; g: number; b: number }, t: number) => ({
+  r: Math.round(c.r + (255 - c.r) * t),
+  g: Math.round(c.g + (255 - c.g) * t),
+  b: Math.round(c.b + (255 - c.b) * t),
+})
+
+const rgba = (c: { r: number; g: number; b: number }, a: number) =>
+  `rgba(${c.r},${c.g},${c.b},${a})`
+
+const getBrandGradient = (colors: string[] | null | undefined): string | null => {
+  if (!colors || colors.length === 0) return null
+  const c1 = parseRgb(colors[0])
+  if (!c1) return null
+  const lum = (0.2126 * c1.r + 0.7152 * c1.g + 0.0722 * c1.b) / 255
+  if (lum < 0.04 || lum > 0.92) return null
+  const c2 = (colors[1] ? parseRgb(colors[1]) : null) ?? c1
+
+  // Keep brand colors vivid, layer them as translucent blobs on dark base
+  // Add a white specular highlight for the glass/depth effect seen in reference
+  return [
+    `radial-gradient(ellipse at 30% 30%, ${rgba(c1, 0.75)} 0%, transparent 60%)`,
+    `radial-gradient(ellipse at 80% 75%, ${rgba(c2, 0.65)} 0%, transparent 55%)`,
+    `radial-gradient(ellipse at 70% 10%, ${rgba(lighten(c1, 0.8), 0.30)} 0%, transparent 30%)`,
+    `radial-gradient(ellipse at 15% 85%, ${rgba(c2, 0.40)} 0%, transparent 35%)`,
+    `#0e0e16`,
+  ].join(', ')
+}
+
+const groupByDomain = (files: SavedFileEntry[]): BrandGroup[] => {
+  const map = new Map<string, SavedFileEntry[]>()
+  for (const f of files) {
+    const existing = map.get(f.domain) || []
+    map.set(f.domain, [...existing, f])
+  }
+  return Array.from(map.entries()).map(([domain, snapshots]) => ({
+    domain,
+    snapshots: snapshots.sort((a, b) => new Date(b.extractedAt).getTime() - new Date(a.extractedAt).getTime()),
+    latest: snapshots[0],
+  }))
 }
 
 // Standard result type
@@ -102,11 +176,13 @@ function App() {
   const [result, setResult] = useState<ExtractionResult | null>(null)
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [dropdownIndex, setDropdownIndex] = useState(0)
-  const [gridIndex, setGridIndex] = useState(0)
+
   const [savedFiles, setSavedFiles] = useState<SavedFileEntry[]>([])
   const [loadingSavedFiles, setLoadingSavedFiles] = useState(false)
   const [activeSection, setActiveSection] = useState<string>('')
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [expandedDomain, setExpandedDomain] = useState<string | null>(null)
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const isLoadingRef = useRef(false)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') {
@@ -159,94 +235,23 @@ function App() {
     window.location.hash = ''
   }, [])
 
-  // Navigate to adjacent extraction
-  const navigateToAdjacent = useCallback((direction: 'prev' | 'next') => {
-    if (!result || savedFiles.length === 0) return
-    const currentDomain = getDomain(result.url)
-    const currentIndex = savedFiles.findIndex(f => getDomain(f.url) === currentDomain)
-    if (currentIndex === -1) return
 
-    const newIndex = direction === 'next'
-      ? (currentIndex + 1) % savedFiles.length
-      : (currentIndex - 1 + savedFiles.length) % savedFiles.length
-    loadSavedFile(savedFiles[newIndex])
-  }, [result, savedFiles])
 
-  // Arrow key navigation (WASD as aliases)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
 
-      const key = e.key
-      const isLeft  = key === 'ArrowLeft'  || key === 'a'
-      const isRight = key === 'ArrowRight' || key === 'd'
-      const isUp    = key === 'ArrowUp'    || key === 'w'
-      const isDown  = key === 'ArrowDown'  || key === 's'
-      const isEnter = key === 'Enter'
-      const isEsc   = key === 'Escape'
-
-      // Dropdown open: up/down scroll list, Enter confirm, Esc close
-      if (dropdownOpen && savedFiles.length > 0) {
-        if (isUp || isLeft) {
-          e.preventDefault()
-          setDropdownIndex(prev => (prev - 1 + savedFiles.length) % savedFiles.length)
-        } else if (isDown || isRight) {
-          e.preventDefault()
-          setDropdownIndex(prev => (prev + 1) % savedFiles.length)
-        } else if (isEnter) {
-          e.preventDefault()
-          loadSavedFile(savedFiles[dropdownIndex])
-          setDropdownOpen(false)
-        } else if (isEsc) {
-          e.preventDefault()
-          setDropdownOpen(false)
-        }
-        return
+  const deleteFile = async (file: SavedFileEntry) => {
+    try {
+      await fetch(`http://localhost:3002/api/saved-extractions/${file.domain}/${file.filename}`, { method: 'DELETE' })
+      setDeletingId(null)
+      if (selectedFileId === file.id) {
+        setResult(null)
+        setSelectedFileId(null)
+        window.location.hash = ''
       }
-
-      // Home grid: arrows move focus, Enter/down opens
-      if (!result && savedFiles.length > 0) {
-        const cols = window.innerWidth >= 768 ? 3 : window.innerWidth >= 640 ? 2 : 1
-        if (isLeft) {
-          e.preventDefault()
-          setGridIndex(prev => (prev - 1 + savedFiles.length) % savedFiles.length)
-        } else if (isRight) {
-          e.preventDefault()
-          setGridIndex(prev => (prev + 1) % savedFiles.length)
-        } else if (isUp) {
-          e.preventDefault()
-          setGridIndex(prev => (prev - cols + savedFiles.length) % savedFiles.length)
-        } else if (isDown || isEnter) {
-          e.preventDefault()
-          loadSavedFile(savedFiles[gridIndex])
-        }
-        return
-      }
-
-      // Site view: up = home, down = open switcher, left/right = prev/next
-      if (result) {
-        if (isUp) {
-          e.preventDefault()
-          navigateHome()
-        } else if (isDown) {
-          e.preventDefault()
-          const currentIndex = savedFiles.findIndex(f => getDomain(f.url) === getDomain(result.url))
-          setDropdownIndex(currentIndex >= 0 ? currentIndex : 0)
-          setDropdownOpen(true)
-        } else if (isLeft) {
-          e.preventDefault()
-          navigateToAdjacent('prev')
-        } else if (isRight) {
-          e.preventDefault()
-          navigateToAdjacent('next')
-        }
-      }
+      setSavedFiles(prev => prev.filter(f => f.id !== file.id))
+    } catch (e) {
+      console.error('Failed to delete file:', e)
     }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [result, navigateToAdjacent, navigateHome, dropdownOpen, dropdownIndex, gridIndex, savedFiles])
-
-
+  }
 
   const fetchSavedFiles = async () => {
     setLoadingSavedFiles(true)
@@ -301,6 +306,46 @@ function App() {
   const colors = result?.colors?.palette || []
   const typography = result?.typography?.styles || []
   const fontFamily = typography[0]?.family || 'system-ui, sans-serif'
+
+  const copy = (key: string, text: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedKey(key)
+    setTimeout(() => setCopiedKey(null), 1500)
+  }
+
+  const buildCssVars = () => {
+    const lines: string[] = [':root {']
+    if (colors.length) {
+      lines.push('  /* Colors */')
+      colors.forEach((c, i) => {
+        const name = `--color-${i + 1}`
+        lines.push(`  ${name}: ${c.normalized || c.color};`)
+      })
+    }
+    const seen = new Set<string>()
+    const deduped = typography.filter(t => { const k = `${t.family}|${t.context}`; if (seen.has(k)) return false; seen.add(k); return true })
+    if (deduped.length) {
+      lines.push('  /* Typography */')
+      if (fontFamily) lines.push(`  --font-family: ${fontFamily};`)
+      deduped.forEach(t => {
+        const slug = t.context.toLowerCase().replace(/\s+/g, '-')
+        if (t.size) lines.push(`  --font-size-${slug}: ${t.size};`)
+        if (t.weight) lines.push(`  --font-weight-${slug}: ${t.weight};`)
+      })
+    }
+    const spacing = result?.spacing?.commonValues || []
+    if (spacing.length) {
+      lines.push('  /* Spacing */')
+      spacing.forEach(s => lines.push(`  --spacing-${s.px}: ${s.px}px;`))
+    }
+    const radii = result?.borderRadius?.values || []
+    if (radii.length) {
+      lines.push('  /* Border Radius */')
+      radii.forEach((r, i) => lines.push(`  --radius-${i + 1}: ${r.value};`))
+    }
+    lines.push('}')
+    return lines.join('\n')
+  }
   const shadows = result?.shadows || []
   const spacing = result?.spacing?.commonValues || []
   const borderRadius = result?.borderRadius?.values || []
@@ -335,17 +380,6 @@ function App() {
               <img src="/logo.png" alt="Dembrandt" className="h-5 w-auto" />
             </button>
 
-            {/* Arrow / WASD Legend */}
-            <div className="hidden sm:flex items-center gap-1.5 text-sm text-[#c0c0cc] ml-2">
-              <kbd className="px-1.5 py-0.5 bg-[#22222e] border border-[#3a3a4a] rounded text-white text-xs">↑</kbd>
-              <span>home</span>
-              <kbd className="px-1.5 py-0.5 bg-[#22222e] border border-[#3a3a4a] rounded text-white text-xs ml-2">↓</kbd>
-              <span>open</span>
-              <kbd className="px-1.5 py-0.5 bg-[#22222e] border border-[#3a3a4a] rounded text-white text-xs ml-2">←</kbd>
-              <kbd className="px-1.5 py-0.5 bg-[#22222e] border border-[#3a3a4a] rounded text-white text-xs">→</kbd>
-              <span>nav</span>
-            </div>
-
             {/* Dropdown selector */}
             {result && (
               <>
@@ -354,13 +388,7 @@ function App() {
                 </svg>
                 <div className="relative">
                   <button
-                    onClick={() => {
-                      if (!dropdownOpen) {
-                        const currentIndex = savedFiles.findIndex(f => getDomain(f.url) === getDomain(result.url))
-                        setDropdownIndex(currentIndex >= 0 ? currentIndex : 0)
-                      }
-                      setDropdownOpen(!dropdownOpen)
-                    }}
+                    onClick={() => setDropdownOpen(!dropdownOpen)}
                     className="flex items-center gap-2 text-white text-sm bg-[#1a1a24] border border-[#2a2a34] rounded-md px-3 py-1.5 hover:border-[#3a3a44] transition-colors min-w-[180px] cursor-pointer"
                   >
                     <img
@@ -377,64 +405,55 @@ function App() {
                   {dropdownOpen && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
-                      <div className="absolute top-full left-0 mt-1 bg-[#12121a] border border-[#2a2a34] rounded-md shadow-2xl z-50 min-w-[220px] max-h-[calc(100vh-80px)] overflow-y-auto py-1">
-                        {savedFiles.map((file, index) => {
-                          const isActive = file.id === selectedFileId
-                          const isFocused = index === dropdownIndex
+                      <div className="absolute top-full left-0 mt-1 bg-[#12121a] border border-[#2a2a34] rounded-md shadow-2xl z-50 min-w-[240px] max-h-[calc(100vh-80px)] overflow-y-auto py-1">
+                        {groupByDomain(savedFiles).map((group) => {
+                          const _activeDomain = savedFiles.find(f => f.id === selectedFileId)?.domain ?? getDomain(result.url)
+                          const isCurrent = _activeDomain === group.domain
+                          const hasMany = group.snapshots.length > 1
                           return (
-                            <button
-                              key={file.id}
-                              onClick={() => {
-                                loadSavedFile(file)
-                                setDropdownOpen(false)
-                              }}
-                              onMouseEnter={() => setDropdownIndex(index)}
-                              className={`w-full text-left px-2.5 py-2 text-sm flex items-center gap-2.5 transition-colors mx-1 rounded cursor-pointer ${
-                                isFocused
-                                  ? 'bg-[#1a1a24] text-white'
-                                  : 'text-[#a0a0b0] hover:text-white hover:bg-[#1a1a24]'
-                              } ${isActive ? 'font-bold' : ''}`}
-                              style={{ width: 'calc(100% - 8px)' }}
-                            >
-                              <img
-                                src={`https://www.google.com/s2/favicons?domain=${file.domain}&sz=32`}
-                                alt=""
-                                className="w-4 h-4 rounded"
-                                onError={(e) => e.currentTarget.style.display = 'none'}
-                              />
-                              <span className="truncate flex-1">{getBrandName(file.url)}</span>
-                              {isActive && (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-brand shrink-0">
-                                  <path d="M20 6L9 17l-5-5"/>
-                                </svg>
+                            <div key={group.domain}>
+                              {/* Brand row */}
+                              <button
+                                onClick={() => { loadSavedFile(group.latest); setDropdownOpen(false) }}
+                                className={`w-full text-left px-2.5 py-2 text-sm flex items-center gap-2.5 transition-colors mx-1 rounded cursor-pointer ${
+                                  isCurrent ? 'text-white bg-[#1a1a24]' : 'text-[#a0a0b0] hover:text-white hover:bg-[#1a1a24]'
+                                }`}
+                                style={{ width: 'calc(100% - 8px)' }}
+                              >
+                                <img src={`https://www.google.com/s2/favicons?domain=${group.domain}&sz=32`} alt="" className="w-4 h-4 rounded" onError={(e) => e.currentTarget.style.display = 'none'} />
+                                <span className="truncate flex-1">
+                                  {getBrandName(group.latest.url)}
+                                  {hasMany && <span className="text-[#555] ml-1">({group.snapshots.length})</span>}
+                                </span>
+                                {isCurrent && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-brand shrink-0"><path d="M20 6L9 17l-5-5"/></svg>}
+                              </button>
+                              {/* Snapshots — always visible when this brand is active */}
+                              {isCurrent && hasMany && (
+                                <div className="ml-6 mb-1 border-l border-[#2a2a34] pl-2">
+                                  {group.snapshots.map((snap) => {
+                                    const isActive = snap.id === selectedFileId
+                                    const path = snap.url.replace(/^https?:\/\//, '').replace(snap.domain, '') || '/'
+                                    return (
+                                      <button
+                                        key={snap.id}
+                                        onClick={() => { loadSavedFile(snap); setDropdownOpen(false) }}
+                                        className={`w-full text-left px-2 py-1 text-xs rounded transition-colors cursor-pointer flex items-center gap-2 ${
+                                          isActive ? 'text-white font-medium' : 'text-[#666] hover:text-[#aaa]'
+                                        }`}
+                                      >
+                                        <span className="shrink-0 text-[#444]">{isActive ? '▶' : '·'}</span>
+                                        <span className="truncate">{new Date(snap.extractedAt).toLocaleDateString()} {path !== '/' && <span className="text-[#444]">{path.slice(0, 20)}</span>}</span>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
                               )}
-                            </button>
+                            </div>
                           )
                         })}
                       </div>
                     </>
                   )}
-                </div>
-                {/* Navigation buttons */}
-                <div className="flex items-center gap-1 ml-2">
-                  <button
-                    onClick={() => navigateToAdjacent('prev')}
-                    className="text-[#a0a0b2] hover:text-white p-2 rounded hover:bg-[#1a1a24] transition-colors cursor-pointer"
-                    title="Previous (A)"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M15 18l-6-6 6-6"/>
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => navigateToAdjacent('next')}
-                    className="text-[#a0a0b2] hover:text-white p-2 rounded hover:bg-[#1a1a24] transition-colors cursor-pointer"
-                    title="Next (D)"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M9 6l6 6-6 6"/>
-                    </svg>
-                  </button>
                 </div>
               </>
             )}
@@ -510,30 +529,107 @@ function App() {
                     </button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {savedFiles.map((file, index) => (
-                      <div
-                        key={file.id}
-                        className={`bg-card rounded-2xl p-5 cursor-pointer hover:bg-card-hover transition-all group relative text-left ${
-                          index === gridIndex ? 'ring-2 ring-brand ring-offset-2 ring-offset-background' : ''
-                        }`}
-                        onClick={() => loadSavedFile(file)}
-                        onMouseEnter={() => setGridIndex(index)}
-                      >
-                        <div className="mb-2">
-                          <img
-                             src={`https://www.google.com/s2/favicons?domain=${file.domain}&sz=64`}
-                             alt=""
-                             className="w-8 h-8 rounded-lg"
-                             onError={(e) => e.currentTarget.style.display = 'none'}
-                          />
+                    {groupByDomain(savedFiles).map((group) => {
+                      const file = group.latest
+                      const gradient = getBrandGradient(file.brandColors)
+                      const isExpanded = expandedDomain === group.domain
+                      const hasMultiple = group.snapshots.length > 1
+                      return (
+                        <div key={group.domain} className="flex flex-col gap-2">
+                          {/* Main card */}
+                          <div
+                            className={`rounded-2xl cursor-pointer transition-all group relative overflow-hidden ${gradient ? 'bg-[#0a0a0f]' : 'bg-card hover:bg-card-hover'}`}
+                            style={gradient ? { background: gradient } : undefined}
+                            onClick={() => deletingId !== file.id && loadSavedFile(file)}
+                          >
+                            {deletingId === file.id ? (
+                              <div className="flex flex-col gap-3 p-5 h-[220px] justify-between">
+                                <p className="text-sm font-medium text-white">Remove this extraction?</p>
+                                <div className="flex gap-2">
+                                  <button onClick={(e) => { e.stopPropagation(); deleteFile(file) }} className="px-3 py-1.5 rounded-md bg-red-500/20 border border-red-500/40 text-red-300 text-xs hover:bg-red-500/30 transition-colors cursor-pointer">Remove</button>
+                                  <button onClick={(e) => { e.stopPropagation(); setDeletingId(null) }} className="px-3 py-1.5 rounded-md bg-white/10 border border-white/20 text-white/70 text-xs hover:text-white transition-colors cursor-pointer">Cancel</button>
+                                </div>
+                              </div>
+                            ) : (
+                              /* Portrait card — logo centred, footer row at bottom */
+                              <div className="flex flex-col h-[220px]">
+                                {/* Logo area — grows to fill space, centres logo */}
+                                <div className="flex-1 flex items-center justify-center">
+                                  <img
+                                    src={`https://www.google.com/s2/favicons?domain=${file.domain}&sz=128`}
+                                    alt=""
+                                    className={`rounded-2xl shadow-xl ${gradient ? 'w-16 h-16' : 'w-10 h-10'}`}
+                                    onError={(e) => e.currentTarget.style.display = 'none'}
+                                  />
+                                </div>
+                                {/* Footer */}
+                                <div className="px-4 pb-4 flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-xs font-medium ${gradient ? 'text-white/70' : 'text-secondary'}`}>{file.domain}</span>
+                                    {group.snapshots.length > 1 && (
+                                      <span className={`text-xs px-1.5 py-0.5 rounded-md ${gradient ? 'bg-white/10 text-white/50' : 'bg-surface text-tertiary'}`}>
+                                        {group.snapshots.length}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-xs ${gradient ? 'text-white/40' : 'text-tertiary'}`}>
+                                      open ↗
+                                    </span>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setDeletingId(file.id) }}
+                                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-white/30 hover:text-white transition-all cursor-pointer"
+                                      title="Remove"
+                                    >
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Snapshots toggle + list */}
+                          {hasMultiple && (
+                            <div>
+                              <button
+                                onClick={() => setExpandedDomain(isExpanded ? null : group.domain)}
+                                className="text-xs text-tertiary hover:text-secondary transition-colors flex items-center gap-1.5 px-1 cursor-pointer"
+                              >
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`}><path d="M9 6l6 6-6 6"/></svg>
+                                {group.snapshots.length} snapshots
+                              </button>
+                              {isExpanded && (
+                                <div className="mt-1 ml-1 border-l border-border pl-3 space-y-0.5">
+                                  {group.snapshots.map((snap, si) => (
+                                    <div key={snap.id} className="flex items-center justify-between group/snap">
+                                      <button
+                                        onClick={() => loadSavedFile(snap)}
+                                        className={`text-xs py-1 text-left transition-colors hover:text-primary cursor-pointer ${selectedFileId === snap.id ? 'text-brand font-medium' : 'text-tertiary'}`}
+                                      >
+                                        {si === 0 ? 'Latest' : new Date(snap.extractedAt).toLocaleDateString()} · {snap.url.replace(/^https?:\/\//, '').replace(snap.domain, '').slice(0, 30) || '/'}
+                                      </button>
+                                      <button
+                                        onClick={() => setDeletingId(snap.id)}
+                                        className="opacity-0 group-hover/snap:opacity-100 p-0.5 text-tertiary hover:text-primary transition-all cursor-pointer"
+                                      >
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                                      </button>
+                                      {deletingId === snap.id && (
+                                        <div className="flex gap-1.5 ml-2">
+                                          <button onClick={() => deleteFile(snap)} className="text-red-400 text-xs hover:text-red-300 cursor-pointer">Remove</button>
+                                          <button onClick={() => setDeletingId(null)} className="text-tertiary text-xs hover:text-secondary cursor-pointer">Cancel</button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        <h3 className="font-bold text-xl text-primary">{getBrandName(file.url)}</h3>
-                        <p className="text-secondary text-sm mt-0.5">{file.domain}</p>
-                        <p className="text-tertiary text-xs mt-2">
-                          {new Date(file.extractedAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -544,29 +640,77 @@ function App() {
           {/* Results */}
           {result && (
             <>
+              {/* Snapshot revision picker — sticky top-right */}
+              {(() => {
+                const currentDomain = savedFiles.find(f => f.id === selectedFileId)?.domain ?? getDomain(result.url)
+                const snaps = savedFiles.filter(f => f.domain === currentDomain)
+                if (snaps.length < 2) return null
+                return (
+                  <div className="sticky top-20 z-30 flex justify-end mb-2 pointer-events-none">
+                    <div className="flex items-center gap-2 pointer-events-auto">
+                    <span className="text-xs text-[#888] select-none">versions</span>
+                    <div className="flex items-center gap-px bg-[#12121a] border border-[#2a2a34] rounded-md overflow-hidden shadow-lg">
+                      {snaps.map((snap, i) => {
+                        const isActive = snap.id === selectedFileId
+                        return (
+                          <button
+                            key={snap.id}
+                            onClick={() => loadSavedFile(snap)}
+                            className={`text-xs px-2.5 py-1.5 transition-all cursor-pointer whitespace-nowrap ${
+                              isActive
+                                ? 'bg-[#2e2e3e] text-white font-medium'
+                                : 'text-[#555] hover:text-[#999] hover:bg-[#1a1a24]'
+                            } ${i > 0 ? 'border-l border-[#2a2a34]' : ''}`}
+                          >
+                            {new Date(snap.extractedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* Brand Header */}
               <div className="text-center mb-12">
                 <h2 className="text-5xl font-bold mb-2">{getBrandName(result.url)}</h2>
-                <div className="flex items-center justify-center gap-3 mt-1">
+                <div className="flex items-center justify-center gap-3 mt-1 flex-wrap">
                   <span className="text-secondary text-sm">{getDomain(result.url)}</span>
                   <a
                     href={result.url.startsWith('http') ? result.url : `https://${result.url}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs text-[#666] hover:text-[#aaa] transition-colors border border-[#2a2a34] hover:border-[#3a3a44] rounded-md px-2.5 py-1"
+                    className="inline-flex items-center gap-1.5 text-xs text-tertiary hover:text-secondary transition-colors border border-border-strong hover:border-border rounded-md px-2.5 py-1"
                   >
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
                     </svg>
                     Inspect live
                   </a>
+                  <button
+                    onClick={() => copy('css-all', buildCssVars())}
+                    className="inline-flex items-center gap-1.5 text-xs text-tertiary hover:text-secondary transition-colors border border-border-strong hover:border-border rounded-md px-2.5 py-1 cursor-pointer"
+                  >
+                    {copiedKey === 'css-all' ? (
+                      <>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                        Copy CSS
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
 
               {/* Sections */}
               <div className="flex gap-8">
                 <div className="hidden lg:block w-36 shrink-0">
-                <nav className="sticky top-20 pt-1 space-y-0.5">
+                <nav className="sticky top-20 pt-1 border-l border-border ml-2">
                   {navSections.map(s => {
                     const isActive = activeSection === s.id
                     return (
@@ -577,13 +721,12 @@ function App() {
                           e.preventDefault()
                           document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                         }}
-                        className={`flex items-center gap-2 text-xs py-1.5 px-2 rounded-md transition-all cursor-pointer ${
+                        className={`flex items-center text-xs py-1 pl-3 transition-colors cursor-pointer border-l -ml-px ${
                           isActive
-                            ? 'text-white bg-[#1a1a2e] font-medium'
-                            : 'text-[#666] hover:text-[#aaa]'
+                            ? 'text-primary font-medium border-primary'
+                            : 'text-tertiary hover:text-secondary border-transparent'
                         }`}
                       >
-                        {isActive && <span className="w-1 h-1 rounded-full bg-brand shrink-0" />}
                         {s.label}
                       </a>
                     )
@@ -667,9 +810,9 @@ function App() {
                               )}
                             </div>
                             <div className="flex gap-1.5 flex-wrap">
-                              <span className="text-[10px] px-1.5 py-0.5 bg-surface border border-border rounded text-secondary">{inst.context}</span>
-                              {inst.type && <span className="text-[10px] px-1.5 py-0.5 bg-surface border border-border rounded text-tertiary">{inst.type}</span>}
-                              {inst.reversed && <span className="text-[10px] px-1.5 py-0.5 bg-[#1a1a24] border border-[#2a2a34] rounded text-[#a0a0b2]">reversed</span>}
+                              <span className="text-xs px-1.5 py-0.5 bg-surface border border-border rounded text-secondary">{inst.context}</span>
+                              {inst.type && <span className="text-xs px-1.5 py-0.5 bg-surface border border-border rounded text-tertiary">{inst.type}</span>}
+                              {inst.reversed && <span className="text-xs px-1.5 py-0.5 bg-[#1a1a24] border border-[#2a2a34] rounded text-[#a0a0b2]">reversed</span>}
                             </div>
                           </div>
                         )
@@ -699,14 +842,14 @@ function App() {
                         <div
                           className="w-16 h-16 rounded-xl cursor-pointer hover:scale-105 transition-transform shadow-lg"
                           style={{ backgroundColor: c.normalized || c.color }}
-                          onClick={() => navigator.clipboard.writeText(c.normalized || c.color)}
+                          onClick={() => copy(`color-${i}`, c.normalized || c.color)}
                         />
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                           <div className="bg-[#1a1a24] border border-[#2a2a34] rounded-lg p-3 text-xs whitespace-nowrap shadow-xl">
                             <div className="text-white font-mono mb-1">{c.normalized || c.color}</div>
                             {c.lch && <div className="text-[#8b8b9e] font-mono">{c.lch}</div>}
                             {c.oklch && <div className="text-[#8b8b9e] font-mono">{c.oklch}</div>}
-                            <div className="text-[#6b6b7e] mt-1.5">click to copy</div>
+                            <div className="text-[#6b6b7e] mt-1.5">{copiedKey === `color-${i}` ? '✓ copied' : 'click to copy'}</div>
                           </div>
                         </div>
                       </div>
@@ -735,8 +878,11 @@ function App() {
                       <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Typography ({deduped.length})</h3>
                       <p className="text-tertiary font-mono text-xs mb-6">{fontFamily}</p>
                       <div className="space-y-6">
-                        {deduped.map((t, i) => (
-                          <div key={i} className="flex flex-col gap-1">
+                        {deduped.map((t, i) => {
+                          const typoCss = `font-family: ${t.family};\nfont-size: ${t.size};\nfont-weight: ${t.weight};${t.lineHeight ? `\nline-height: ${t.lineHeight};` : ''}`
+                          const key = `typo-${i}`
+                          return (
+                          <div key={i} className="flex flex-col gap-1 group/typo cursor-pointer" onClick={() => copy(key, typoCss)} title="Click to copy CSS">
                             <span className="text-brand font-medium text-xs uppercase tracking-tight">{t.context}</span>
                             <span className="text-primary leading-tight" style={{ fontFamily: t.family, fontSize: previewSize(t.size), fontWeight: t.weight }}>
                               The quick brown fox
@@ -746,9 +892,13 @@ function App() {
                               <span>·</span>
                               <span>{t.weight}</span>
                               {t.lineHeight && <><span>·</span><span>{t.lineHeight}</span></>}
+                              <span className="opacity-0 group-hover/typo:opacity-100 transition-opacity ml-1">
+                                {copiedKey === key ? '✓ copied' : '· copy CSS'}
+                              </span>
                             </div>
                           </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </section>
                   )
@@ -762,7 +912,7 @@ function App() {
                       <span
                         key={i}
                         className="px-3 py-1.5 rounded-lg bg-surface border border-border text-sm text-secondary cursor-pointer hover:border-brand transition-colors"
-                        onClick={() => navigator.clipboard.writeText(`${s.px}px`)}
+                        onClick={() => copy(`spacing-${s.px}`, `${s.px}px`)}
                       >
                         {s.px}px
                       </span>
@@ -783,7 +933,7 @@ function App() {
                           className="w-16 h-16 rounded-xl bg-shadow-preview-card cursor-pointer hover:scale-105 transition-transform"
                           style={{ boxShadow: s.shadow }}
                           title={s.shadow}
-                          onClick={() => navigator.clipboard.writeText(s.shadow)}
+                          onClick={() => copy(`shadow-${i}`, s.shadow)}
                         />
                       ))}
                     </div>
@@ -797,14 +947,14 @@ function App() {
                   <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Border Radius ({borderRadius.length})</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                     {borderRadius.length > 0 ? borderRadius.map((r: any, i) => (
-                      <div key={i} className="flex flex-col gap-2 cursor-pointer" onClick={() => navigator.clipboard.writeText(r.value)}>
+                      <div key={i} className="flex flex-col gap-2 cursor-pointer" onClick={() => copy(`radius-${i}`, r.value)}>
                         <div className="aspect-square bg-surface border border-border group hover:border-brand transition-colors flex items-center justify-center relative overflow-hidden" style={{ borderRadius: r.value }}>
                            <div className="w-full h-full bg-brand/10 absolute inset-0" />
                            <span className="text-brand font-mono text-xs z-10">{r.value}</span>
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {r.elements?.slice(0, 2).map((el: string, j: number) => (
-                            <span key={j} className="text-[10px] text-tertiary px-1.5 py-0.5 bg-surface rounded uppercase tracking-tighter">{el}</span>
+                            <span key={j} className="text-xs text-tertiary px-1.5 py-0.5 bg-surface rounded uppercase tracking-tighter">{el}</span>
                           ))}
                         </div>
                       </div>
@@ -840,7 +990,7 @@ function App() {
                             >
                               {label}
                             </button>
-                            <span className="text-[10px] text-[#555] font-mono">{s.borderRadius}</span>
+                            <span className="text-xs text-[#555] font-mono">{s.borderRadius}</span>
                           </div>
                         )
                       })}
