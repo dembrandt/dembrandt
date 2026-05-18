@@ -16,7 +16,7 @@ interface ExtractionResult {
   }
   spacing?: {
     scaleType?: string
-    commonValues?: Array<{ px: number; rem: string; count: number }>
+    commonValues?: Array<{ px: string; rem: string; count: number; numericValue?: number }>
   }
   borderRadius?: {
     values?: Array<{ value: string; count: number; confidence: string; elements?: string[] }>
@@ -183,6 +183,7 @@ function App() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [expandedDomain, setExpandedDomain] = useState<string | null>(null)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  const [openColorPicker, setOpenColorPicker] = useState<number | null>(null)
   const isLoadingRef = useRef(false)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') {
@@ -234,6 +235,34 @@ function App() {
     setSelectedFileId(null)
     window.location.hash = ''
   }, [])
+
+  // Navigate through all snapshots, grouped by brand (3 stripe snapshots → 3 stops, then next brand)
+  const navigateBrand = useCallback((direction: 'prev' | 'next') => {
+    if (!result || savedFiles.length === 0) return
+    const flat = groupByDomain(savedFiles).flatMap(g => g.snapshots)
+    const currentDomain = savedFiles.find(f => f.id === selectedFileId)?.domain ?? getDomain(result.url)
+    let idx = flat.findIndex(f => f.id === selectedFileId)
+    if (idx === -1) idx = flat.findIndex(f => f.domain === currentDomain)
+    if (idx === -1) return
+    const newIdx = direction === 'next'
+      ? (idx + 1) % flat.length
+      : (idx - 1 + flat.length) % flat.length
+    loadSavedFile(flat[newIdx])
+  }, [result, savedFiles, selectedFileId])
+
+  // A/D keyboard shortcuts (only on site view)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!result) return
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const k = e.key.toLowerCase()
+      if (k === 'a') { e.preventDefault(); navigateBrand('prev') }
+      else if (k === 'd') { e.preventDefault(); navigateBrand('next') }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [result, navigateBrand])
 
 
 
@@ -336,7 +365,7 @@ function App() {
     const spacing = result?.spacing?.commonValues || []
     if (spacing.length) {
       lines.push('  /* Spacing */')
-      spacing.forEach(s => lines.push(`  --spacing-${s.px}: ${s.px}px;`))
+      spacing.forEach(s => lines.push(`  --spacing-${s.numericValue ?? s.px}: ${s.px};`))
     }
     const radii = result?.borderRadius?.values || []
     if (radii.length) {
@@ -455,6 +484,27 @@ function App() {
                     </>
                   )}
                 </div>
+                {/* Prev/next snapshot (across brands) */}
+                {savedFiles.length > 1 && (
+                  <div className="flex items-center ml-1">
+                    <button
+                      onClick={() => navigateBrand('prev')}
+                      className="text-[#a0a0b2] hover:text-white p-1.5 rounded hover:bg-[#1a1a24] transition-colors cursor-pointer"
+                      title="Previous (A)"
+                      aria-label="Previous"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+                    </button>
+                    <button
+                      onClick={() => navigateBrand('next')}
+                      className="text-[#a0a0b2] hover:text-white p-1.5 rounded hover:bg-[#1a1a24] transition-colors cursor-pointer"
+                      title="Next (D)"
+                      aria-label="Next"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 6l6 6-6 6"/></svg>
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </nav>
@@ -837,23 +887,48 @@ function App() {
                 <section id="colors">
                   <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Colors ({colors.length})</h3>
                   <div className="flex flex-wrap gap-3">
-                    {colors.length > 0 ? colors.map((c, i) => (
-                      <div key={i} className="group relative">
-                        <div
-                          className="w-16 h-16 rounded-xl cursor-pointer hover:scale-105 transition-transform shadow-lg"
+                    {colors.length > 0 ? colors.map((c, i) => {
+                      const formats: { label: string; value: string }[] = []
+                      if (c.normalized) formats.push({ label: 'HEX', value: c.normalized })
+                      if (c.color && c.color !== c.normalized) formats.push({ label: 'RGB', value: c.color })
+                      if (c.lch) formats.push({ label: 'LCH', value: c.lch })
+                      if (c.oklch) formats.push({ label: 'OKLCH', value: c.oklch })
+                      const isOpen = openColorPicker === i
+                      return (
+                      <div key={i} className="relative">
+                        <button
+                          className={`w-16 h-16 rounded-xl cursor-pointer hover:scale-105 transition-transform shadow-lg block ${isOpen ? 'ring-2 ring-white/40 ring-offset-2 ring-offset-background' : ''}`}
                           style={{ backgroundColor: c.normalized || c.color }}
-                          onClick={() => copy(`color-${i}`, c.normalized || c.color)}
+                          onClick={() => setOpenColorPicker(isOpen ? null : i)}
+                          aria-label={`Color ${c.normalized || c.color}`}
                         />
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                          <div className="bg-[#1a1a24] border border-[#2a2a34] rounded-lg p-3 text-xs whitespace-nowrap shadow-xl">
-                            <div className="text-white font-mono mb-1">{c.normalized || c.color}</div>
-                            {c.lch && <div className="text-[#8b8b9e] font-mono">{c.lch}</div>}
-                            {c.oklch && <div className="text-[#8b8b9e] font-mono">{c.oklch}</div>}
-                            <div className="text-[#6b6b7e] mt-1.5">{copiedKey === `color-${i}` ? '✓ copied' : 'click to copy'}</div>
-                          </div>
-                        </div>
+                        {isOpen && (
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setOpenColorPicker(null)} />
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50">
+                              <div className="bg-[#1a1a24] border border-[#2a2a34] rounded-lg p-1 text-xs whitespace-nowrap shadow-2xl flex flex-col gap-px min-w-[220px]">
+                                {formats.map(f => {
+                                  const k = `color-${i}-${f.label}`
+                                  const isCopied = copiedKey === k
+                                  return (
+                                    <button
+                                      key={f.label}
+                                      onClick={(e) => { e.stopPropagation(); copy(k, f.value) }}
+                                      className="flex items-center gap-3 px-2.5 py-2 rounded hover:bg-[#2a2a34] cursor-pointer text-left transition-colors"
+                                    >
+                                      <span className="text-[#8b8b9e] text-[10px] tracking-wider w-11 shrink-0 font-medium">{f.label}</span>
+                                      <span className="text-white font-mono flex-1">{f.value}</span>
+                                      <span className={`text-[10px] w-12 text-right shrink-0 ${isCopied ? 'text-green-400' : 'text-[#6b6b7e]'}`}>{isCopied ? '✓ copied' : 'copy'}</span>
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
-                    )) : (
+                      )
+                    }) : (
                       <p className="text-tertiary text-sm">No colors found</p>
                     )}
                   </div>
@@ -908,15 +983,19 @@ function App() {
                 <section id="spacing">
                   <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Spacing ({spacing.length})</h3>
                   <div className="flex flex-wrap gap-2">
-                    {spacing.length > 0 ? spacing.map((s, i) => (
-                      <span
+                    {spacing.length > 0 ? spacing.map((s, i) => {
+                      const k = `spacing-${s.px}`
+                      const isCopied = copiedKey === k
+                      return (
+                      <button
                         key={i}
-                        className="px-3 py-1.5 rounded-lg bg-surface border border-border text-sm text-secondary cursor-pointer hover:border-brand transition-colors"
-                        onClick={() => copy(`spacing-${s.px}`, `${s.px}px`)}
+                        className={`px-3 py-1.5 rounded-lg bg-surface border text-sm cursor-pointer transition-colors ${isCopied ? 'border-green-400 text-green-400' : 'border-border text-secondary hover:border-brand'}`}
+                        onClick={() => copy(k, s.px)}
                       >
-                        {s.px}px
-                      </span>
-                    )) : (
+                        {isCopied ? `✓ ${s.px}` : s.px}
+                      </button>
+                      )
+                    }) : (
                       <p className="text-tertiary text-sm">No spacing found</p>
                     )}
                   </div>
@@ -926,16 +1005,27 @@ function App() {
                 <section id="shadows">
                   <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Shadows ({shadows.length})</h3>
                   {shadows.length > 0 ? (
-                    <div className="bg-shadow-preview-bg rounded-xl p-6 flex flex-wrap gap-4">
-                      {shadows.map((s, i) => (
-                        <div
-                          key={i}
-                          className="w-16 h-16 rounded-xl bg-shadow-preview-card cursor-pointer hover:scale-105 transition-transform"
-                          style={{ boxShadow: s.shadow }}
-                          title={s.shadow}
-                          onClick={() => copy(`shadow-${i}`, s.shadow)}
-                        />
-                      ))}
+                    <div className="bg-shadow-preview-bg rounded-xl p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+                      {shadows.map((s, i) => {
+                        const k = `shadow-${i}`
+                        const isCopied = copiedKey === k
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => copy(k, s.shadow)}
+                            className="flex flex-col gap-2 items-start text-left group cursor-pointer"
+                          >
+                            <div
+                              className="w-16 h-16 rounded-xl bg-shadow-preview-card group-hover:scale-105 transition-transform shrink-0"
+                              style={{ boxShadow: s.shadow }}
+                            />
+                            <div className="flex items-center gap-1.5 text-xs font-mono text-tertiary group-hover:text-secondary transition-colors min-w-0 max-w-full">
+                              <span className="truncate">{s.shadow}</span>
+                              <span className={`shrink-0 text-[10px] ${isCopied ? 'text-green-400' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>{isCopied ? '✓' : 'copy'}</span>
+                            </div>
+                          </button>
+                        )
+                      })}
                     </div>
                   ) : (
                     <p className="text-tertiary text-sm">No shadows found</p>
@@ -946,11 +1036,15 @@ function App() {
                 <section id="border-radius">
                   <h3 className="text-secondary text-xs uppercase tracking-wider mb-4">Border Radius ({borderRadius.length})</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                    {borderRadius.length > 0 ? borderRadius.map((r: any, i) => (
-                      <div key={i} className="flex flex-col gap-2 cursor-pointer" onClick={() => copy(`radius-${i}`, r.value)}>
-                        <div className="aspect-square bg-surface border border-border group hover:border-brand transition-colors flex items-center justify-center relative overflow-hidden" style={{ borderRadius: r.value }}>
+                    {borderRadius.length > 0 ? borderRadius.map((r: any, i) => {
+                      const k = `radius-${i}`
+                      const isCopied = copiedKey === k
+                      return (
+                      <div key={i} className="flex flex-col gap-2 cursor-pointer group" onClick={() => copy(k, r.value)}>
+                        <div className="aspect-square bg-surface border border-border group-hover:border-brand transition-colors flex items-center justify-center relative overflow-hidden" style={{ borderRadius: r.value }}>
                            <div className="w-full h-full bg-brand/10 absolute inset-0" />
                            <span className="text-brand font-mono text-xs z-10">{r.value}</span>
+                           <span className={`absolute top-1.5 right-1.5 text-[10px] z-10 ${isCopied ? 'text-green-400' : 'text-tertiary opacity-0 group-hover:opacity-100'} transition-opacity`}>{isCopied ? '✓ copied' : 'copy'}</span>
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {r.elements?.slice(0, 2).map((el: string, j: number) => (
@@ -958,7 +1052,8 @@ function App() {
                           ))}
                         </div>
                       </div>
-                    )) : (
+                      )
+                    }) : (
                       <p className="text-tertiary text-sm">No border radius found</p>
                     )}
                   </div>
