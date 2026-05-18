@@ -404,10 +404,25 @@ async function main() {
   );
 
   if (isBaseline) {
+    let ok = 0;
+    let failed = 0;
+    const failures = [];
     for (const domain of targetSites) {
-      extractSite(domain);
+      const result = extractSite(domain);
+      if (result) ok++;
+      else { failed++; failures.push(domain); }
     }
     console.log(`\nBaselines saved to ${GOLDEN_DIR}`);
+    console.log(`Extracted: ${ok}/${targetSites.length}, failed: ${failed}`);
+    if (failures.length > 0) console.log(`Failed sites: ${failures.join(", ")}`);
+    // CI mode: fail if >25% of sites fail to extract (signals a real regression in the engine)
+    if (isCI && failed > 0) {
+      const failRate = failed / targetSites.length;
+      if (failRate > 0.25) {
+        console.log(`\n${failed}/${targetSites.length} extractions failed (${Math.round(failRate * 100)}%) — failing CI`);
+        process.exit(1);
+      }
+    }
     return;
   }
 
