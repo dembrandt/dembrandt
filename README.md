@@ -45,11 +45,12 @@ Or add to your project's `.mcp.json`:
 
 ## What to expect from extraction?
 
-- Colors (semantic, palette, CSS variables)
+- Colors (semantic, palette, CSS variables, gradients)
 - Typography (fonts, sizes, weights, sources)
 - Spacing (margin/padding scales)
 - Borders (radius, widths, styles, colors)
 - Shadows
+- Motion (duration scale, easing curves, hover patterns per component type)
 - Components (buttons, badges, inputs, links)
 - Breakpoints
 - Icons & frameworks
@@ -150,6 +151,24 @@ dembrandt stripe.com --wcag
 ```
 
 Returns every text/background pair with contrast ratio and WCAG 2.1 grade (AA, AA-Large, AAA, or fail), sorted by how often each pair appears. Results are shown in terminal and included in JSON output as `wcag`.
+
+Also captures **interactive state contrast**: dembrandt simulates hover, focus, and disabled states on buttons, links, and inputs and checks contrast on each state. State pairs are tagged `[hover]`, `[focus]`, or `[disabled]` in output so you can catch contrast failures that only appear on interaction.
+
+### Motion Tokens
+
+Motion tokens are extracted automatically on every run — no flag needed. Dembrandt analyzes CSS transitions and animations across the page and returns a structured motion profile.
+
+```bash
+dembrandt stripe.com
+```
+
+Returns:
+- **Duration scale**: all unique animation durations found on the page
+- **Easing curves**: named easing types (ease-out, spring, custom cubic-bezier) with usage counts
+- **Per-context profiles**: motion behavior by component type (button, nav, card, modal, hero)
+- **Hover interaction deltas**: which properties animate on hover (transform, opacity, background, color) and the pattern (scale-up, fade-in, color-shift, slide-y)
+
+Motion data is included in JSON output as `motion` and printed in terminal under a dedicated Motion section.
 
 ### Brand Guide PDF
 
