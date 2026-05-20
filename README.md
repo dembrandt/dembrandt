@@ -135,7 +135,7 @@ The DTCG format is an industry-standard JSON schema that can be consumed by desi
 
 ### DESIGN.md
 
-Use `--design-md` to generate a [DESIGN.md](https://stitch.withgoogle.com/docs/design-md) file, a plain-text design system document readable by AI agents.
+Use `--design-md` to generate a [DESIGN.md](https://stitch.withgoogle.com/docs/design-md) file, a plain-text design system document readable by AI agents. The export follows Google's DESIGN.md draft format: YAML design tokens in front matter plus ordered Markdown guidance sections.
 
 ```bash
 dembrandt example.com --design-md
