@@ -105,3 +105,50 @@ test('generateDesignMd does not invent token defaults when extraction data is ab
   assert.doesNotMatch(output, /#000000|#FFFFFF|system-ui|16px|8px|button-observed/);
   assert.match(output, /without redesigning or correcting the source site/);
 });
+
+test('generateDesignMd does not promote transparent colors to opaque tokens', () => {
+  const output = generateDesignMd({
+    url: 'https://transparent.example',
+    colors: {
+      semantic: {
+        primary: 'rgba(0,0,0,0)',
+      },
+      palette: [
+        { color: 'rgba(255,0,0,0)', confidence: 'high' },
+        { color: '#33669900', confidence: 'high' },
+        { color: 'rgb(10, 20, 30)', confidence: 'medium' },
+      ],
+    },
+    components: {
+      buttons: [
+        {
+          backgroundColor: 'rgba(0, 0, 0, 0)',
+          color: 'rgb(255, 255, 255)',
+        },
+      ],
+    },
+  });
+
+  assert.match(output, /colors:\n  primary: "#0A141E"/);
+  assert.doesNotMatch(output, /#000000|#FF0000|#336699/);
+  assert.doesNotMatch(output, /\ncomponents:/);
+});
+
+test('generateDesignMd omits hidden input borders and empty component sections', () => {
+  const output = generateDesignMd({
+    url: 'https://inputs.example',
+    components: {
+      inputs: {
+        text: [
+          {
+            border: '0px none rgb(40, 40, 40)',
+          },
+        ],
+      },
+    },
+  });
+
+  assert.doesNotMatch(output, /0px none border/);
+  assert.doesNotMatch(output, /\ncomponents:/);
+  assert.doesNotMatch(output, /## Components/);
+});
