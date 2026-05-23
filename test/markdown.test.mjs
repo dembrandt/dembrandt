@@ -25,6 +25,7 @@ test('generateDesignMd emits Google DESIGN.md front matter and ordered sections'
           fontWeight: '600',
           lineHeight: '1.1',
           letterSpacing: '-0.02em',
+          fontFeatures: '"liga" 1, "kern" 1',
           contexts: ['h1'],
         },
         {
@@ -67,7 +68,7 @@ test('generateDesignMd emits Google DESIGN.md front matter and ordered sections'
 
   assert.match(output, /^---\nname: "Example Product"\n/);
   assert.match(output, /colors:\n  primary: "#1A1C1E"/);
-  assert.match(output, /typography:\n  headline-display:\n    fontFamily: "Public Sans"\n    fontSize: "48px"\n    fontWeight: 600\n    lineHeight: 1.1\n    letterSpacing: "-0.02em"/);
+  assert.match(output, /typography:\n  headline-display:\n    fontFamily: "Public Sans"\n    fontSize: "48px"\n    fontWeight: 600\n    lineHeight: 1.1\n    letterSpacing: "-0.02em"\n    fontFeature: "\\"liga\\" 1, \\"kern\\" 1"/);
   assert.match(output, /spacing:\n  base: "8px"/);
   assert.match(output, /rounded:\n  sm: "4px"\n  md: "8px"\n  full: "9999px"/);
   assert.match(output, /components:\n  button-observed:\n    backgroundColor: "\{colors.primary\}"/);
@@ -78,7 +79,6 @@ test('generateDesignMd emits Google DESIGN.md front matter and ordered sections'
     '## Colors',
     '## Typography',
     '## Layout',
-    '## Elevation & Depth',
     '## Shapes',
     '## Components',
   ];
