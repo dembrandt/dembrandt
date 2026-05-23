@@ -52,7 +52,29 @@ test('generateDesignMd emits Google DESIGN.md front matter and ordered sections'
         { value: '50%', confidence: 'medium' },
       ],
     },
-    shadows: [],
+    shadows: [
+      { shadow: '0 1px 2px rgba(0, 0, 0, 0.1)', count: 10 },
+      { shadow: '0 8px 24px rgba(0, 0, 0, 0.2)', count: 4 },
+    ],
+    borders: {
+      combinations: [
+        { width: '1px', style: 'solid', color: 'rgb(220, 220, 220)', count: 12 },
+      ],
+    },
+    gradients: [
+      { gradient: 'linear-gradient(90deg, rgb(0, 0, 0), rgb(255, 255, 255))', type: 'linear', count: 5 },
+    ],
+    motion: {
+      durations: [
+        { value: '150ms', ms: 150, count: 5 },
+        { value: '300ms', ms: 300, count: 3 },
+      ],
+      easings: [
+        { value: 'ease-out', type: 'ease-out', count: 8 },
+        { value: 'cubic-bezier(0.34, 1.56, 0.64, 1)', type: 'spring', count: 2 },
+      ],
+    },
+    breakpoints: [{ px: '768px' }, { px: '1024px' }],
     components: {
       buttons: [
         {
@@ -70,6 +92,11 @@ test('generateDesignMd emits Google DESIGN.md front matter and ordered sections'
   assert.match(output, /typography:\n  headline-display:\n    fontFamily: "Public Sans"\n    fontSize: "48px"\n    fontWeight: 600\n    lineHeight: 1.1\n    letterSpacing: "-0.02em"/);
   assert.match(output, /spacing:\n  base: "8px"/);
   assert.match(output, /rounded:\n  sm: "4px"\n  md: "8px"\n  full: "9999px"/);
+  assert.match(output, /elevation:\n  sm: "0 1px 2px rgba/);
+  assert.match(output, /borders:\n  sm:\n    width: "1px"\n    style: "solid"\n    color: "#DCDCDC"/);
+  assert.match(output, /gradients:\n  linear: "linear-gradient/);
+  assert.match(output, /motion:\n  duration:\n    fast: "150ms"\n    base: "300ms"\n  easing:\n    ease-out: "ease-out"/);
+  assert.match(output, /breakpoints:\n  sm: "768px"\n  md: "1024px"/);
   assert.match(output, /components:\n  button-observed:\n    backgroundColor: "\{colors.primary\}"/);
   assert.doesNotMatch(output, /## Do's and Don'ts/);
 
@@ -80,6 +107,8 @@ test('generateDesignMd emits Google DESIGN.md front matter and ordered sections'
     '## Layout',
     '## Elevation & Depth',
     '## Shapes',
+    '## Gradients',
+    '## Motion',
     '## Components',
   ];
 
@@ -101,6 +130,11 @@ test('generateDesignMd does not invent token defaults when extraction data is ab
   assert.doesNotMatch(output, /\ntypography:/);
   assert.doesNotMatch(output, /\nspacing:/);
   assert.doesNotMatch(output, /\nrounded:/);
+  assert.doesNotMatch(output, /\nelevation:/);
+  assert.doesNotMatch(output, /\nborders:/);
+  assert.doesNotMatch(output, /\ngradients:/);
+  assert.doesNotMatch(output, /\nmotion:/);
+  assert.doesNotMatch(output, /\nbreakpoints:/);
   assert.doesNotMatch(output, /\ncomponents:/);
   assert.doesNotMatch(output, /#000000|#FFFFFF|system-ui|16px|8px|button-observed/);
   assert.match(output, /without redesigning or correcting the source site/);
