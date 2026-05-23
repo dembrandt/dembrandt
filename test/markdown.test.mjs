@@ -5,7 +5,13 @@ import { generateDesignMd } from '../lib/formatters/markdown.js';
 test('generateDesignMd emits Google DESIGN.md front matter and ordered sections', () => {
   const output = generateDesignMd({
     url: 'https://example.com',
+    extractedAt: '2026-05-22T00:00:00.000Z',
     siteName: 'Example Product',
+    logo: { url: 'https://example.com/logo.svg', type: 'wordmark' },
+    favicons: [
+      { type: 'icon', url: 'https://example.com/favicon-32.png', sizes: '32x32' },
+      { type: 'og:image', url: 'https://example.com/og.png', sizes: null },
+    ],
     colors: {
       semantic: {
         primary: 'rgb(26, 28, 30)',
@@ -18,6 +24,7 @@ test('generateDesignMd emits Google DESIGN.md front matter and ordered sections'
       ],
     },
     typography: {
+      sources: { googleFonts: ['Public Sans'] },
       styles: [
         {
           fontFamily: 'Public Sans',
@@ -98,6 +105,8 @@ test('generateDesignMd emits Google DESIGN.md front matter and ordered sections'
   assert.match(output, /motion:\n  duration:\n    fast: "150ms"\n    base: "300ms"\n  easing:\n    ease-out: "ease-out"/);
   assert.match(output, /breakpoints:\n  sm: "768px"\n  md: "1024px"/);
   assert.match(output, /components:\n  button-observed:\n    backgroundColor: "\{colors.primary\}"/);
+  assert.match(output, /assets:\n  logo: "https:\/\/example.com\/logo.svg"\n  favicon: "https:\/\/example.com\/favicon-32.png"\n  socialImage: "https:\/\/example.com\/og.png"/);
+  assert.match(output, /meta:\n  source: "https:\/\/example.com"\n  extractedAt: "2026-05-22T00:00:00.000Z"\n  fontProvider: "Google Fonts \(Public Sans\)"/);
   assert.doesNotMatch(output, /## Do's and Don'ts/);
 
   const sectionOrder = [
@@ -110,6 +119,7 @@ test('generateDesignMd emits Google DESIGN.md front matter and ordered sections'
     '## Gradients',
     '## Motion',
     '## Components',
+    '## Assets',
   ];
 
   let previousIndex = -1;
@@ -136,8 +146,10 @@ test('generateDesignMd does not invent token defaults when extraction data is ab
   assert.doesNotMatch(output, /\nmotion:/);
   assert.doesNotMatch(output, /\nbreakpoints:/);
   assert.doesNotMatch(output, /\ncomponents:/);
+  assert.doesNotMatch(output, /\nassets:/);
   assert.doesNotMatch(output, /#000000|#FFFFFF|system-ui|16px|8px|button-observed/);
   assert.match(output, /without redesigning or correcting the source site/);
+  assert.match(output, /\nmeta:\n  source: "https:\/\/empty.example"/);
 });
 
 test('generateDesignMd does not promote transparent colors to opaque tokens', () => {
