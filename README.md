@@ -181,37 +181,6 @@ dembrandt example.com --brand-guide
 # Saves to: output/example.com/TIMESTAMP.brand-guide.pdf
 ```
 
-## Local UI
-
-Browse your extractions in a visual interface.
-
-### Setup
-
-```bash
-cd local-ui
-npm install
-```
-
-### Running
-
-```bash
-npm start
-```
-
-Opens http://localhost:5173 with API on port 3002.
-
-### Features
-
-- Visual grid of all extractions
-- Color palettes with click-to-copy
-- Typography specimens
-- Spacing, shadows, border radius visualization
-- Button and link component previews
-- Dark/light theme toggle
-- Section nav links on extraction pages, jump directly to Colors, Typography, Shadows, etc. via a sticky sidebar
-
-Extractions are performed via CLI (`dembrandt <url> --save-output`) and automatically appear in the UI.
-
 ## Recipes
 
 **Quick brand scan**
