@@ -4,7 +4,7 @@
  * Dembrandt - Design Token Extraction CLI
  *
  * Extracts design tokens, brand colors, typography, spacing, and component styles
- * from any website using Playwright with advanced bot detection avoidance.
+ * from any website using Playwright.
  */
 
 import { program } from "commander";
@@ -209,7 +209,7 @@ program
             err.message.includes("net::ERR_")
           ) {
             spinner.warn(
-              "Bot detection detected → retrying with visible browser"
+              "Navigation failed → retrying with visible browser"
             );
             console.error(chalk.dim(`  ↳ Error: ${err.message}`));
             console.error(chalk.dim(`  ↳ URL: ${url}`));
