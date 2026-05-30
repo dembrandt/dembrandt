@@ -48,6 +48,13 @@ jobs:
 
             - Bumped `dembrandt-skills` patch version
             - Updated CLI version references in skill files
+
+            **⚠ Manual check required before merging**
+            This automation only updates version numbers. If this release added or changed CLI flags, update `skills/extract-design/SKILL.md` manually:
+            - Flags reference table
+            - Anti-Bot section if behavior changed
+
+            See full checklist: [dembrandt/CLAUDE.md](https://github.com/dembrandt/dembrandt/blob/main/CLAUDE.md)
           labels: automated
 
   sync-next:
@@ -85,4 +92,15 @@ jobs:
             Automated bump triggered by [dembrandt ${{ github.event.release.tag_name || github.event.inputs.tag }}](${{ github.event.release.html_url || 'manual trigger' }}).
 
             Updates `dembrandt` npm dependency to latest release. Run `npm install` after merging.
+
+            **⚠ Manual check required before merging**
+            This automation only bumps the npm version in `package.json`. If this release added or changed CLI flags, update these manually before merging:
+            - `app/layout.tsx` — `softwareVersion` in schema.org JSON-LD
+            - `app/getting-started/page.tsx` — flags list
+            - `app/blackpaper/page.tsx` — flags list
+            - `app/page.tsx` — landing page flags (`new: true` for new ones)
+            - `lib/app/extract-types.ts` — `ExtractionMeta` if JSON output shape changed
+            - `app/api/extractions/route.ts` — if field access needs updating
+
+            See full checklist: [dembrandt/CLAUDE.md](https://github.com/dembrandt/dembrandt/blob/main/CLAUDE.md)
           labels: automated
