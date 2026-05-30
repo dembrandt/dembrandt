@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+> Ecosystem docs, release process, flag checklists, infrastructure: clone `github.com/dembrandt/dembrandt-internal` (private) and open its README.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
