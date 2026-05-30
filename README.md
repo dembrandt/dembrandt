@@ -51,13 +51,14 @@ npx skills add dembrandt/dembrandt-skills
 
 ## Dembrandt App (Beta)
 
-The **[Dembrandt App](https://www.dembrandt.com/app)** is the new home for your design system audits. It replaces the legacy Local UI with a more powerful, web-based management experience.
+**[dembrandt.com/app](https://www.dembrandt.com/app)** — load extractions, track token drift, and compare snapshots over time.
 
-* **Visual Management:** View typography, color palettes, and spacing scales in a clean, human-readable dashboard.
-* **Privacy-First:** No login required. No analytics. Your data is stored locally in your browser and is never sent to our servers.
-* **CLI Integration:** Simply run your extraction with `--save-output` and open the resulting JSON in the App for deep analysis.
-* **AI-Ready:** Copy tokens directly into your agentic workflows (Cursor, Claude, etc.) with one click.
-* **Public Beta:** More best-in-class features will be added to dembrandt App in upcoming weeks.
+* **Token drift tracking:** Pin any snapshot as your baseline. Every new extraction is automatically compared against it — colors, typography, spacing, radius, shadows.
+* **Visual diff:** See exactly what changed as a report with color swatches, before/after values, and delta scores.
+* **Snapshot timeline:** GitHub-style calendar showing your extraction history per domain.
+* **Copy tokens instantly:** Paste individual values straight into Copilot, Claude, or Cursor.
+* **Privacy-first:** No login required. Your data lives in your browser and is never sent to any server.
+* **Desktop-first:** Designed for designers and developers working at a desk.
 
 
 ## What to expect from extraction?
