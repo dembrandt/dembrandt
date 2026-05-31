@@ -41,9 +41,6 @@ coverage/
 
 build
 
-# Internal
-INTERNAL.md
-
 # Test artifacts
 test/golden/
 test/report-assets/
