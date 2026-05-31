@@ -13,10 +13,10 @@ Absolute Mode. Eliminate emojis, filler, hype, soft asks, conversational transit
 ```bash
 node index.js <url>
 node index.js dembrandt.com --json-only
-node index.js site.com --dark-mode
-node index.js site.com --mobile
-node index.js site.com --slow
-node index.js site.com --stealth
+node index.js dembrandt.com --dark-mode
+node index.js dembrandt.com --mobile
+node index.js dembrandt.com --slow
+node index.js dembrandt.com --stealth
 npm run install-browser
 ```
 
