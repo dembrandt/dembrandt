@@ -90,6 +90,11 @@ dembrandt example.com --crawl 10 --sitemap # Combine: up to 10 pages discovered 
 dembrandt example.com --no-sandbox     # Disable Chromium sandbox (required for Docker/CI)
 dembrandt example.com --browser=firefox # Use Firefox instead of Chromium (better for Cloudflare bypass)
 dembrandt example.com --wcag           # WCAG 2.1 contrast analysis — real DOM pairs, AA/AAA grades
+dembrandt example.com --stealth        # Opt-in anti-detection: navigator spoofing + human mouse simulation (use only when authorized)
+dembrandt example.com --locale fi-FI --timezone Europe/Helsinki  # Browser fingerprint: locale and timezone
+dembrandt example.com --user-agent "Mozilla/5.0 ..."            # Custom user agent string
+dembrandt example.com --accept-language "fi,en;q=0.9"           # Custom Accept-Language header
+dembrandt example.com --screen-size 2560x1440                   # Physical screen resolution to report
 ```
 
 Default: formatted terminal display only. Use `--save-output` to persist results as JSON files. Browser automatically retries in visible mode if headless extraction fails.

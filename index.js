@@ -4,7 +4,7 @@
  * Dembrandt - Design Token Extraction CLI
  *
  * Extracts design tokens, brand colors, typography, spacing, and component styles
- * from any website using Playwright with advanced bot detection avoidance.
+ * from any website using Playwright.
  */
 
 import { program } from "commander";
@@ -58,6 +58,12 @@ program
     return n;
   })
   .option("--sitemap", "Discover pages from sitemap.xml instead of DOM links")
+  .option("--stealth", "Enable anti-detection scripts to bypass bot protection (use only when authorized)")
+  .option("--user-agent <string>", "Custom user agent string")
+  .option("--locale <string>", "Browser locale, e.g. en-GB, fi-FI (default: en-US)")
+  .option("--timezone <string>", "Browser timezone, e.g. Europe/Helsinki (default: America/New_York)")
+  .option("--accept-language <string>", "Custom Accept-Language header value")
+  .option("--screen-size <WxH>", "Physical screen resolution to report, e.g. 1920x1080 (default: 1920x1080)")
   .action(async (input, paths, opts) => {
     let url = input;
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
@@ -133,6 +139,13 @@ program
             discoverLinks: isAutoCrawl ? crawlN - 1 : null,
             wcag: opts.wcag,
             includeRawColors: opts.rawColors,
+            stealth: opts.stealth,
+            userAgent: opts.userAgent,
+            locale: opts.locale,
+            timezoneId: opts.timezone,
+            acceptLanguage: opts.acceptLanguage,
+            screenSize: opts.screenSize,
+            _version: version,
           });
 
           // Build list of additional URLs to extract
@@ -181,6 +194,11 @@ program
                   darkMode: opts.darkMode,
                   mobile: opts.mobile,
                   slow: opts.slow,
+                  stealth: opts.stealth,
+                  userAgent: opts.userAgent,
+                  locale: opts.locale,
+                  timezoneId: opts.timezone,
+                  acceptLanguage: opts.acceptLanguage,
                 });
                 delete pageResult._discoveredLinks;
                 allResults.push(pageResult);
@@ -209,7 +227,7 @@ program
             err.message.includes("net::ERR_")
           ) {
             spinner.warn(
-              "Bot detection detected → retrying with visible browser"
+              "Navigation failed → retrying with visible browser"
             );
             console.error(chalk.dim(`  ↳ Error: ${err.message}`));
             console.error(chalk.dim(`  ↳ URL: ${url}`));
