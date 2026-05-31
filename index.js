@@ -265,7 +265,7 @@ program
           mkdirSync(outputDir, { recursive: true });
 
           const suffix = opts.dtcg ? '.tokens' : '';
-          const filename = `${timestamp}${suffix}.json`;
+          const filename = `${timestamp}_v${version}${suffix}.json`;
           const filepath = join(outputDir, filename);
           writeFileSync(filepath, JSON.stringify(outputData, null, 2));
 
