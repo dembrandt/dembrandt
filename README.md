@@ -84,6 +84,7 @@ dembrandt example.com --mobile         # Use mobile viewport (390x844) for respo
 dembrandt example.com --slow           # 3x longer timeouts (24s hydration) for JavaScript-heavy sites
 dembrandt example.com --brand-guide    # Generate a brand guide PDF
 dembrandt example.com --design-md      # Generate a DESIGN.md file for AI agents
+dembrandt example.com /pricing /docs   # Extract specific paths and merge results into one output
 dembrandt example.com --crawl 5        # Analyze 5 pages (homepage + 4 discovered pages), merges results
 dembrandt example.com --sitemap        # Discover pages from sitemap.xml instead of DOM links
 dembrandt example.com --crawl 10 --sitemap # Combine: up to 10 pages discovered via sitemap

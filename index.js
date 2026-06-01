@@ -52,11 +52,6 @@ program
     if (isNaN(n) || n < 1) throw new Error(`--crawl must be a positive integer, got: ${v}`);
     return n;
   })
-  .option("--pages <n>", "Alias for --crawl (deprecated)", (v) => {
-    const n = parseInt(v, 10);
-    if (isNaN(n) || n < 1) throw new Error(`--pages must be a positive integer, got: ${v}`);
-    return n;
-  })
   .option("--sitemap", "Discover pages from sitemap.xml instead of DOM links")
   .option("--stealth", "Enable anti-detection scripts to bypass bot protection (use only when authorized)")
   .option("--user-agent <string>", "Custom user agent string")
@@ -126,7 +121,7 @@ program
         }
 
         try {
-          const crawlN = opts.crawl ?? opts.pages ?? null;
+          const crawlN = opts.crawl ?? null;
           const isAutoCrawl = crawlN && !opts.sitemap && (!paths || paths.length === 0);
           const hasExplicitPaths = paths && paths.length > 0;
 
