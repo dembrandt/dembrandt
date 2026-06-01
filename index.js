@@ -32,7 +32,7 @@ program
   .description("Extract design tokens from any website")
   .version(version)
   .argument("<url>")
-  .argument("[paths...]", "Additional paths to extract and merge, e.g. /pricing /docs")
+  .argument("[paths...]", "Additional paths on the same domain to extract and merge, e.g. /pricing /docs")
   .option("--browser <type>", "Browser to use (chromium|firefox); set BROWSER_CDP_ENDPOINT env var to connect to an existing Chromium instance via CDP", "chromium")
   .option("--json-only", "Output raw JSON")
   .option("--save-output", "Save JSON file to output folder")
@@ -44,19 +44,19 @@ program
   .option("--design-md", "Export a DESIGN.md file")
   .option("--no-sandbox", "Disable browser sandbox (needed for Docker/CI)")
   .option("--raw-colors", "Include pre-filter raw colors in JSON output")
-  .option("--screenshot <path>", "Save a screenshot of the page")
+  .option("--screenshot <path>", "Save a viewport screenshot of the page (not full-page)")
   .option("--wcag", "Analyze WCAG contrast ratios between palette colors")
-  .option("--crawl [n]", "Auto-discover and extract up to N pages via DOM links (default: 5)", (v) => {
+  .option("--crawl [n]", "Auto-discover and extract up to N pages via DOM links (default: 5); combine with --sitemap to use sitemap discovery instead", (v) => {
     if (v === undefined || v === true) return 5;
     const n = parseInt(v, 10);
     if (isNaN(n) || n < 1) throw new Error(`--crawl must be a positive integer, got: ${v}`);
     return n;
   })
-  .option("--sitemap", "Discover pages from sitemap.xml instead of DOM links")
-  .option("--stealth", "Enable anti-detection scripts to bypass bot protection (use only when authorized)")
+  .option("--sitemap", "Discover pages from sitemap.xml instead of DOM links; use alone or combine with --crawl to set page limit")
+  .option("--stealth", "Enable anti-detection: navigator spoofing, human mouse simulation, randomized fingerprint (use only when authorized)")
   .option("--user-agent <string>", "Custom user agent string")
-  .option("--locale <string>", "Browser locale, e.g. en-GB, fi-FI (default: en-US)")
-  .option("--timezone <string>", "Browser timezone, e.g. Europe/Helsinki (default: America/New_York)")
+  .option("--locale <string>", "Browser locale for fingerprint, e.g. en-GB, fi-FI; affects content only if the site reacts to Accept-Language (default: en-US)")
+  .option("--timezone <string>", "Browser timezone for fingerprint, e.g. Europe/Helsinki; affects content only if the site reacts to timezone (default: America/New_York)")
   .option("--accept-language <string>", "Custom Accept-Language header value")
   .option("--screen-size <WxH>", "Physical screen resolution to report, e.g. 1920x1080 (default: 1920x1080)")
   .action(async (input, paths, opts) => {
