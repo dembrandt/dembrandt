@@ -24,6 +24,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { checkRobotsTxt } from "./lib/robots.js";
 import { writeConfig, printInitSuccess } from "./lib/init.js";
+import { lint } from "./lib/lint.js";
 import { extractWithCrawl } from "./lib/crawl.js";
 import { computeDrift, DEFAULT_DRIFT_CONFIG } from "./lib/drift.js";
 import { existsSync } from "fs";
@@ -58,6 +59,7 @@ program
   .option("--raw-colors", "Include pre-filter raw colors in JSON output")
   .option("--screenshot <path>", "Save a viewport screenshot of the page (not full-page)")
   .option("--wcag", "Analyze WCAG contrast ratios between palette colors")
+  .option("--lint", "Run design lint rules against extracted tokens")
   .option("--crawl [n]", "Auto-discover and extract up to N pages via DOM links (default: 5); combine with --sitemap to use sitemap discovery instead", (v) => {
     if (v === undefined || v === true) return 5;
     const n = parseInt(v, 10);
@@ -358,8 +360,8 @@ program
         );
       if (opts.jsonOnly) {
         console.log = originalConsoleLog;
+        if (opts.lint) outputData.lint = lint(result);
         console.log(JSON.stringify(outputData, null, 2));
-        // Keep stdout pure JSON: summary and notices go to stderr
         console.error(summaryLine);
         for (const notice of savedNotices) console.error(notice);
       } else {
@@ -368,6 +370,7 @@ program
         console.log();
         console.log(summaryLine);
         for (const notice of savedNotices) console.log(notice);
+        if (opts.lint) printLintResults(lint(result));
       }
     } catch (err) {
       spinner.fail("Failed");
@@ -606,6 +609,21 @@ function printDriftReport(report, config, url) {
   const parts = [changed && `${changed} changed`, added && `${added} added`, removed && `${removed} removed`].filter(Boolean);
   console.log(chalk.dim(`  ${parts.join(", ")}`));
   console.log("");
+}
+
+function printLintResults({ errors, warnings, info }) {
+  if (errors.length === 0 && warnings.length === 0) {
+    console.log(chalk.green("\n  ✓ Lint passed — no issues found"));
+    return;
+  }
+  console.log(chalk.bold("\n  Lint results"));
+  for (const r of errors) {
+    console.log(chalk.red(`  ✗ [${r.rule}] ${r.message}`));
+  }
+  for (const r of warnings) {
+    console.log(chalk.yellow(`  ⚠ [${r.rule}] ${r.message}`));
+  }
+  if (errors.length > 0) process.exitCode = 1;
 }
 
 program.parse();
