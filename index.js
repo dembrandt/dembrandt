@@ -426,8 +426,22 @@ program
       spinner.succeed(`Extracted ${new URL(url).hostname || url}`);
 
       const extractedUrls = result._extractedUrls ?? [url];
+      const pageResults = result._pageResults ?? [];
       delete result._extractedUrls;
+      delete result._pageResults;
       const info = writeConfig(url, result, extractedUrls);
+
+      // Write per-page snapshots to .dembrandt/pages/
+      if (pageResults.length > 1) {
+        for (const { url: pageUrl, result: pageResult } of pageResults) {
+          try {
+            const pathname = new URL(pageUrl).pathname.replace(/\//g, "_").replace(/^_/, "") || "index";
+            const pagePath = join(info.pagesDir, `${pathname}.yaml`);
+            const { buildSnapshot, buildSnapshotYaml } = await import("./lib/init.js");
+            writeFileSync(pagePath, buildSnapshotYaml(buildSnapshot(pageUrl, pageResult)));
+          } catch {}
+        }
+      }
       printInitSuccess(info);
     } catch (err) {
       spinner.fail("Extraction failed");
