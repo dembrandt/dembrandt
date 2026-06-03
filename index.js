@@ -438,6 +438,7 @@ program
   .option("--json", "Output raw JSON report")
   .option("--threshold <n>", "Fail if drift score exceeds this (default: 10)", (v) => parseInt(v, 10))
   .option("--quick", "Extract only the primary page, skip additional pages in the baseline")
+  .option("--pages <paths...>", "Only check specific pages, e.g. --pages /checkout /pricing")
   .option("--cookie <string>", "Cookie string for authenticated pages")
   .option("--header <string>", "Extra HTTP header, e.g. \"Authorization: Bearer eyJ...\"")
   .action(async (opts) => {
@@ -467,7 +468,14 @@ program
     const primaryUrl = configPages[0] === "/"
       ? baseUrl
       : `${new URL(baseUrl).origin}${configPages[0]}`;
-    const additionalPaths = opts.quick ? [] : configPages.slice(1);
+    let additionalPaths;
+    if (opts.quick) {
+      additionalPaths = [];
+    } else if (opts.pages?.length) {
+      additionalPaths = opts.pages.map((p) => p.startsWith("/") ? p : "/" + p).filter((p) => p !== "/");
+    } else {
+      additionalPaths = configPages.slice(1);
+    }
 
     const threshold = opts.threshold ?? config.thresholds?.failThreshold ?? DEFAULT_DRIFT_CONFIG.failThreshold;
     const stdoutLog = console.log.bind(console);
