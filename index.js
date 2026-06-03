@@ -26,6 +26,7 @@ import { checkRobotsTxt } from "./lib/robots.js";
 import { writeConfig, printInitSuccess } from "./lib/init.js";
 import { computeDrift, DEFAULT_DRIFT_CONFIG } from "./lib/drift.js";
 import { existsSync } from "fs";
+import yaml from "js-yaml";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"));
@@ -430,7 +431,9 @@ program
     }
 
     const threshold = opts.threshold ?? config.thresholds?.failThreshold ?? DEFAULT_DRIFT_CONFIG.failThreshold;
-    const spinner = ora(`Extracting ${new URL(url).hostname}...`).start();
+    const stdoutLog = console.log.bind(console);
+    if (opts.json) console.log = (...args) => console.error(...args);
+    const spinner = ora({ text: `Extracting ${new URL(url).hostname}...`, stream: opts.json ? process.stderr : process.stdout }).start();
     let browser;
 
     try {
@@ -441,17 +444,33 @@ program
       });
       spinner.succeed(`Extracted ${new URL(url).hostname}`);
 
-      const snapshotPath = join(process.cwd(), ".dembrandt-snapshot.json");
+      const snapshotPath = join(process.cwd(), ".dembrandt-snapshot.yaml");
       if (!existsSync(snapshotPath)) {
-        console.error(chalk.red("  .dembrandt-snapshot.json not found. Re-run `dembrandt init`."));
+        console.error(chalk.red("  .dembrandt-snapshot.yaml not found. Re-run `dembrandt init`."));
         process.exit(1);
       }
-      const baseline = JSON.parse(readFileSync(snapshotPath, "utf8"));
+      const snap = yaml.load(readFileSync(snapshotPath, "utf8"));
+
+      // Reconstruct ExtractionResult shape from snapshot for drift engine
+      const baseline = {
+        colors: {
+          palette: (snap.palette ?? []).map((entry) => {
+            const hex = entry.split("  #")[0].replace(/"/g, "").trim();
+            const roleMatch = entry.match(/role:(\w+)/);
+            const countMatch = entry.match(/count:(\d+)/);
+            return { normalized: hex, color: hex, role: roleMatch?.[1], count: countMatch ? parseInt(countMatch[1]) : 1 };
+          }),
+        },
+        typography: { styles: (snap.typography ?? []).map((s) => ({ context: s.context, family: s.family, size: s.size, weight: String(s.weight) })) },
+        spacing: { commonValues: (snap.spacing ?? []).map((px) => ({ px })) },
+        borderRadius: { values: (snap.borderRadius ?? []).map((value) => ({ value })) },
+        shadows: (snap.shadows ?? []).map((shadow) => ({ shadow })),
+      };
 
       const report = computeDrift(baseline, candidate, { failThreshold: threshold });
 
       if (opts.json) {
-        console.log(JSON.stringify(report, null, 2));
+        stdoutLog(JSON.stringify(report, null, 2));
         process.exit(report.status === "drift" ? 1 : 0);
       }
 
