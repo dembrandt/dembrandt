@@ -414,7 +414,7 @@ program
         sitemap: opts.sitemap ?? false,
       });
 
-      spinner.succeed(`Extracted ${new URL(url).hostname}`);
+      spinner.succeed(`Extracted ${new URL(url).hostname || url}`);
 
       const extractedUrls = result._extractedUrls ?? [url];
       delete result._extractedUrls;
