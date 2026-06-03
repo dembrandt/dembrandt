@@ -437,6 +437,7 @@ program
   .option("--mobile", "Extract from mobile viewport")
   .option("--json", "Output raw JSON report")
   .option("--threshold <n>", "Fail if drift score exceeds this (default: 10)", (v) => parseInt(v, 10))
+  .option("--quick", "Extract only the primary page, skip additional pages in the baseline")
   .option("--cookie <string>", "Cookie string for authenticated pages")
   .option("--header <string>", "Extra HTTP header, e.g. \"Authorization: Bearer eyJ...\"")
   .action(async (opts) => {
@@ -453,12 +454,20 @@ program
       process.exit(1);
     }
 
+    // Warn if baseline is stale
+    if (config.extractedAt) {
+      const age = (Date.now() - new Date(config.extractedAt).getTime()) / (1000 * 60 * 60 * 24);
+      if (age > 30) {
+        console.log(chalk.yellow(`  ⚠ Baseline is ${Math.round(age)} days old. Run \`dembrandt init\` to refresh.`));
+      }
+    }
+
     // Re-extract the same pages that were used to build the baseline
     const configPages = config.pages ?? ["/"];
     const primaryUrl = configPages[0] === "/"
       ? baseUrl
       : `${new URL(baseUrl).origin}${configPages[0]}`;
-    const additionalPaths = configPages.slice(1);
+    const additionalPaths = opts.quick ? [] : configPages.slice(1);
 
     const threshold = opts.threshold ?? config.thresholds?.failThreshold ?? DEFAULT_DRIFT_CONFIG.failThreshold;
     const stdoutLog = console.log.bind(console);
