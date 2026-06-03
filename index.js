@@ -441,24 +441,12 @@ program
       });
       spinner.succeed(`Extracted ${new URL(url).hostname}`);
 
-      // Build a synthetic baseline extract from tokens.json
-      const tokensPath = join(process.cwd(), config.tokens ?? "tokens.json");
-      if (!existsSync(tokensPath)) {
-        console.error(chalk.red(`  tokens.json not found at ${tokensPath}. Re-run \`dembrandt init\`.`));
+      const snapshotPath = join(process.cwd(), ".dembrandt-snapshot.json");
+      if (!existsSync(snapshotPath)) {
+        console.error(chalk.red("  .dembrandt-snapshot.json not found. Re-run `dembrandt init`."));
         process.exit(1);
       }
-      const tokens = JSON.parse(readFileSync(tokensPath, "utf8"));
-
-      // Reconstruct a minimal ExtractionResult from tokens.json for comparison
-      const baseline = {
-        colors: {
-          palette: (tokens.palette ?? []).map((hex) => ({ normalized: hex, color: hex })),
-        },
-        typography: { styles: [] },
-        spacing: { commonValues: (tokens.spacing ?? []).map((px) => ({ px })) },
-        borderRadius: { values: (tokens.borderRadius ?? []).map((value) => ({ value })) },
-        shadows: (tokens.shadows ?? []).map((shadow) => ({ shadow })),
-      };
+      const baseline = JSON.parse(readFileSync(snapshotPath, "utf8"));
 
       const report = computeDrift(baseline, candidate, { failThreshold: threshold });
 
