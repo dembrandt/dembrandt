@@ -57,7 +57,7 @@ Load extractions, track token drift, and compare snapshots. **[dembrandt.com/app
 * **Visual diff.** Color swatches, before/after values, delta scores per category.
 * **Snapshot history.** GitHub-style calendar per domain.
 * **Copy tokens.** Paste values straight into Copilot, Claude, or Cursor.
-* **No login.** Your data stays in the browser, nothing is sent to any server.
+* **No login.** Your data stays in the browser. Drift is computed locally — nothing is sent to any server.
 
 ## Recipes
 
@@ -78,6 +78,12 @@ Load extractions, track token drift, and compare snapshots. **[dembrandt.com/app
 ## Usage
 
 ```bash
+dembrandt init example.com             # Save baseline (.dembrandtrc + tokens.json + .dembrandt-snapshot.yaml)
+dembrandt init example.com --crawl 5   # Multi-page baseline (homepage + 4 discovered pages)
+dembrandt drift                        # Compare live site against baseline, exit 1 on drift
+dembrandt drift --url https://staging  # Drift check against a different URL
+dembrandt drift --json                 # Machine-readable drift report (stdout)
+dembrandt drift --threshold 20         # Custom drift score threshold
 dembrandt <url>                        # Basic extraction (terminal display only)
 dembrandt example.com --json-only      # Output raw JSON to terminal (no formatted display, no file save)
 dembrandt example.com --save-output    # Save JSON to output/example.com/YYYY-MM-DDTHH-MM-SS.json
@@ -205,6 +211,97 @@ Use `--brand-guide` to generate a printable PDF summarizing the extracted design
 ```bash
 dembrandt example.com --brand-guide
 # Saves to: output/example.com/TIMESTAMP.brand-guide.pdf
+```
+
+## Brand Drift Detection
+
+Track design token changes over time. Save a baseline, re-run on any deploy, catch drift before it ships.
+
+### Setup
+
+```bash
+# Save your baseline — extracts tokens and writes .dembrandtrc + tokens.json + .dembrandt-snapshot.yaml
+dembrandt init example.com
+
+# Multi-page baseline (recommended — more representative token coverage)
+dembrandt init example.com --crawl 5
+
+# Check for drift against baseline
+dembrandt drift
+```
+
+Commit `.dembrandtrc`, `tokens.json`, and `.dembrandt-snapshot.yaml` to your repo. The snapshot is ~6KB — no LFS needed.
+
+`dembrandt drift` re-extracts the same pages recorded during `init`, compares against the snapshot, and reports what changed. Exit code `1` on drift above threshold — works in CI without extra config.
+
+### CI/CD Integration
+
+Run drift detection on every push to `main`:
+
+```yaml
+# .github/workflows/brand-drift.yml
+on:
+  push:
+    branches: [main]
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install -g dembrandt
+      - run: npx playwright install chromium --with-deps
+      - run: dembrandt drift
+```
+
+### Drift output
+
+```
+✗ Drift detected  score 14/10  —  example.com vs baseline (1 Jun 2026)
+
+  color
+    ~ #533afd → #635bff   Δ8.2
+    - #ff6118
+
+  typography
+    ~ h1  Sohne 56px/300 → Sohne 48px/300
+
+  2 changed, 1 removed
+```
+
+Colors are compared using ΔE (perceptual color distance). Brand-critical colors (`accent`, `primary`) are weighted higher than structural colors (`surface`, `background`). Spacing and radii use percentage change. Typography matches by semantic context.
+
+### Configuration
+
+`.dembrandtrc` is written by `dembrandt init`. Edit thresholds to tune sensitivity:
+
+```json
+{
+  "baseline": "https://example.com",
+  "pages": ["/", "/pricing", "/about"],
+  "thresholds": {
+    "color": 2.3,
+    "spacing": 4,
+    "typography": 0
+  }
+}
+```
+
+`color` threshold is a ΔE value — 2.3 is the just-noticeable difference. `spacing` is a percentage change. `typography: 0` means any change flags.
+
+Override the baseline URL for staging environments:
+
+```bash
+dembrandt drift --url https://staging.example.com
+```
+
+Get raw JSON output for custom reporting:
+
+```bash
+dembrandt drift --json
 ```
 
 ## Recipes
