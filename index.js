@@ -23,6 +23,9 @@ import { writeFileSync, mkdirSync, readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { checkRobotsTxt } from "./lib/robots.js";
+import { writeConfig, printInitSuccess } from "./lib/init.js";
+import { computeDrift, DEFAULT_DRIFT_CONFIG } from "./lib/drift.js";
+import { existsSync } from "fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"));
@@ -363,5 +366,160 @@ program
       if (browser) await browser.close();
     }
   });
+
+program
+  .command("init [url]")
+  .description("Save extracted tokens as project baseline (.dembrandtrc + tokens.json)")
+  .option("--slow", "3x longer timeouts for slow-loading sites")
+  .option("--mobile", "Extract from mobile viewport")
+  .option("--stealth", "Enable anti-detection (use only when authorized)")
+  .action(async (input, opts) => {
+    let url = input;
+    if (!url) {
+      console.error(chalk.red("  Usage: dembrandt init <url>"));
+      process.exit(1);
+    }
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      url = "https://" + url;
+    }
+
+    const spinner = ora("Extracting design tokens...").start();
+    let browser;
+
+    try {
+      browser = await chromium.launch({ headless: true });
+      const result = await extractBranding(url, spinner, browser, {
+        slow: opts.slow,
+        mobile: opts.mobile,
+        stealth: opts.stealth,
+      });
+
+      spinner.succeed(`Extracted ${new URL(url).hostname}`);
+
+      const info = writeConfig(url, result);
+      printInitSuccess(info);
+    } catch (err) {
+      spinner.fail("Extraction failed");
+      console.error(chalk.red(`  ${err.message}`));
+      process.exit(1);
+    } finally {
+      if (browser) await browser.close();
+    }
+  });
+
+program
+  .command("drift")
+  .description("Compare live site against .dembrandtrc baseline and report changes")
+  .option("--url <url>", "Override the baseline URL (e.g. point at staging)")
+  .option("--slow", "3x longer timeouts")
+  .option("--mobile", "Extract from mobile viewport")
+  .option("--json", "Output raw JSON report")
+  .option("--threshold <n>", "Fail if drift score exceeds this (default: 10)", (v) => parseInt(v, 10))
+  .action(async (opts) => {
+    const configPath = join(process.cwd(), ".dembrandtrc");
+    if (!existsSync(configPath)) {
+      console.error(chalk.red("  No .dembrandtrc found. Run `dembrandt init <url>` first."));
+      process.exit(1);
+    }
+
+    const config = JSON.parse(readFileSync(configPath, "utf8"));
+    const url = opts.url ?? config.baseline;
+    if (!url) {
+      console.error(chalk.red("  No baseline URL in .dembrandtrc."));
+      process.exit(1);
+    }
+
+    const threshold = opts.threshold ?? config.thresholds?.failThreshold ?? DEFAULT_DRIFT_CONFIG.failThreshold;
+    const spinner = ora(`Extracting ${new URL(url).hostname}...`).start();
+    let browser;
+
+    try {
+      browser = await chromium.launch({ headless: true });
+      const candidate = await extractBranding(url, spinner, browser, {
+        slow: opts.slow,
+        mobile: opts.mobile,
+      });
+      spinner.succeed(`Extracted ${new URL(url).hostname}`);
+
+      // Build a synthetic baseline extract from tokens.json
+      const tokensPath = join(process.cwd(), config.tokens ?? "tokens.json");
+      if (!existsSync(tokensPath)) {
+        console.error(chalk.red(`  tokens.json not found at ${tokensPath}. Re-run \`dembrandt init\`.`));
+        process.exit(1);
+      }
+      const tokens = JSON.parse(readFileSync(tokensPath, "utf8"));
+
+      // Reconstruct a minimal ExtractionResult from tokens.json for comparison
+      const baseline = {
+        colors: {
+          palette: (tokens.palette ?? []).map((hex) => ({ normalized: hex, color: hex })),
+        },
+        typography: { styles: [] },
+        spacing: { commonValues: (tokens.spacing ?? []).map((px) => ({ px })) },
+        borderRadius: { values: (tokens.borderRadius ?? []).map((value) => ({ value })) },
+        shadows: (tokens.shadows ?? []).map((shadow) => ({ shadow })),
+      };
+
+      const report = computeDrift(baseline, candidate, { failThreshold: threshold });
+
+      if (opts.json) {
+        console.log(JSON.stringify(report, null, 2));
+        process.exit(report.status === "drift" ? 1 : 0);
+      }
+
+      printDriftReport(report, config, url);
+      process.exit(report.status === "drift" ? 1 : 0);
+    } catch (err) {
+      spinner.fail("Failed");
+      console.error(chalk.red(`  ${err.message}`));
+      process.exit(1);
+    } finally {
+      if (browser) await browser.close();
+    }
+  });
+
+function printDriftReport(report, config, url) {
+  const domain = new URL(url).hostname.replace("www.", "");
+  const since = config.extractedAt ? new Date(config.extractedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "baseline";
+
+  console.log("");
+
+  if (report.status === "stable") {
+    console.log(chalk.green(`  ✓ Stable`) + chalk.dim(`  score ${report.score}/${report.threshold}  —  ${domain} matches baseline (${since})`));
+  } else {
+    console.log(chalk.red(`  ✗ Drift detected`) + chalk.dim(`  score ${report.score}/${report.threshold}  —  ${domain} vs baseline (${since})`));
+  }
+
+  if (report.changes.length === 0) {
+    console.log(chalk.dim("\n  No token changes."));
+    console.log("");
+    return;
+  }
+
+  const byCategory = {};
+  for (const c of report.changes) {
+    if (!byCategory[c.category]) byCategory[c.category] = [];
+    byCategory[c.category].push(c);
+  }
+
+  console.log("");
+  for (const [cat, changes] of Object.entries(byCategory)) {
+    console.log(chalk.dim(`  ${cat}`));
+    for (const c of changes) {
+      const kindColor = c.kind === "added" ? chalk.green : c.kind === "removed" ? chalk.red : chalk.yellow;
+      const kindSymbol = c.kind === "added" ? "+" : c.kind === "removed" ? "-" : "~";
+      let line = `    ${kindColor(kindSymbol)} ${c.label}`;
+      if (c.before && c.after) line += chalk.dim(`  ${c.before} → ${c.after}`);
+      if (c.delta !== undefined) line += chalk.dim(`  Δ${c.delta}`);
+      console.log(line);
+    }
+    console.log("");
+  }
+
+  const { changed, added, removed } = report.summary;
+  const parts = [changed && `${changed} changed`, added && `${added} added`, removed && `${removed} removed`].filter(Boolean);
+  console.log(chalk.dim(`  ${parts.join(", ")}`));
+  console.log("");
+}
 
 program.parse();
