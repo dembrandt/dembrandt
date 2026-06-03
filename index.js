@@ -524,17 +524,17 @@ program
       // Reconstruct ExtractionResult shape from snapshot for drift engine
       const baseline = {
         colors: {
-          palette: (snap.palette ?? []).map((entry) => {
+          palette: (snap.palette ?? []).filter((e) => typeof e === "string").map((entry) => {
             const hex = entry.split("  #")[0].replace(/"/g, "").trim();
             const roleMatch = entry.match(/role:(\w+)/);
             const countMatch = entry.match(/count:(\d+)/);
             return { normalized: hex, color: hex, role: roleMatch?.[1], count: countMatch ? parseInt(countMatch[1]) : 1 };
           }),
         },
-        typography: { styles: (snap.typography ?? []).map((s) => ({ context: s.context, family: s.family, size: s.size, weight: String(s.weight) })) },
-        spacing: { commonValues: (snap.spacing ?? []).map((px) => ({ px })) },
-        borderRadius: { values: (snap.borderRadius ?? []).map((value) => ({ value })) },
-        shadows: (snap.shadows ?? []).map((shadow) => ({ shadow })),
+        typography: { styles: (snap.typography ?? []).filter(Boolean).map((s) => ({ context: s.context ?? "", family: s.family ?? "", size: s.size ?? "", weight: String(s.weight ?? "") })) },
+        spacing: { commonValues: (snap.spacing ?? []).filter(Boolean).map((px) => ({ px: String(px) })) },
+        borderRadius: { values: (snap.borderRadius ?? []).filter(Boolean).map((value) => ({ value: String(value) })) },
+        shadows: (snap.shadows ?? []).filter((s) => typeof s === "string").map((shadow) => ({ shadow })),
       };
 
       const report = computeDrift(baseline, candidate, {
