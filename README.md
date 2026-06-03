@@ -78,7 +78,7 @@ Load extractions, track token drift, and compare snapshots. **[dembrandt.com/app
 ## Usage
 
 ```bash
-dembrandt init example.com             # Save baseline (.dembrandtrc + tokens.json + .dembrandt-snapshot.yaml)
+dembrandt init example.com             # Save baseline (.dembrandt/ (config.json + snapshot.yaml + tokens.json))
 dembrandt init example.com --crawl 5   # Multi-page baseline (homepage + 4 discovered pages)
 dembrandt drift                        # Compare live site against baseline, exit 1 on drift
 dembrandt drift --url https://staging  # Drift check against a different URL
@@ -220,7 +220,7 @@ Track design token changes over time. Save a baseline, re-run on any deploy, cat
 ### Setup
 
 ```bash
-# Save your baseline — extracts tokens and writes .dembrandtrc + tokens.json + .dembrandt-snapshot.yaml
+# Save your baseline — extracts tokens and writes .dembrandt/ (config.json + snapshot.yaml + tokens.json)
 dembrandt init example.com
 
 # Multi-page baseline (recommended — more representative token coverage)
@@ -230,7 +230,7 @@ dembrandt init example.com --crawl 5
 dembrandt drift
 ```
 
-Commit `.dembrandtrc`, `tokens.json`, and `.dembrandt-snapshot.yaml` to your repo. The snapshot is ~6KB — no LFS needed.
+Commit `.dembrandt/` to your repo. The snapshot is ~6KB — no LFS needed.
 
 `dembrandt drift` re-extracts the same pages recorded during `init`, compares against the snapshot, and reports what changed. Exit code `1` on drift above threshold — works in CI without extra config.
 
@@ -276,7 +276,7 @@ Colors are compared using ΔE (perceptual color distance). Brand-critical colors
 
 ### Configuration
 
-`.dembrandtrc` is written by `dembrandt init`. Edit thresholds to tune sensitivity:
+`.dembrandt/config.json` is written by `dembrandt init`. Edit thresholds to tune sensitivity:
 
 ```json
 {

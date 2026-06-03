@@ -437,7 +437,7 @@ program
 
 program
   .command("drift")
-  .description("Compare live site against .dembrandtrc baseline and report changes")
+  .description("Compare live site against .dembrandt/ baseline and report changes")
   .option("--url <url>", "Override the baseline URL (e.g. point at staging)")
   .option("--slow", "3x longer timeouts")
   .option("--mobile", "Extract from mobile viewport")
