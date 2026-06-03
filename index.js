@@ -59,6 +59,8 @@ program
     return n;
   })
   .option("--sitemap", "Discover pages from sitemap.xml instead of DOM links; use alone or combine with --crawl to set page limit")
+  .option("--cookie <string>", "Cookie string for authenticated pages, e.g. \"session=abc; token=xyz\"")
+  .option("--header <string>", "Extra HTTP header, e.g. \"Authorization: Bearer eyJ...\"")
   .option("--stealth", "Enable anti-detection: navigator spoofing, human mouse simulation, randomized fingerprint (use only when authorized)")
   .option("--user-agent <string>", "Custom user agent string")
   .option("--locale <string>", "Browser locale for fingerprint, e.g. en-GB, fi-FI; affects content only if the site reacts to Accept-Language (default: en-US)")
@@ -141,6 +143,8 @@ program
             wcag: opts.wcag,
             includeRawColors: opts.rawColors,
             stealth: opts.stealth,
+            cookie: opts.cookie,
+            header: opts.header,
             userAgent: opts.userAgent,
             locale: opts.locale,
             timezoneId: opts.timezone,
@@ -383,6 +387,8 @@ program
     return n;
   })
   .option("--sitemap", "Discover pages from sitemap.xml instead of DOM links")
+  .option("--cookie <string>", "Cookie string for authenticated pages")
+  .option("--header <string>", "Extra HTTP header, e.g. \"Authorization: Bearer eyJ...\"")
   .action(async (input, opts) => {
     let url = input;
     if (!url) {
@@ -402,6 +408,8 @@ program
         slow: opts.slow,
         mobile: opts.mobile,
         stealth: opts.stealth,
+        cookie: opts.cookie,
+        header: opts.header,
         crawl: opts.crawl ?? null,
         sitemap: opts.sitemap ?? false,
       });
@@ -429,6 +437,8 @@ program
   .option("--mobile", "Extract from mobile viewport")
   .option("--json", "Output raw JSON report")
   .option("--threshold <n>", "Fail if drift score exceeds this (default: 10)", (v) => parseInt(v, 10))
+  .option("--cookie <string>", "Cookie string for authenticated pages")
+  .option("--header <string>", "Extra HTTP header, e.g. \"Authorization: Bearer eyJ...\"")
   .action(async (opts) => {
     const configPath = join(process.cwd(), ".dembrandtrc");
     if (!existsSync(configPath)) {
@@ -461,6 +471,8 @@ program
       const candidate = await extractWithCrawl(primaryUrl, spinner, browser, {
         slow: opts.slow,
         mobile: opts.mobile,
+        cookie: opts.cookie,
+        header: opts.header,
         paths: additionalPaths,
       });
       spinner.succeed(`Extracted ${new URL(baseUrl).hostname}`);
