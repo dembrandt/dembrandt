@@ -408,7 +408,9 @@ program
 
       spinner.succeed(`Extracted ${new URL(url).hostname}`);
 
-      const info = writeConfig(url, result);
+      const extractedUrls = result._extractedUrls ?? [url];
+      delete result._extractedUrls;
+      const info = writeConfig(url, result, extractedUrls);
       printInitSuccess(info);
     } catch (err) {
       spinner.fail("Extraction failed");
@@ -435,25 +437,33 @@ program
     }
 
     const config = JSON.parse(readFileSync(configPath, "utf8"));
-    const url = opts.url ?? config.baseline;
-    if (!url) {
+    const baseUrl = opts.url ?? config.baseline;
+    if (!baseUrl) {
       console.error(chalk.red("  No baseline URL in .dembrandtrc."));
       process.exit(1);
     }
 
+    // Re-extract the same pages that were used to build the baseline
+    const configPages = config.pages ?? ["/"];
+    const primaryUrl = configPages[0] === "/"
+      ? baseUrl
+      : `${new URL(baseUrl).origin}${configPages[0]}`;
+    const additionalPaths = configPages.slice(1);
+
     const threshold = opts.threshold ?? config.thresholds?.failThreshold ?? DEFAULT_DRIFT_CONFIG.failThreshold;
     const stdoutLog = console.log.bind(console);
     if (opts.json) console.log = (...args) => console.error(...args);
-    const spinner = ora({ text: `Extracting ${new URL(url).hostname}...`, stream: opts.json ? process.stderr : process.stdout }).start();
+    const spinner = ora({ text: `Extracting ${new URL(baseUrl).hostname}...`, stream: opts.json ? process.stderr : process.stdout }).start();
     let browser;
 
     try {
       browser = await chromium.launch({ headless: true });
-      const candidate = await extractBranding(url, spinner, browser, {
+      const candidate = await extractWithCrawl(primaryUrl, spinner, browser, {
         slow: opts.slow,
         mobile: opts.mobile,
+        paths: additionalPaths,
       });
-      spinner.succeed(`Extracted ${new URL(url).hostname}`);
+      spinner.succeed(`Extracted ${new URL(baseUrl).hostname}`);
 
       const snapshotPath = join(process.cwd(), ".dembrandt-snapshot.yaml");
       if (!existsSync(snapshotPath)) {
@@ -485,7 +495,7 @@ program
         process.exit(report.status === "drift" ? 1 : 0);
       }
 
-      printDriftReport(report, config, url);
+      printDriftReport(report, config, baseUrl);
       process.exit(report.status === "drift" ? 1 : 0);
     } catch (err) {
       spinner.fail("Failed");
