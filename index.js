@@ -34,7 +34,13 @@ const { version } = JSON.parse(readFileSync(join(__dirname, "package.json"), "ut
 
 program
   .name("dembrandt")
-  .description("Extract design tokens from any website")
+  .description([
+    "Extract design tokens from any website.",
+    "",
+    "  dembrandt stripe.com          # extract design tokens",
+    "  dembrandt init stripe.com     # save baseline for drift detection",
+    "  dembrandt drift               # check for changes since baseline",
+  ].join("\n"))
   .version(version)
   .enablePositionalOptions()
   .argument("<url>")
@@ -376,7 +382,7 @@ program
 
 program
   .command("init <url>")
-  .description("Save extracted tokens as project baseline (.dembrandtrc + tokens.json)")
+  .description("Save baseline to .dembrandt/ (config.json + snapshot.yaml + tokens.json)")
   .option("--slow", "3x longer timeouts for slow-loading sites")
   .option("--mobile", "Extract from mobile viewport")
   .option("--stealth", "Enable anti-detection (use only when authorized)")
