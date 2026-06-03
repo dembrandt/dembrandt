@@ -500,7 +500,10 @@ program
         shadows: (snap.shadows ?? []).map((shadow) => ({ shadow })),
       };
 
-      const report = computeDrift(baseline, candidate, { failThreshold: threshold });
+      const report = computeDrift(baseline, candidate, {
+        failThreshold: threshold,
+        ignore: config.ignore ?? {},
+      });
 
       if (opts.json) {
         stdoutLog(JSON.stringify(report, null, 2));
