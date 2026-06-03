@@ -440,9 +440,9 @@ program
   .option("--cookie <string>", "Cookie string for authenticated pages")
   .option("--header <string>", "Extra HTTP header, e.g. \"Authorization: Bearer eyJ...\"")
   .action(async (opts) => {
-    const configPath = join(process.cwd(), ".dembrandtrc");
+    const configPath = join(process.cwd(), ".dembrandt/config.json");
     if (!existsSync(configPath)) {
-      console.error(chalk.red("  No .dembrandtrc found. Run `dembrandt init <url>` first."));
+      console.error(chalk.red("  No .dembrandt/config.json found. Run `dembrandt init <url>` first."));
       process.exit(1);
     }
 
@@ -477,9 +477,9 @@ program
       });
       spinner.succeed(`Extracted ${new URL(baseUrl).hostname}`);
 
-      const snapshotPath = join(process.cwd(), ".dembrandt-snapshot.yaml");
+      const snapshotPath = join(process.cwd(), ".dembrandt/snapshot.yaml");
       if (!existsSync(snapshotPath)) {
-        console.error(chalk.red("  .dembrandt-snapshot.yaml not found. Re-run `dembrandt init`."));
+        console.error(chalk.red("  .dembrandt/snapshot.yaml not found. Re-run `dembrandt init`."));
         process.exit(1);
       }
       const snap = yaml.load(readFileSync(snapshotPath, "utf8"));
