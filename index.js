@@ -24,6 +24,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { checkRobotsTxt } from "./lib/robots.js";
 import { writeConfig, printInitSuccess } from "./lib/init.js";
+import { extractWithCrawl } from "./lib/crawl.js";
 import { computeDrift, DEFAULT_DRIFT_CONFIG } from "./lib/drift.js";
 import { existsSync } from "fs";
 import yaml from "js-yaml";
@@ -35,6 +36,7 @@ program
   .name("dembrandt")
   .description("Extract design tokens from any website")
   .version(version)
+  .enablePositionalOptions()
   .argument("<url>")
   .argument("[paths...]", "Additional paths on the same domain to extract and merge, e.g. /pricing /docs")
   .option("--browser <type>", "Browser to use (chromium|firefox); set BROWSER_CDP_ENDPOINT env var to connect to an existing Chromium instance via CDP", "chromium")
@@ -369,11 +371,18 @@ program
   });
 
 program
-  .command("init [url]")
+  .command("init <url>")
   .description("Save extracted tokens as project baseline (.dembrandtrc + tokens.json)")
   .option("--slow", "3x longer timeouts for slow-loading sites")
   .option("--mobile", "Extract from mobile viewport")
   .option("--stealth", "Enable anti-detection (use only when authorized)")
+  .option("--crawl [n]", "Extract up to N pages and merge before saving baseline (default: 5)", (v) => {
+    if (v === undefined || v === true) return 5;
+    const n = parseInt(v, 10);
+    if (isNaN(n) || n < 1) throw new Error(`--crawl must be a positive integer, got: ${v}`);
+    return n;
+  })
+  .option("--sitemap", "Discover pages from sitemap.xml instead of DOM links")
   .action(async (input, opts) => {
     let url = input;
     if (!url) {
@@ -389,10 +398,12 @@ program
 
     try {
       browser = await chromium.launch({ headless: true });
-      const result = await extractBranding(url, spinner, browser, {
+      const result = await extractWithCrawl(url, spinner, browser, {
         slow: opts.slow,
         mobile: opts.mobile,
         stealth: opts.stealth,
+        crawl: opts.crawl ?? null,
+        sitemap: opts.sitemap ?? false,
       });
 
       spinner.succeed(`Extracted ${new URL(url).hostname}`);
