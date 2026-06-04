@@ -24,7 +24,7 @@ jobs:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
 
       - name: Run unit tests
-        run: node --test test/markdown.test.mjs
+        run: npm test
 
   smoke:
     runs-on: ubuntu-latest

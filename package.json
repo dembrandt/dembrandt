@@ -16,6 +16,7 @@
   ],
   "scripts": {
     "start": "node index.js",
+    "test": "node --test test/*.test.mjs",
     "install-browser": "npx playwright install chromium firefox || echo 'Playwright browser installation failed. You may need to install system dependencies manually.'",
     "qa:baseline": "node test/qa.mjs --baseline",
     "qa:diff": "node test/qa.mjs --diff",

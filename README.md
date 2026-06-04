@@ -181,7 +181,7 @@ DESIGN.md reports only what Dembrandt observed on the source site. Exact values 
 Use `--wcag` to check accessibility contrast ratios across the page. Unlike palette-based checkers, dembrandt walks the actual DOM and finds what color is rendered on top of what background — per element.
 
 ```bash
-dembrandt stripe.com --wcag
+dembrandt dembrandt.com --wcag
 ```
 
 Returns every text/background pair with contrast ratio and WCAG 2.1 grade (AA, AA-Large, AAA, or fail), sorted by how often each pair appears. Results are shown in terminal and included in JSON output as `wcag`.
@@ -193,7 +193,7 @@ Also captures **interactive state contrast**: dembrandt simulates hover, focus, 
 Motion tokens are extracted automatically on every run — no flag needed. Dembrandt analyzes CSS transitions and animations across the page and returns a structured motion profile.
 
 ```bash
-dembrandt stripe.com
+dembrandt dembrandt.com
 ```
 
 Returns:
@@ -292,11 +292,55 @@ Colors are compared using ΔE (perceptual color distance). Brand-critical colors
 
 `color` threshold is a ΔE value — 2.3 is the just-noticeable difference. `spacing` is a percentage change. `typography: 0` means any change flags.
 
-Override the baseline URL for staging environments:
+### Lint config
+
+`dembrandt --lint` runs a set of design rules out of the box (no config needed):
+
+- **primary-contrast** — the brand primary colour is legible on white (WCAG AA + margin).
+- **button-contrast** — solid buttons have readable text (WCAG AA 4.5:1); outline/ghost buttons are skipped.
+- **body-text-size** — body copy is at least 16px.
+- **palette-size** — at most 8 accent/brand colours (skipped for data-viz pages).
+- **typography-scale** — font sizes follow a consistent modular ratio.
+- **radius-consistency** — border-radius values form a scale (pills excluded).
+- **shadow-scale** — shadows form a limited elevation scale.
+- **button-variants** — buttons share a limited set of styles.
+- **focus-visible** — form inputs have a visible focus state (WCAG 2.4.7).
+- **logo-format** — the logo is a vector (SVG), not a raster.
+
+Rules read from the `lint` section of `.dembrandt/config.json` and follow the ESLint `[level, options]` model — set a rule to `"off"` to disable it, or override its level (`"error"`, `"warn"`, `"info"`) and options:
+
+```json
+{
+  "lint": {
+    "rules": {
+      "primary-contrast": ["error", { "min": 4.5 }],
+      "button-contrast": ["error", { "min": 4.5 }],
+      "palette-size": ["warn", { "max": 8 }],
+      "typography-scale": "off"
+    }
+  }
+}
+```
+
+Without a config file, lint uses built-in defaults. `dembrandt init` seeds the section with those defaults so the editable form is discoverable. Note: a primary contrast below 3.0:1 is an outright WCAG AA failure and is always reported as `error` regardless of the configured level.
+
+Override the baseline URL for staging environments (same design, different environment — localhost, staging, prod):
 
 ```bash
 dembrandt drift --url https://staging.example.com
+dembrandt drift --url http://localhost:3000
 ```
+
+### Per-page drift
+
+By default `drift` compares the merged whole-site baseline. To check specific pages against their own per-page baseline (e.g. four pages are fine and you only changed one), use `--pages` against a multi-page baseline (`dembrandt init --crawl`):
+
+```bash
+dembrandt drift --pages /checkout            # compare just /checkout to its own snapshot
+dembrandt drift --pages /checkout /pricing   # several specific pages
+```
+
+Each page is compared to its own snapshot, so one changed page does not drown in the whole-site average. A page that is not in the baseline is reported as **new** — check it against the token contract with `dembrandt conformance <url>/newpage` instead, since there is no prior snapshot to drift against.
 
 Get raw JSON output for custom reporting:
 
@@ -304,51 +348,66 @@ Get raw JSON output for custom reporting:
 dembrandt drift --json
 ```
 
+### Conformance: check live against a declared contract
+
+`drift` is symmetric — it flags any change from a snapshot. `conformance` is one-directional: it checks that every token your contract *declares* is present in the live site. Extra tokens in live are not violations. Use it to enforce a curated token contract (`.dembrandt/tokens.json`) rather than a captured snapshot.
+
+```bash
+dembrandt conformance example.com                       # check live vs .dembrandt/tokens.json
+dembrandt conformance example.com --contract ./tokens.json
+dembrandt conformance example.com --contract ./DESIGN.md  # DESIGN.md front matter as contract
+dembrandt conformance --threshold 0                     # fail on any missing token
+```
+
+The contract can be a `tokens.json`, a `DESIGN.md` (its YAML front matter is mapped to tokens), or a plain YAML file.
+
+Exit code is 1 when the contract is violated, so it works as a CI gate alongside `drift` and `--lint`. The comparison is **unweighted** — the contract carries no usage counts or roles, so every declared token counts equally. The conformance score is not comparable to a drift score.
+
 ## Recipes
 
 **Quick brand scan**
 ```bash
-dembrandt stripe.com
+dembrandt dembrandt.com
 ```
 
 **Compare two sites**
 ```bash
-dembrandt stripe.com --save-output
+dembrandt dembrandt.com --save-output
 dembrandt braintree.com --save-output
-# Compare output/stripe.com and output/braintree.com side by side
+# Compare output/dembrandt.com and output/braintree.com side by side
 ```
 
 **Multi-page audit** — get a fuller picture across the whole site
 ```bash
-dembrandt stripe.com --crawl 10 --sitemap --save-output
+dembrandt dembrandt.com --crawl 10 --sitemap --save-output
 ```
 
 **Spot-check a value** — verify a specific token fast
 ```bash
-dembrandt stripe.com --json-only | grep -i "border-radius"
+dembrandt dembrandt.com --json-only | grep -i "border-radius"
 ```
 
 **Export for Tailwind** — get spacing and color values into your config
 ```bash
-dembrandt stripe.com --dtcg --save-output
+dembrandt dembrandt.com --dtcg --save-output
 # Use the .tokens.json with Style Dictionary to generate tailwind.config.js
 ```
 
 **Export for Tokens Studio / Figma**
 ```bash
-dembrandt stripe.com --dtcg --save-output
+dembrandt dembrandt.com --dtcg --save-output
 # Import the .tokens.json directly into Tokens Studio
 ```
 
 **Generate DESIGN.md for your AI agent**
 ```bash
-dembrandt stripe.com --design-md
+dembrandt dembrandt.com --design-md
 # Point your agent at the output DESIGN.md
 ```
 
 **Accessibility audit** — check contrast on any live URL
 ```bash
-dembrandt stripe.com --wcag
+dembrandt dembrandt.com --wcag
 ```
 
 **Regression baseline** — snapshot now, catch drift later
