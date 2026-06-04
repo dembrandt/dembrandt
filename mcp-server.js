@@ -15,9 +15,11 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { chromium } from "playwright-core";
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { extractBranding } from "./lib/extractors/index.js";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
+const pwVersion = createRequire(import.meta.url)("playwright-core/package.json").version;
 
 const server = new McpServer({
   name: "dembrandt",
@@ -50,7 +52,7 @@ async function runExtraction(url, options = {}) {
   } catch (err) {
     return {
       ok: false,
-      error: `Browser launch failed. Is Playwright installed? Run: npx playwright install chromium\n\n${err.message}`,
+      error: `Browser launch failed. Install the matching browser: npx playwright@${pwVersion} install chromium\n\n${err.message}`,
     };
   }
 
