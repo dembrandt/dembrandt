@@ -17,7 +17,7 @@
   "scripts": {
     "start": "node index.js",
     "test": "node --test test/*.test.mjs",
-    "install-browser": "npx playwright install chromium firefox || echo 'Playwright browser installation failed. You may need to install system dependencies manually.'",
+    "install-browser": "node tools/install-browser.mjs",
     "qa:baseline": "node test/qa.mjs --baseline",
     "qa:diff": "node test/qa.mjs --diff",
     "qa:site": "node test/qa.mjs --site",
@@ -53,7 +53,7 @@
     "js-yaml": "4.2.0",
     "ora": "^7.0.1",
     "playwright": "^1.57.0",
-    "playwright-core": "^1.57.0",
+    "playwright-core": "1.60.0",
     "zod": "4.3.6"
   },
   "engines": {

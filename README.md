@@ -151,7 +151,7 @@ dembrandt example.com --browser=firefox --save-output --dtcg
 Firefox browser is installed automatically with `npm install`. If you need to install manually:
 
 ```bash
-npx playwright install firefox
+npx playwright@$(node -p "require('playwright-core/package.json').version") install firefox
 ```
 
 ### W3C Design Tokens (DTCG) Format
@@ -253,23 +253,24 @@ jobs:
         with:
           node-version: 20
       - run: npm install -g dembrandt
-      - run: npx playwright install chromium --with-deps
+      - run: npx playwright@$(node -p "require('playwright-core/package.json').version") install --with-deps chromium
       - run: dembrandt drift
 ```
 
 ### Drift output
 
 ```
-✗ Drift detected  score 14/10  —  example.com vs baseline (1 Jun 2026)
+✗ Drift   score 14/100 · threshold 10   example.com
+  baseline 1 Jun 2026, 09:12  →  now 4 Jun 2026, 14:30
 
   color
-    ~ #533afd → #635bff   Δ8.2
-    - #ff6118
+    ~ accent     ▇ #533afd → ▇ #635bff   Δ8.2
+    - accent     ▇ #ff6118  (2 uses)
 
   typography
-    ~ h1  Sohne 56px/300 → Sohne 48px/300
+    ~ h1         size 56px → 48px   family + weight unchanged
 
-  2 changed, 1 removed
+  2 changes — over threshold, failing the check
 ```
 
 Colors are compared using ΔE (perceptual color distance). Brand-critical colors (`accent`, `primary`) are weighted higher than structural colors (`surface`, `background`). Spacing and radii use percentage change. Typography matches by semantic context.
@@ -362,6 +363,61 @@ dembrandt conformance --threshold 0                     # fail on any missing to
 The contract can be a `tokens.json`, a `DESIGN.md` (its YAML front matter is mapped to tokens), or a plain YAML file.
 
 Exit code is 1 when the contract is violated, so it works as a CI gate alongside `drift` and `--lint`. The comparison is **unweighted** — the contract carries no usage counts or roles, so every declared token counts equally. The conformance score is not comparable to a drift score.
+
+## Continuous integration
+
+Dembrandt drives a real browser, so two things matter in CI: the browser revision must match `playwright-core`, and the rendering environment must match the one your baseline was captured in.
+
+**Recommended adoption pattern**
+
+- **`--lint` is the gate.** It is deterministic and largely rendering-independent, so it fails the build reliably.
+- **`drift` is non-blocking until the baseline is captured in the same environment.** A baseline captured on macOS and checked on Linux produces false typography drift (fonts render with different metrics per OS). Run it with `continue-on-error` until you have a CI-captured baseline, then make it a gate.
+
+```yaml
+jobs:
+  design:
+    runs-on: ubuntu-latest
+    # Browser preinstalled; tag MUST match dembrandt's playwright-core version.
+    container: mcr.microsoft.com/playwright:v1.60.0-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run build && npm run start & npx --yes wait-on -t 60000 http://localhost:3000
+
+      - name: Lint design tokens (gate)
+        run: npx dembrandt http://localhost:3000 --lint --no-sandbox
+
+      - name: Token drift (non-blocking until baseline is captured in CI)
+        continue-on-error: true
+        run: npx dembrandt drift --no-sandbox
+```
+
+**Browser version**
+
+If you are not using the Playwright container image, install the browser revision that matches `playwright-core`:
+
+```bash
+# in dembrandt's own repo
+npm run install-browser
+# elsewhere — derive the version so it always matches
+npx playwright@$(node -p "require('playwright-core/package.json').version") install --with-deps chromium
+```
+
+A mismatched version fails with "Executable doesn't exist". The container image avoids this entirely — just match its tag (`v1.60.0`) to the `playwright-core` version.
+
+**Capturing the baseline in CI**
+
+Drift baselines are environment-specific. Capture the baseline on the same OS as the check (Linux), commit `.dembrandt/`, then drift against it. Capture it from your Mac inside the matching container so the metrics line up with CI:
+
+```bash
+docker run --rm -v "$PWD":/work -w /work mcr.microsoft.com/playwright:v1.60.0-jammy \
+  npx dembrandt init https://your-preview-url --no-sandbox
+git add .dembrandt && git commit -m "chore: capture drift baseline (linux)"
+```
+
+Refresh it deliberately (a reviewed PR), or accept a single changed page with `dembrandt drift --pages /x -y` run in the same container. Once the baseline is Linux-captured, drop `continue-on-error` and `drift` becomes a real gate.
 
 ## Recipes
 
