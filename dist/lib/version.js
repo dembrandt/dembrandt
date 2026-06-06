@@ -75,4 +75,71 @@ export function buildDembrandtProvenance(result = {}) {
         extractedAt: result?.extractedAt ?? null,
     };
 }
+/** Parse a semver-ish string into its numeric parts, or null if unparseable. */
+function parseSemver(v) {
+    if (!v)
+        return null;
+    const m = /^(\d+)\.(\d+)\.(\d+)/.exec(v.trim());
+    if (!m)
+        return null;
+    return { major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3]) };
+}
+/**
+ * Compare an extraction's output-contract version against this build's
+ * SCHEMA_VERSION. Never throws: malformed or missing version data degrades to
+ * 'unknown' / 'legacy'. See SchemaCompatibility for the status semantics.
+ */
+export function checkSchemaCompatibility(result = {}) {
+    const found = result?.meta?.schemaVersion ?? null;
+    const toolVersion = result?.meta?.dembrandtVersion ?? null;
+    const base = { found, expected: SCHEMA_VERSION, toolVersion };
+    const foundParts = parseSemver(found);
+    if (!foundParts) {
+        if (toolVersion) {
+            return {
+                ...base,
+                status: 'legacy',
+                compatible: false,
+                message: `Extraction predates the schema contract (produced by dembrandt v${toolVersion}, ` +
+                    `no schemaVersion). Re-extract with the current release to validate against ` +
+                    `schema ${SCHEMA_VERSION}. Reading best-effort.`,
+            };
+        }
+        return {
+            ...base,
+            status: 'unknown',
+            compatible: false,
+            message: 'No version metadata on this extraction. Cannot verify schema compatibility; reading best-effort.',
+        };
+    }
+    const expectedParts = parseSemver(SCHEMA_VERSION);
+    if (foundParts.major === expectedParts.major) {
+        const status = found === SCHEMA_VERSION ? 'current' : 'compatible';
+        return { ...base, status, compatible: true, message: null };
+    }
+    if (foundParts.major < expectedParts.major) {
+        return {
+            ...base,
+            status: 'outdated',
+            compatible: false,
+            message: `Extraction uses schema ${found}, this build expects ${SCHEMA_VERSION} ` +
+                `(breaking change between majors). Re-extract recommended.`,
+        };
+    }
+    return {
+        ...base,
+        status: 'ahead',
+        compatible: false,
+        message: `Extraction uses schema ${found}, newer than this build's ${SCHEMA_VERSION} ` +
+            `(breaking change between majors). Upgrade dembrandt to read it reliably.`,
+    };
+}
+/**
+ * One-line notice for surfacing a compatibility verdict in a UI or log. Returns
+ * null when there is nothing to warn about, so callers can render unconditionally:
+ * `const notice = formatCompatibilityNotice(checkSchemaCompatibility(result));`
+ */
+export function formatCompatibilityNotice(compat) {
+    return compat.compatible ? null : compat.message;
+}
 //# sourceMappingURL=version.js.map

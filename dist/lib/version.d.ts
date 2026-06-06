@@ -66,6 +66,7 @@ export interface ExtractionLike {
     extractedAt?: string;
     meta?: {
         dembrandtVersion?: string | null;
+        schemaVersion?: string | null;
     };
 }
 /**
@@ -74,3 +75,52 @@ export interface ExtractionLike {
  * place (extractBranding's meta) that owns toolVersion.
  */
 export declare function buildDembrandtProvenance(result?: ExtractionLike): DembrandtProvenance;
+/**
+ * Verdict of comparing an extraction's output-contract version against the
+ * contract this build understands.
+ *
+ *  - 'current'    : found === SCHEMA_VERSION exactly.
+ *  - 'compatible' : same major, different minor/patch. Safe to consume: within a
+ *                   major the contract only changes additively, so a newer
+ *                   producer just carries extra fields a consumer can ignore,
+ *                   and an older producer is missing fields a consumer tolerates.
+ *  - 'outdated'   : found major < expected major. A breaking contract change
+ *                   landed since; re-extraction recommended.
+ *  - 'ahead'      : found major > expected major. The producer is newer than
+ *                   this build; upgrade the consumer to read it reliably.
+ *  - 'legacy'     : no schemaVersion present but a toolVersion is. A pre-1.0
+ *                   extraction made before the contract existed.
+ *  - 'unknown'    : no version metadata at all.
+ *
+ * `compatible` is true only for 'current' and 'compatible'; every other status
+ * carries a non-null `message`. This is the single sanctioned compatibility
+ * check: consumers (the viewer, dembrandt-next, the drift engine) must compare
+ * the OUTPUT CONTRACT here, never the CLI release (`toolVersion`), which churns
+ * on every publish and produces false "version mismatch" warnings.
+ */
+export type SchemaCompatibilityStatus = 'current' | 'compatible' | 'outdated' | 'ahead' | 'legacy' | 'unknown';
+export interface SchemaCompatibility {
+    status: SchemaCompatibilityStatus;
+    /** True when the extraction can be consumed without caveats. */
+    compatible: boolean;
+    /** schemaVersion read off the extraction, or null when absent. */
+    found: string | null;
+    /** The contract version this build understands (SCHEMA_VERSION). */
+    expected: string;
+    /** CLI release that produced the extraction, for diagnostics only. */
+    toolVersion: string | null;
+    /** Human-readable caveat, or null when status is 'current' / 'compatible'. */
+    message: string | null;
+}
+/**
+ * Compare an extraction's output-contract version against this build's
+ * SCHEMA_VERSION. Never throws: malformed or missing version data degrades to
+ * 'unknown' / 'legacy'. See SchemaCompatibility for the status semantics.
+ */
+export declare function checkSchemaCompatibility(result?: ExtractionLike): SchemaCompatibility;
+/**
+ * One-line notice for surfacing a compatibility verdict in a UI or log. Returns
+ * null when there is nothing to warn about, so callers can render unconditionally:
+ * `const notice = formatCompatibilityNotice(checkSchemaCompatibility(result));`
+ */
+export declare function formatCompatibilityNotice(compat: SchemaCompatibility): string | null;
