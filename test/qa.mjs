@@ -52,7 +52,7 @@ function extractSite(domain) {
 
   try {
     const stdout = execSync(
-      `node index.js ${domain} --json-only --raw-colors ${SLOW_FLAG} --screenshot "${screenshotPath}"`,
+      `node dist/index.js ${domain} --json-only --raw-colors ${SLOW_FLAG} --screenshot "${screenshotPath}"`,
       {
         cwd: ROOT,
         encoding: "utf8",
@@ -93,7 +93,7 @@ function extractToTemp(domain) {
 
   try {
     const stdout = execSync(
-      `node index.js ${domain} --json-only --raw-colors ${SLOW_FLAG} --screenshot "${screenshotPath}"`,
+      `node dist/index.js ${domain} --json-only --raw-colors ${SLOW_FLAG} --screenshot "${screenshotPath}"`,
       {
         cwd: ROOT,
         encoding: "utf8",

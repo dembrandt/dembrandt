@@ -59,7 +59,7 @@ async function runExtraction(url) {
     const screenshotPath = resolve(tmpdir(), `dembrandt-gold-${ts}.png`);
     return await new Promise((res, rej) => {
       const proc = spawn(process.execPath, [
-        resolve(ROOT, 'index.js'),
+        resolve(ROOT, 'dist', 'index.js'),
         url,
         '--json-only',
         '--screenshot', screenshotPath,
@@ -181,7 +181,7 @@ async function generateBrandGuide(url) {
   const ts = Date.now();
   return await new Promise((res, rej) => {
     const proc = spawn(process.execPath, [
-      resolve(ROOT, 'index.js'),
+      resolve(ROOT, 'dist', 'index.js'),
       url, '--brand-guide', '--json-only',
     ], { cwd: ROOT });
     let stdout = '', stderr = '';

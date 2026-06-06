@@ -3,20 +3,28 @@
   "version": "0.16.0",
   "description": "Extract design tokens and publicly visible CSS information from any website",
   "mcpName": "io.github.dembrandt/dembrandt",
-  "main": "index.js",
+  "main": "dist/index.js",
   "type": "module",
   "bin": {
-    "dembrandt": "index.js",
-    "dembrandt-mcp": "mcp-server.js"
+    "dembrandt": "dist/index.js",
+    "dembrandt-mcp": "dist/mcp-server.js"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./dtcg": "./dist/lib/dtcg/validate.js",
+    "./normalize": "./dist/lib/normalize.js",
+    "./types": {
+      "types": "./dist/lib/types.d.ts",
+      "default": "./dist/lib/types.js"
+    }
   },
   "files": [
-    "index.js",
-    "mcp-server.js",
-    "lib/"
+    "dist/"
   ],
   "scripts": {
-    "start": "node index.js",
-    "test": "node --test test/*.test.mjs",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build",
+    "test": "npm run build && node --test dist/test/*.test.js",
     "install-browser": "node tools/install-browser.mjs",
     "qa:baseline": "node test/qa.mjs --baseline",
     "qa:diff": "node test/qa.mjs --diff",
@@ -26,7 +34,9 @@
     "gold:judge": "node tools/gold-ai-judge.mjs",
     "gold:tune": "node tools/gold-tune.mjs",
     "gold:cluster": "node tools/gold-cluster.mjs",
-    "gold:analyze": "node tools/gold-analyze.mjs"
+    "gold:analyze": "node tools/gold-analyze.mjs",
+    "build": "tsc && cp package.json dist/package.json",
+    "lint": "eslint . --ext .ts"
   },
   "keywords": [
     "design-tokens",
@@ -58,5 +68,12 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "25.9.2",
+    "eslint": "10.4.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.60.1"
   }
 }

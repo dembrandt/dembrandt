@@ -57,7 +57,7 @@ async function runDembrandt(url) {
   const screenshotPath = resolve(tmpdir(), `judge-${Date.now()}.png`);
   return await new Promise((res, rej) => {
     const proc = spawn(process.execPath, [
-      resolve(ROOT, 'index.js'),
+      resolve(ROOT, 'dist', 'index.js'),
       url, '--json-only', '--screenshot', screenshotPath,
     ], { cwd: ROOT });
     let stdout = '', stderr = '';
