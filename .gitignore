@@ -23,6 +23,7 @@ test-output/
 # Don't commit example outputs (but allow examples/ directory)
 *.json
 !package*.json
+!tsconfig.json
 !examples/*.json
 !test/sites*.json
 

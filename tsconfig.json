@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "outDir": "dist",
+    "rootDir": ".",
+    "allowJs": true,
+    "checkJs": false,
+    "declaration": true,
+    "sourceMap": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "moduleDetection": "force",
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": false
+  },
+  "include": ["index.ts", "mcp-server.ts", "lib/**/*", "test/**/*.ts"],
+  "exclude": ["node_modules", "dist", "output", "tools"]
+}
