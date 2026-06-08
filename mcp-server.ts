@@ -7,7 +7,7 @@
  * Windsurf, and any MCP-compatible client.
  *
  * Install:
- *   claude mcp add --transport stdio dembrandt -- npx -y dembrandt-mcp
+ *   claude mcp add --transport stdio dembrandt -- npx -y --package dembrandt dembrandt-mcp
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";

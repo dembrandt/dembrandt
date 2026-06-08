@@ -25,7 +25,7 @@ Requires Node.js 18+
 Use Dembrandt as a tool in Claude Code, Cursor, Windsurf, or any MCP-compatible client. Ask your agent to "extract the color palette from example.com" and it calls Dembrandt automatically.
 
 ```bash
-claude mcp add --transport stdio dembrandt -- npx -y dembrandt-mcp
+claude mcp add --transport stdio dembrandt -- npx -y --package dembrandt dembrandt-mcp
 ```
 
 Or add to your project's `.mcp.json`:
@@ -35,7 +35,7 @@ Or add to your project's `.mcp.json`:
   "mcpServers": {
     "dembrandt": {
       "command": "npx",
-      "args": ["-y", "dembrandt-mcp"]
+      "args": ["-y", "--package", "dembrandt", "dembrandt-mcp"]
     }
   }
 }
