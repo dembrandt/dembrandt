@@ -78,12 +78,6 @@ Load extractions, track token drift, and compare snapshots. **[dembrandt.com/app
 ## Usage
 
 ```bash
-dembrandt init example.com             # Save baseline (.dembrandt/ (config.json + snapshot.yaml + tokens.json))
-dembrandt init example.com --crawl 5   # Multi-page baseline (homepage + 4 discovered pages)
-dembrandt drift                        # Compare live site against baseline, exit 1 on drift
-dembrandt drift --url https://staging  # Drift check against a different URL
-dembrandt drift --json                 # Machine-readable drift report (stdout)
-dembrandt drift --threshold 20         # Custom drift score threshold
 dembrandt <url>                        # Basic extraction (terminal display only)
 dembrandt example.com --json-only      # Output raw JSON to terminal (no formatted display, no file save)
 dembrandt example.com --save-output    # Save JSON to output/example.com/YYYY-MM-DDTHH-MM-SS.json
@@ -213,188 +207,9 @@ dembrandt example.com --brand-guide
 # Saves to: output/example.com/TIMESTAMP.brand-guide.pdf
 ```
 
-## Brand Drift Detection
-
-Track design token changes over time. Save a baseline, re-run on any deploy, catch drift before it ships.
-
-### Setup
-
-```bash
-# Save your baseline — extracts tokens and writes .dembrandt/ (config.json + snapshot.yaml + tokens.json)
-dembrandt init example.com
-
-# Multi-page baseline (recommended — more representative token coverage)
-dembrandt init example.com --crawl 5
-
-# Check for drift against baseline
-dembrandt drift
-```
-
-Commit `.dembrandt/` to your repo. The snapshot is ~6KB — no LFS needed.
-
-`dembrandt drift` re-extracts the same pages recorded during `init`, compares against the snapshot, and reports what changed. Exit code `1` on drift above threshold — works in CI without extra config.
-
-### CI/CD Integration
-
-Run drift detection on every push to `main`:
-
-```yaml
-# .github/workflows/brand-drift.yml
-on:
-  push:
-    branches: [main]
-
-jobs:
-  drift:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm install -g dembrandt
-      - run: npx playwright@$(node -p "require('playwright-core/package.json').version") install --with-deps chromium
-      - run: dembrandt drift
-```
-
-### Drift output
-
-```
-✗ Drift   score 14/100 · threshold 10   example.com
-  baseline 1 Jun 2026, 09:12  →  now 4 Jun 2026, 14:30
-
-  color
-    ~ accent     ▇ #533afd → ▇ #635bff   Δ8.2
-    - accent     ▇ #ff6118  (2 uses)
-
-  typography
-    ~ h1         size 56px → 48px   family + weight unchanged
-
-  2 changes — over threshold, failing the check
-```
-
-Colors are compared using ΔE (perceptual color distance). Brand-critical colors (`accent`, `primary`) are weighted higher than structural colors (`surface`, `background`). Spacing and radii use percentage change. Typography matches by semantic context.
-
-### Configuration
-
-`.dembrandt/config.json` is written by `dembrandt init`. Edit thresholds to tune sensitivity:
-
-```json
-{
-  "baseline": "https://example.com",
-  "pages": ["/", "/pricing", "/about"],
-  "thresholds": {
-    "color": 2.3,
-    "spacing": 4,
-    "typography": 0
-  }
-}
-```
-
-`color` threshold is a ΔE value — 2.3 is the just-noticeable difference. `spacing` is a percentage change. `typography: 0` means any change flags.
-
-### Lint config
-
-`dembrandt --lint` runs a set of design rules out of the box (no config needed):
-
-- **primary-contrast** — the brand primary colour is legible on white (WCAG AA + margin).
-- **button-contrast** — solid buttons have readable text (WCAG AA 4.5:1); outline/ghost buttons are skipped.
-- **body-text-size** — body copy is at least 16px.
-- **palette-size** — at most 8 accent/brand colours (skipped for data-viz pages).
-- **typography-scale** — font sizes follow a consistent modular ratio.
-- **radius-consistency** — border-radius values form a scale (pills excluded).
-- **shadow-scale** — shadows form a limited elevation scale.
-- **button-variants** — buttons share a limited set of styles.
-- **focus-visible** — form inputs have a visible focus state (WCAG 2.4.7).
-- **logo-format** — the logo is a vector (SVG), not a raster.
-
-Rules read from the `lint` section of `.dembrandt/config.json` and follow the ESLint `[level, options]` model — set a rule to `"off"` to disable it, or override its level (`"error"`, `"warn"`, `"info"`) and options:
-
-```json
-{
-  "lint": {
-    "rules": {
-      "primary-contrast": ["error", { "min": 4.5 }],
-      "button-contrast": ["error", { "min": 4.5 }],
-      "palette-size": ["warn", { "max": 8 }],
-      "typography-scale": "off"
-    }
-  }
-}
-```
-
-Without a config file, lint uses built-in defaults. `dembrandt init` seeds the section with those defaults so the editable form is discoverable. Note: a primary contrast below 3.0:1 is an outright WCAG AA failure and is always reported as `error` regardless of the configured level.
-
-Override the baseline URL for staging environments (same design, different environment — localhost, staging, prod):
-
-```bash
-dembrandt drift --url https://staging.example.com
-dembrandt drift --url http://localhost:3000
-```
-
-### Per-page drift
-
-By default `drift` compares the merged whole-site baseline. To check specific pages against their own per-page baseline (e.g. four pages are fine and you only changed one), use `--pages` against a multi-page baseline (`dembrandt init --crawl`):
-
-```bash
-dembrandt drift --pages /checkout            # compare just /checkout to its own snapshot
-dembrandt drift --pages /checkout /pricing   # several specific pages
-```
-
-Each page is compared to its own snapshot, so one changed page does not drown in the whole-site average. A page that is not in the baseline is reported as **new** — check it against the token contract with `dembrandt conformance <url>/newpage` instead, since there is no prior snapshot to drift against.
-
-Get raw JSON output for custom reporting:
-
-```bash
-dembrandt drift --json
-```
-
-### Conformance: check live against a declared contract
-
-`drift` is symmetric — it flags any change from a snapshot. `conformance` is one-directional: it checks that every token your contract *declares* is present in the live site. Extra tokens in live are not violations. Use it to enforce a curated token contract (`.dembrandt/tokens.json`) rather than a captured snapshot.
-
-```bash
-dembrandt conformance example.com                       # check live vs .dembrandt/tokens.json
-dembrandt conformance example.com --contract ./tokens.json
-dembrandt conformance example.com --contract ./DESIGN.md  # DESIGN.md front matter as contract
-dembrandt conformance --threshold 0                     # fail on any missing token
-```
-
-The contract can be a `tokens.json`, a `DESIGN.md` (its YAML front matter is mapped to tokens), or a plain YAML file.
-
-Exit code is 1 when the contract is violated, so it works as a CI gate alongside `drift` and `--lint`. The comparison is **unweighted** — the contract carries no usage counts or roles, so every declared token counts equally. The conformance score is not comparable to a drift score.
-
 ## Continuous integration
 
-Dembrandt drives a real browser, so two things matter in CI: the browser revision must match `playwright-core`, and the rendering environment must match the one your baseline was captured in.
-
-**Recommended adoption pattern**
-
-- **`--lint` is the gate.** It is deterministic and largely rendering-independent, so it fails the build reliably.
-- **`drift` is non-blocking until the baseline is captured in the same environment.** A baseline captured on macOS and checked on Linux produces false typography drift (fonts render with different metrics per OS). Run it with `continue-on-error` until you have a CI-captured baseline, then make it a gate.
-
-```yaml
-jobs:
-  design:
-    runs-on: ubuntu-latest
-    # Browser preinstalled; tag MUST match dembrandt's playwright-core version.
-    container: mcr.microsoft.com/playwright:v1.60.0-jammy
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: npm }
-      - run: npm ci
-      - run: npm run build && npm run start & npx --yes wait-on -t 60000 http://localhost:3000
-
-      - name: Lint design tokens (gate)
-        run: npx dembrandt http://localhost:3000 --lint --no-sandbox
-
-      - name: Token drift (non-blocking until baseline is captured in CI)
-        continue-on-error: true
-        run: npx dembrandt drift --no-sandbox
-```
-
-**Browser version**
+Dembrandt drives a real browser, so the browser revision must match `playwright-core`.
 
 If you are not using the Playwright container image, install the browser revision that matches `playwright-core`:
 
@@ -406,18 +221,6 @@ npx playwright@$(node -p "require('playwright-core/package.json').version") inst
 ```
 
 A mismatched version fails with "Executable doesn't exist". The container image avoids this entirely — just match its tag (`v1.60.0`) to the `playwright-core` version.
-
-**Capturing the baseline in CI**
-
-Drift baselines are environment-specific. Capture the baseline on the same OS as the check (Linux), commit `.dembrandt/`, then drift against it. Capture it from your Mac inside the matching container so the metrics line up with CI:
-
-```bash
-docker run --rm -v "$PWD":/work -w /work mcr.microsoft.com/playwright:v1.60.0-jammy \
-  npx dembrandt init https://your-preview-url --no-sandbox
-git add .dembrandt && git commit -m "chore: capture drift baseline (linux)"
-```
-
-Refresh it deliberately (a reviewed PR), or accept a single changed page with `dembrandt drift --pages /x -y` run in the same container. Once the baseline is Linux-captured, drop `continue-on-error` and `drift` becomes a real gate.
 
 ## Recipes
 

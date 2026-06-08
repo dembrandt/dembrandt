@@ -282,10 +282,38 @@ export async function extractLogo(page, url) {
                 };
             }
             else if (el.tagName === 'SVG' || el.tagName === 'svg') {
+                // Inline SVG: the logo lives in the DOM, not at a URL. Capture the
+                // resolved color (currentColor → the element's `color`), serialize the
+                // markup, and emit a self-contained data URI so the logo is usable.
+                const color = toHex(computed.color);
+                const ariaLabel = el.getAttribute('aria-label') || null;
+                let markup = null;
+                let dataUri = null;
+                try {
+                    const clone = el.cloneNode(true);
+                    // Bake the resolved color in so `currentColor` fills render standalone.
+                    if (color)
+                        clone.style.color = color;
+                    if (!clone.getAttribute('xmlns'))
+                        clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                    const serialized = clone.outerHTML;
+                    // Skip pathological inline SVGs (sprite sheets, embedded rasters).
+                    if (serialized && serialized.length <= 50000) {
+                        markup = serialized;
+                        dataUri = 'data:image/svg+xml;utf8,' + encodeURIComponent(serialized);
+                    }
+                }
+                catch { }
                 return {
                     source: 'svg',
                     context,
+                    inline: true,
+                    // Link target the logo points at; the logo itself is `markup`/`dataUri`.
                     url: parentLink ? parentLink.href : baseUrl,
+                    color,
+                    ariaLabel,
+                    markup,
+                    dataUri,
                     width: el.width?.baseVal?.value || rect.width,
                     height: el.height?.baseVal?.value || rect.height,
                     type: logoType,
@@ -582,7 +610,10 @@ export async function extractLogo(page, url) {
             }
             catch { }
         }
-        if (!favicons.some(f => f.url.endsWith('/favicon.ico'))) {
+        // Only synthesize the /favicon.ico fallback when the page declares no icon at
+        // all. Sites that ship their icon under another name (e.g. favicon-purple.ico)
+        // often 404 on the bare /favicon.ico, which would surface as a broken entry.
+        if (!favicons.some(f => /icon/i.test(f.type || ''))) {
             favicons.push({ type: 'favicon.ico', url: new URL('/favicon.ico', baseUrl).href, sizes: null });
         }
         return { logo: primaryLogo, instances, favicons };

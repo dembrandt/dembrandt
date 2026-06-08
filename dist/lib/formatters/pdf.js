@@ -839,6 +839,10 @@ ${(() => {
 }
 function getLogoImageUrl(data) {
     const isImageUrl = (url) => /\.(svg|png|jpg|jpeg|webp|gif)(\?.*)?$/i.test(url);
+    // Inline SVG logos carry their own self-contained data URI.
+    if (data.logo?.inline && data.logo.dataUri) {
+        return data.logo.dataUri;
+    }
     if (data.logo?.url && isImageUrl(data.logo.url)) {
         return data.logo.url;
     }

@@ -62,7 +62,14 @@ function displayLogo(logo) {
     if (!logo)
         return;
     console.log(chalk.dim('├─') + ' ' + chalk.bold('Logo'));
-    if (logo.url) {
+    if (logo.inline) {
+        const colorInfo = logo.color ? ` · ${logo.color}` : '';
+        console.log(chalk.dim('│  ├─') + ' ' + chalk.dim(`inline ${logo.source || 'svg'}${colorInfo}`));
+        if (logo.url && logo.url !== '/') {
+            console.log(chalk.dim('│  ├─') + ' ' + chalk.blue(terminalLink(logo.url)));
+        }
+    }
+    else if (logo.url) {
         console.log(chalk.dim('│  ├─') + ' ' + chalk.blue(terminalLink(logo.url)));
     }
     if (logo.width && logo.height) {

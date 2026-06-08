@@ -250,6 +250,7 @@ async function simulateHumanMouse(page) {
 export async function extractBranding(url, spinner, browser, options = {}) {
     const timeoutMultiplier = options.slow ? 3 : 1;
     const timeouts = [];
+    const degraded = []; // post-extraction stages that failed but did not abort the run
     // Progress lines print only in verbose mode (the main `dembrandt <url>`
     // command). Report commands (drift/init/conformance) pass no verbose flag and
     // stay clean. Warnings are NOT routed through this — they always print.
@@ -568,78 +569,84 @@ export async function extractBranding(url, spinner, browser, options = {}) {
         let siteName = siteNameRaw;
         spinner.stop();
         // Inject manifest theme_color / background_color as high-confidence palette entries
-        if (manifest) {
-            const manifestColorEntries = [
-                manifest.themeColor && { color: manifest.themeColor, label: 'manifest:theme_color' },
-                manifest.backgroundColor && { color: manifest.backgroundColor, label: 'manifest:background_color' },
-            ].filter(Boolean);
-            const rawManifestColors = manifestColorEntries.map(e => e.color);
-            const manifestNormMap = rawManifestColors.length ? await page.evaluate((cols) => {
-                const canvas = document.createElement('canvas');
-                canvas.width = canvas.height = 1;
-                const ctx = canvas.getContext('2d');
-                const out = {};
-                for (const c of cols) {
-                    if (/^#[0-9a-f]{6}$/i.test(c)) {
-                        out[c] = c.toLowerCase();
-                        continue;
-                    }
-                    if (/^#[0-9a-f]{3}$/i.test(c)) {
-                        out[c] = `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}`.toLowerCase();
-                        continue;
-                    }
-                    if (/^#[0-9a-f]{8}$/i.test(c)) {
-                        out[c] = c.toLowerCase().slice(0, 7);
-                        continue;
-                    }
-                    const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-                    if (m) {
-                        out[c] = `#${parseInt(m[1]).toString(16).padStart(2, '0')}${parseInt(m[2]).toString(16).padStart(2, '0')}${parseInt(m[3]).toString(16).padStart(2, '0')}`;
-                        continue;
-                    }
-                    if (ctx) {
-                        try {
-                            ctx.clearRect(0, 0, 1, 1);
-                            ctx.fillStyle = 'rgba(0,0,0,0)';
-                            ctx.fillStyle = c;
-                            ctx.fillRect(0, 0, 1, 1);
-                            const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-                            if (a > 0) {
-                                out[c] = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-                                continue;
-                            }
+        try {
+            if (manifest) {
+                const manifestColorEntries = [
+                    manifest.themeColor && { color: manifest.themeColor, label: 'manifest:theme_color' },
+                    manifest.backgroundColor && { color: manifest.backgroundColor, label: 'manifest:background_color' },
+                ].filter(Boolean);
+                const rawManifestColors = manifestColorEntries.map(e => e.color);
+                const manifestNormMap = rawManifestColors.length ? await page.evaluate((cols) => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = canvas.height = 1;
+                    const ctx = canvas.getContext('2d');
+                    const out = {};
+                    for (const c of cols) {
+                        if (/^#[0-9a-f]{6}$/i.test(c)) {
+                            out[c] = c.toLowerCase();
+                            continue;
                         }
-                        catch { }
+                        if (/^#[0-9a-f]{3}$/i.test(c)) {
+                            out[c] = `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}`.toLowerCase();
+                            continue;
+                        }
+                        if (/^#[0-9a-f]{8}$/i.test(c)) {
+                            out[c] = c.toLowerCase().slice(0, 7);
+                            continue;
+                        }
+                        const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+                        if (m) {
+                            out[c] = `#${parseInt(m[1]).toString(16).padStart(2, '0')}${parseInt(m[2]).toString(16).padStart(2, '0')}${parseInt(m[3]).toString(16).padStart(2, '0')}`;
+                            continue;
+                        }
+                        if (ctx) {
+                            try {
+                                ctx.clearRect(0, 0, 1, 1);
+                                ctx.fillStyle = 'rgba(0,0,0,0)';
+                                ctx.fillStyle = c;
+                                ctx.fillRect(0, 0, 1, 1);
+                                const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+                                if (a > 0) {
+                                    out[c] = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+                                    continue;
+                                }
+                            }
+                            catch { }
+                        }
+                        out[c] = c.toLowerCase();
                     }
-                    out[c] = c.toLowerCase();
-                }
-                return out;
-            }, rawManifestColors) : {};
-            for (const { color: raw, label } of manifestColorEntries) {
-                const normalized = manifestNormMap[raw] ?? raw.toLowerCase();
-                if (!colors.palette.some(c => c.normalized === normalized)) {
-                    colors.palette.push({ color: raw, normalized, count: 10, confidence: 'high', sources: [label] });
-                }
-                else {
-                    const existing = colors.palette.find(c => c.normalized === normalized);
-                    if (existing) {
-                        existing.confidence = 'high';
-                        if (!existing.sources.includes(label))
-                            existing.sources.push(label);
+                    return out;
+                }, rawManifestColors) : {};
+                for (const { color: raw, label } of manifestColorEntries) {
+                    const normalized = manifestNormMap[raw] ?? raw.toLowerCase();
+                    if (!colors.palette.some(c => c.normalized === normalized)) {
+                        colors.palette.push({ color: raw, normalized, count: 10, confidence: 'high', sources: [label] });
                     }
+                    else {
+                        const existing = colors.palette.find(c => c.normalized === normalized);
+                        if (existing) {
+                            existing.confidence = 'high';
+                            if (!existing.sources.includes(label))
+                                existing.sources.push(label);
+                        }
+                    }
+                }
+                if (!siteName && (manifest.name || manifest.shortName)) {
+                    siteName = manifest.name || manifest.shortName;
                 }
             }
-            if (!siteName && (manifest.name || manifest.shortName)) {
-                siteName = manifest.name || manifest.shortName;
+            if (manifest) {
+                const parts = [
+                    manifest.themeColor && `theme: ${manifest.themeColor}`,
+                    manifest.backgroundColor && `bg: ${manifest.backgroundColor}`,
+                    manifest.name && `name: "${manifest.name}"`,
+                ].filter(Boolean);
+                log(color.success(`  ✓ Manifest: ${parts.join(', ')}`));
             }
         }
-        if (manifest) {
-            const parts = [
-                manifest.themeColor && `theme: ${manifest.themeColor}`,
-                manifest.backgroundColor && `bg: ${manifest.backgroundColor}`,
-                manifest.name && `name: "${manifest.name}"`,
-            ].filter(Boolean);
-            log(color.success(`  ✓ Manifest: ${parts.join(', ')}`));
+        catch (e) {
+            degraded.push('manifest');
+            console.log(color.warning('  ! Manifest injection: failed (continuing)'));
         }
         console.log(colors.palette.length > 0 ? color.success(`  ✓ Colors: ${colors.palette.length} found`) : color.warning(`  ! Colors: 0 found`));
         console.log(typography.styles.length > 0 ? color.success(`  ✓ Typography: ${typography.styles.length} styles`) : color.warning(`  ! Typography: 0 styles`));
@@ -658,256 +665,277 @@ export async function extractBranding(url, spinner, browser, options = {}) {
         console.log(motion.durations.length > 0 ? color.success(`  ✓ Motion: ${motion.durations.length} durations, ${motion.easings.length} easings`) : color.info(`  · Motion: none detected`));
         console.log();
         // Hover/focus state extraction
-        spinner.start("Extracting hover/focus state colors...");
         const hoverFocusColors = [];
-        function splitMultiValueColors(colorValue) {
-            if (!colorValue)
-                return [];
-            const colorRegex = /(#[0-9a-f]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\))/gi;
-            const matches = colorValue.match(colorRegex) || [colorValue];
-            return matches.filter(c => c !== 'transparent' && c !== 'rgba(0, 0, 0, 0)' && c !== 'rgba(0,0,0,0)' && c.length > 3);
-        }
-        const interactiveElements = await page.$$(`
+        const interactiveStatePairs = []; // { fg, bg, state, tag } — raw rgb strings, normalized later (consumed by WCAG stage)
+        try {
+            spinner.start("Extracting hover/focus state colors...");
+            function splitMultiValueColors(colorValue) {
+                if (!colorValue)
+                    return [];
+                const colorRegex = /(#[0-9a-f]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\))/gi;
+                const matches = colorValue.match(colorRegex) || [colorValue];
+                return matches.filter(c => c !== 'transparent' && c !== 'rgba(0, 0, 0, 0)' && c !== 'rgba(0,0,0,0)' && c.length > 3);
+            }
+            const interactiveElements = await page.$$(`
       a, button, input, textarea, select,
       [role="button"], [role="link"], [role="tab"], [role="menuitem"], [role="switch"],
       [role="checkbox"], [role="radio"], [role="textbox"], [role="searchbox"], [role="combobox"],
       [aria-pressed], [aria-expanded], [aria-current],
       [tabindex]:not([tabindex="-1"])
     `);
-        const sampled = interactiveElements.slice(0, 20);
-        const interactiveStatePairs = []; // { fg, bg, state, tag } — raw rgb strings, normalized later
-        for (const element of sampled) {
-            try {
-                const isVisible = await element.evaluate(el => {
-                    const rect = el.getBoundingClientRect();
-                    const style = getComputedStyle(el);
-                    return rect.width > 0 && rect.height > 0 &&
-                        style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
-                });
-                if (!isVisible)
-                    continue;
-                const beforeState = await element.evaluate(el => {
-                    function findBg(node) {
-                        while (node && node.tagName !== 'HTML') {
-                            const bg = getComputedStyle(node).backgroundColor;
-                            if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent')
-                                return bg;
-                            node = node.parentElement;
-                        }
-                        return null;
-                    }
-                    const computed = getComputedStyle(el);
-                    return { color: computed.color, backgroundColor: computed.backgroundColor, resolvedBg: findBg(el), borderColor: computed.borderColor, tag: el.tagName.toLowerCase() };
-                });
-                const hovered = await element.hover({ timeout: 1000 * timeoutMultiplier }).then(() => true).catch(() => false);
-                await page.waitForTimeout(100 * timeoutMultiplier);
-                const afterHover = await element.evaluate(el => {
-                    function findBg(node) {
-                        while (node && node.tagName !== 'HTML') {
-                            const bg = getComputedStyle(node).backgroundColor;
-                            if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent')
-                                return bg;
-                            node = node.parentElement;
-                        }
-                        return null;
-                    }
-                    const computed = getComputedStyle(el);
-                    return { color: computed.color, backgroundColor: computed.backgroundColor, resolvedBg: findBg(el), borderColor: computed.borderColor };
-                }).catch(() => null);
-                if (!afterHover)
-                    continue;
-                if (afterHover.color !== beforeState.color && afterHover.color !== 'rgba(0, 0, 0, 0)' && afterHover.color !== 'transparent') {
-                    hoverFocusColors.push({ color: afterHover.color, property: 'color', state: 'hover', element: beforeState.tag });
-                }
-                if (afterHover.backgroundColor !== beforeState.backgroundColor && afterHover.backgroundColor !== 'rgba(0, 0, 0, 0)' && afterHover.backgroundColor !== 'transparent') {
-                    hoverFocusColors.push({ color: afterHover.backgroundColor, property: 'background-color', state: 'hover', element: beforeState.tag });
-                }
-                if (afterHover.borderColor !== beforeState.borderColor) {
-                    const hoverBorderColors = splitMultiValueColors(afterHover.borderColor);
-                    const beforeBorderColors = splitMultiValueColors(beforeState.borderColor);
-                    hoverBorderColors.forEach(color => {
-                        if (!beforeBorderColors.includes(color)) {
-                            hoverFocusColors.push({ color, property: 'border-color', state: 'hover', element: beforeState.tag });
-                        }
+            const sampled = interactiveElements.slice(0, 20);
+            for (const element of sampled) {
+                try {
+                    const isVisible = await element.evaluate(el => {
+                        const rect = el.getBoundingClientRect();
+                        const style = getComputedStyle(el);
+                        return rect.width > 0 && rect.height > 0 &&
+                            style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
                     });
-                }
-                // Collect hover contrast pair only if hover actually changed styles
-                const hoverFg = afterHover.color;
-                const hoverBg = afterHover.resolvedBg;
-                if (hovered && hoverFg && hoverBg && (hoverFg !== beforeState.color || hoverBg !== beforeState.resolvedBg)) {
-                    interactiveStatePairs.push({ fg: hoverFg, bg: hoverBg, state: 'hover', tag: beforeState.tag });
-                }
-                if (['input', 'textarea', 'select', 'button', 'a'].includes(beforeState.tag)) {
-                    try {
-                        await element.focus({ timeout: 500 * timeoutMultiplier });
-                        await page.waitForTimeout(100 * timeoutMultiplier);
-                        const afterFocus = await element.evaluate(el => {
-                            function findBg(node) {
-                                while (node && node.tagName !== 'HTML') {
-                                    const bg = getComputedStyle(node).backgroundColor;
-                                    if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent')
-                                        return bg;
-                                    node = node.parentElement;
-                                }
-                                return null;
+                    if (!isVisible)
+                        continue;
+                    const beforeState = await element.evaluate(el => {
+                        function findBg(node) {
+                            while (node && node.tagName !== 'HTML') {
+                                const bg = getComputedStyle(node).backgroundColor;
+                                if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent')
+                                    return bg;
+                                node = node.parentElement;
                             }
-                            const computed = getComputedStyle(el);
-                            return { color: computed.color, backgroundColor: computed.backgroundColor, resolvedBg: findBg(el), borderColor: computed.borderColor, outlineColor: computed.outlineColor };
-                        });
-                        if (afterFocus.outlineColor && afterFocus.outlineColor !== 'rgba(0, 0, 0, 0)' && afterFocus.outlineColor !== 'transparent' && afterFocus.outlineColor !== beforeState.color) {
-                            hoverFocusColors.push({ color: afterFocus.outlineColor, property: 'outline-color', state: 'focus', element: beforeState.tag });
+                            return null;
                         }
-                        if (afterFocus.borderColor !== beforeState.borderColor && afterFocus.borderColor !== afterHover.borderColor) {
-                            const focusBorderColors = splitMultiValueColors(afterFocus.borderColor);
-                            const beforeBorderColors = splitMultiValueColors(beforeState.borderColor);
-                            focusBorderColors.forEach(color => {
-                                if (!beforeBorderColors.includes(color)) {
-                                    hoverFocusColors.push({ color, property: 'border-color', state: 'focus', element: beforeState.tag });
-                                }
-                            });
+                        const computed = getComputedStyle(el);
+                        return { color: computed.color, backgroundColor: computed.backgroundColor, resolvedBg: findBg(el), borderColor: computed.borderColor, tag: el.tagName.toLowerCase() };
+                    });
+                    const hovered = await element.hover({ timeout: 1000 * timeoutMultiplier }).then(() => true).catch(() => false);
+                    await page.waitForTimeout(100 * timeoutMultiplier);
+                    const afterHover = await element.evaluate(el => {
+                        function findBg(node) {
+                            while (node && node.tagName !== 'HTML') {
+                                const bg = getComputedStyle(node).backgroundColor;
+                                if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent')
+                                    return bg;
+                                node = node.parentElement;
+                            }
+                            return null;
                         }
-                        // Collect focus contrast pair
-                        const focusFg = afterFocus.color;
-                        const focusBg = afterFocus.resolvedBg;
-                        if (focusFg && focusBg && (focusFg !== beforeState.color || focusBg !== beforeState.resolvedBg)) {
-                            interactiveStatePairs.push({ fg: focusFg, bg: focusBg, state: 'focus', tag: beforeState.tag });
-                        }
+                        const computed = getComputedStyle(el);
+                        return { color: computed.color, backgroundColor: computed.backgroundColor, resolvedBg: findBg(el), borderColor: computed.borderColor };
+                    }).catch(() => null);
+                    if (!afterHover)
+                        continue;
+                    if (afterHover.color !== beforeState.color && afterHover.color !== 'rgba(0, 0, 0, 0)' && afterHover.color !== 'transparent') {
+                        hoverFocusColors.push({ color: afterHover.color, property: 'color', state: 'hover', element: beforeState.tag });
                     }
-                    catch (e) { }
+                    if (afterHover.backgroundColor !== beforeState.backgroundColor && afterHover.backgroundColor !== 'rgba(0, 0, 0, 0)' && afterHover.backgroundColor !== 'transparent') {
+                        hoverFocusColors.push({ color: afterHover.backgroundColor, property: 'background-color', state: 'hover', element: beforeState.tag });
+                    }
+                    if (afterHover.borderColor !== beforeState.borderColor) {
+                        const hoverBorderColors = splitMultiValueColors(afterHover.borderColor);
+                        const beforeBorderColors = splitMultiValueColors(beforeState.borderColor);
+                        hoverBorderColors.forEach(color => {
+                            if (!beforeBorderColors.includes(color)) {
+                                hoverFocusColors.push({ color, property: 'border-color', state: 'hover', element: beforeState.tag });
+                            }
+                        });
+                    }
+                    // Collect hover contrast pair only if hover actually changed styles
+                    const hoverFg = afterHover.color;
+                    const hoverBg = afterHover.resolvedBg;
+                    if (hovered && hoverFg && hoverBg && (hoverFg !== beforeState.color || hoverBg !== beforeState.resolvedBg)) {
+                        interactiveStatePairs.push({ fg: hoverFg, bg: hoverBg, state: 'hover', tag: beforeState.tag });
+                    }
+                    if (['input', 'textarea', 'select', 'button', 'a'].includes(beforeState.tag)) {
+                        try {
+                            await element.focus({ timeout: 500 * timeoutMultiplier });
+                            await page.waitForTimeout(100 * timeoutMultiplier);
+                            const afterFocus = await element.evaluate(el => {
+                                function findBg(node) {
+                                    while (node && node.tagName !== 'HTML') {
+                                        const bg = getComputedStyle(node).backgroundColor;
+                                        if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent')
+                                            return bg;
+                                        node = node.parentElement;
+                                    }
+                                    return null;
+                                }
+                                const computed = getComputedStyle(el);
+                                return { color: computed.color, backgroundColor: computed.backgroundColor, resolvedBg: findBg(el), borderColor: computed.borderColor, outlineColor: computed.outlineColor };
+                            });
+                            if (afterFocus.outlineColor && afterFocus.outlineColor !== 'rgba(0, 0, 0, 0)' && afterFocus.outlineColor !== 'transparent' && afterFocus.outlineColor !== beforeState.color) {
+                                hoverFocusColors.push({ color: afterFocus.outlineColor, property: 'outline-color', state: 'focus', element: beforeState.tag });
+                            }
+                            if (afterFocus.borderColor !== beforeState.borderColor && afterFocus.borderColor !== afterHover.borderColor) {
+                                const focusBorderColors = splitMultiValueColors(afterFocus.borderColor);
+                                const beforeBorderColors = splitMultiValueColors(beforeState.borderColor);
+                                focusBorderColors.forEach(color => {
+                                    if (!beforeBorderColors.includes(color)) {
+                                        hoverFocusColors.push({ color, property: 'border-color', state: 'focus', element: beforeState.tag });
+                                    }
+                                });
+                            }
+                            // Collect focus contrast pair
+                            const focusFg = afterFocus.color;
+                            const focusBg = afterFocus.resolvedBg;
+                            if (focusFg && focusBg && (focusFg !== beforeState.color || focusBg !== beforeState.resolvedBg)) {
+                                interactiveStatePairs.push({ fg: focusFg, bg: focusBg, state: 'focus', tag: beforeState.tag });
+                            }
+                        }
+                        catch (e) { }
+                    }
                 }
+                catch (e) { }
+            }
+            // Collect disabled element pairs
+            try {
+                const disabledPairs = await page.evaluate(() => {
+                    function findBg(node) {
+                        while (node && node.tagName !== 'HTML') {
+                            const bg = getComputedStyle(node).backgroundColor;
+                            if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent')
+                                return bg;
+                            node = node.parentElement;
+                        }
+                        return null;
+                    }
+                    const els = document.querySelectorAll('button[disabled], input[disabled], [aria-disabled="true"], [disabled]');
+                    const pairs = [];
+                    for (const el of Array.from(els).slice(0, 10)) {
+                        const rect = el.getBoundingClientRect();
+                        if (rect.width === 0 || rect.height === 0)
+                            continue;
+                        const s = getComputedStyle(el);
+                        const fg = s.color;
+                        const bg = findBg(el);
+                        if (fg && bg)
+                            pairs.push({ fg, bg, state: 'disabled', tag: el.tagName.toLowerCase() });
+                    }
+                    return pairs;
+                });
+                interactiveStatePairs.push(...disabledPairs);
             }
             catch (e) { }
-        }
-        // Collect disabled element pairs
-        try {
-            const disabledPairs = await page.evaluate(() => {
-                function findBg(node) {
-                    while (node && node.tagName !== 'HTML') {
-                        const bg = getComputedStyle(node).backgroundColor;
-                        if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent')
-                            return bg;
-                        node = node.parentElement;
-                    }
-                    return null;
-                }
-                const els = document.querySelectorAll('button[disabled], input[disabled], [aria-disabled="true"], [disabled]');
-                const pairs = [];
-                for (const el of Array.from(els).slice(0, 10)) {
-                    const rect = el.getBoundingClientRect();
-                    if (rect.width === 0 || rect.height === 0)
+            await page.mouse.move(0, 0).catch(() => { });
+            // Batch-normalize hover/focus colors via browser canvas to handle oklab/oklch/lab
+            const rawHoverColors = [...new Set(hoverFocusColors.map(h => h.color).filter(Boolean))];
+            const hoverColorMap = rawHoverColors.length ? await page.evaluate((cols) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = 1;
+                const ctx = canvas.getContext('2d');
+                const out = {};
+                for (const color of cols) {
+                    const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+                    if (m) {
+                        out[color] = `#${parseInt(m[1]).toString(16).padStart(2, '0')}${parseInt(m[2]).toString(16).padStart(2, '0')}${parseInt(m[3]).toString(16).padStart(2, '0')}`;
                         continue;
-                    const s = getComputedStyle(el);
-                    const fg = s.color;
-                    const bg = findBg(el);
-                    if (fg && bg)
-                        pairs.push({ fg, bg, state: 'disabled', tag: el.tagName.toLowerCase() });
-                }
-                return pairs;
-            });
-            interactiveStatePairs.push(...disabledPairs);
-        }
-        catch (e) { }
-        await page.mouse.move(0, 0).catch(() => { });
-        // Batch-normalize hover/focus colors via browser canvas to handle oklab/oklch/lab
-        const rawHoverColors = [...new Set(hoverFocusColors.map(h => h.color).filter(Boolean))];
-        const hoverColorMap = rawHoverColors.length ? await page.evaluate((cols) => {
-            const canvas = document.createElement('canvas');
-            canvas.width = canvas.height = 1;
-            const ctx = canvas.getContext('2d');
-            const out = {};
-            for (const color of cols) {
-                const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-                if (m) {
-                    out[color] = `#${parseInt(m[1]).toString(16).padStart(2, '0')}${parseInt(m[2]).toString(16).padStart(2, '0')}${parseInt(m[3]).toString(16).padStart(2, '0')}`;
-                    continue;
-                }
-                if (/^#[0-9a-f]{6}$/i.test(color)) {
-                    out[color] = color.toLowerCase();
-                    continue;
-                }
-                if (ctx) {
-                    try {
-                        ctx.clearRect(0, 0, 1, 1);
-                        ctx.fillStyle = 'rgba(0,0,0,0)';
-                        ctx.fillStyle = color;
-                        ctx.fillRect(0, 0, 1, 1);
-                        const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-                        if (a > 0) {
-                            out[color] = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-                            continue;
-                        }
                     }
-                    catch { }
+                    if (/^#[0-9a-f]{6}$/i.test(color)) {
+                        out[color] = color.toLowerCase();
+                        continue;
+                    }
+                    if (ctx) {
+                        try {
+                            ctx.clearRect(0, 0, 1, 1);
+                            ctx.fillStyle = 'rgba(0,0,0,0)';
+                            ctx.fillStyle = color;
+                            ctx.fillRect(0, 0, 1, 1);
+                            const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+                            if (a > 0) {
+                                out[color] = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+                                continue;
+                            }
+                        }
+                        catch { }
+                    }
+                    out[color] = color.toLowerCase();
                 }
-                out[color] = color.toLowerCase();
-            }
-            return out;
-        }, rawHoverColors) : {};
-        hoverFocusColors.forEach(({ color, property }) => {
-            const normalized = hoverColorMap[color] || color.toLowerCase();
-            const isDuplicate = colors.palette.some((c) => c.normalized === normalized);
-            if (!isDuplicate && color) {
-                if (property !== 'background-color') {
-                    const hex = normalized.replace('#', '');
-                    const r = parseInt(hex.substring(0, 2), 16);
-                    const g = parseInt(hex.substring(2, 4), 16);
-                    const b = parseInt(hex.substring(4, 6), 16);
-                    const max = Math.max(r, g, b);
-                    const min = Math.min(r, g, b);
-                    const saturation = max === 0 ? 0 : (max - min) / max;
-                    if (saturation > 0.3)
-                        return;
+                return out;
+            }, rawHoverColors) : {};
+            hoverFocusColors.forEach(({ color, property }) => {
+                const normalized = hoverColorMap[color] || color.toLowerCase();
+                const isDuplicate = colors.palette.some((c) => c.normalized === normalized);
+                if (!isDuplicate && color) {
+                    if (property !== 'background-color') {
+                        const hex = normalized.replace('#', '');
+                        const r = parseInt(hex.substring(0, 2), 16);
+                        const g = parseInt(hex.substring(2, 4), 16);
+                        const b = parseInt(hex.substring(4, 6), 16);
+                        const max = Math.max(r, g, b);
+                        const min = Math.min(r, g, b);
+                        const saturation = max === 0 ? 0 : (max - min) / max;
+                        if (saturation > 0.3)
+                            return;
+                    }
+                    colors.palette.push({ color, normalized, count: 1, confidence: "medium", sources: ["hover/focus"] });
                 }
-                colors.palette.push({ color, normalized, count: 1, confidence: "medium", sources: ["hover/focus"] });
-            }
-        });
-        spinner.stop();
-        console.log(hoverFocusColors.length > 0 ?
-            color.success(`  ✓ Hover/focus: ${hoverFocusColors.length} state colors found`) :
-            color.warning(`  ! Hover/focus: 0 state colors found`));
+            });
+            spinner.stop();
+            console.log(hoverFocusColors.length > 0 ?
+                color.success(`  ✓ Hover/focus: ${hoverFocusColors.length} state colors found`) :
+                color.warning(`  ! Hover/focus: 0 state colors found`));
+        }
+        catch (e) {
+            spinner.stop();
+            degraded.push('hover-focus');
+            console.log(color.warning('  ! Hover/focus: failed (continuing)'));
+        }
         // Dark mode
         if (options.darkMode) {
-            spinner.start("Extracting dark mode colors...");
-            await page.evaluate(() => {
-                document.documentElement.setAttribute("data-theme", "dark");
-                document.documentElement.setAttribute("data-mode", "dark");
-                document.body.setAttribute("data-theme", "dark");
-                document.documentElement.classList.add("dark", "dark-mode", "theme-dark");
-                document.body.classList.add("dark", "dark-mode", "theme-dark");
-            });
-            await page.emulateMedia({ colorScheme: "dark" });
-            await page.waitForTimeout(500 * timeoutMultiplier);
-            const darkModeColors = await extractColors(page);
-            const darkModeButtons = await extractButtonStyles(page);
-            const darkModeLinks = await extractLinkStyles(page);
-            const mergedPalette = [...colors.palette];
-            darkModeColors.palette.forEach((darkColor) => {
-                const isDuplicate = mergedPalette.some((c) => c.normalized === darkColor.normalized);
-                if (!isDuplicate)
-                    mergedPalette.push({ ...darkColor, source: "dark-mode" });
-            });
-            colors.palette = mergedPalette;
-            Object.assign(colors.semantic, darkModeColors.semantic);
-            buttons.push(...darkModeButtons.map((btn) => ({ ...btn, source: "dark-mode" })));
-            links.push(...darkModeLinks.map((link) => ({ ...link, source: "dark-mode" })));
-            spinner.stop();
-            log(color.success(`  ✓ Dark mode: +${darkModeColors.palette.length} colors`));
+            try {
+                spinner.start("Extracting dark mode colors...");
+                await page.evaluate(() => {
+                    document.documentElement.setAttribute("data-theme", "dark");
+                    document.documentElement.setAttribute("data-mode", "dark");
+                    document.body.setAttribute("data-theme", "dark");
+                    document.documentElement.classList.add("dark", "dark-mode", "theme-dark");
+                    document.body.classList.add("dark", "dark-mode", "theme-dark");
+                });
+                await page.emulateMedia({ colorScheme: "dark" });
+                await page.waitForTimeout(500 * timeoutMultiplier);
+                const darkModeColors = await extractColors(page);
+                const darkModeButtons = await extractButtonStyles(page);
+                const darkModeLinks = await extractLinkStyles(page);
+                const mergedPalette = [...colors.palette];
+                darkModeColors.palette.forEach((darkColor) => {
+                    const isDuplicate = mergedPalette.some((c) => c.normalized === darkColor.normalized);
+                    if (!isDuplicate)
+                        mergedPalette.push({ ...darkColor, source: "dark-mode" });
+                });
+                colors.palette = mergedPalette;
+                Object.assign(colors.semantic, darkModeColors.semantic);
+                buttons.push(...darkModeButtons.map((btn) => ({ ...btn, source: "dark-mode" })));
+                links.push(...darkModeLinks.map((link) => ({ ...link, source: "dark-mode" })));
+                spinner.stop();
+                log(color.success(`  ✓ Dark mode: +${darkModeColors.palette.length} colors`));
+            }
+            catch (e) {
+                spinner.stop();
+                degraded.push('dark-mode');
+                log(color.warning('  ! Dark mode: failed (continuing)'));
+            }
         }
         // Mobile viewport
         if (options.mobile) {
-            spinner.start("Extracting mobile viewport colors...");
-            await page.setViewportSize({ width: 390, height: 844 });
-            await page.waitForTimeout(500 * timeoutMultiplier);
-            const mobileColors = await extractColors(page);
-            const mergedPalette = [...colors.palette];
-            mobileColors.palette.forEach((mobileColor) => {
-                const isDuplicate = mergedPalette.some((c) => c.normalized === mobileColor.normalized);
-                if (!isDuplicate)
-                    mergedPalette.push({ ...mobileColor, source: "mobile" });
-            });
-            colors.palette = mergedPalette;
-            spinner.stop();
-            log(color.success(`  ✓ Mobile: +${mobileColors.palette.length} colors`));
+            try {
+                spinner.start("Extracting mobile viewport colors...");
+                await page.setViewportSize({ width: 390, height: 844 });
+                await page.waitForTimeout(500 * timeoutMultiplier);
+                const mobileColors = await extractColors(page);
+                const mergedPalette = [...colors.palette];
+                mobileColors.palette.forEach((mobileColor) => {
+                    const isDuplicate = mergedPalette.some((c) => c.normalized === mobileColor.normalized);
+                    if (!isDuplicate)
+                        mergedPalette.push({ ...mobileColor, source: "mobile" });
+                });
+                colors.palette = mergedPalette;
+                spinner.stop();
+                log(color.success(`  ✓ Mobile: +${mobileColors.palette.length} colors`));
+            }
+            catch (e) {
+                spinner.stop();
+                degraded.push('mobile');
+                log(color.warning('  ! Mobile: failed (continuing)'));
+            }
         }
         spinner.stop();
         console.log();
@@ -1013,22 +1041,33 @@ export async function extractBranding(url, spinner, browser, options = {}) {
             frameworks,
             ...(options.wcag ? { wcag } : {}),
         };
-        const isCanvasOnly = await page.evaluate(() => {
-            const canvases = document.querySelectorAll("canvas");
-            const hasRealContent = document.body.textContent.trim().length > 200;
-            const hasManyCanvases = canvases.length > 3;
-            const hasWebGL = Array.from(canvases).some((c) => {
-                const ctx = c.getContext("webgl") || c.getContext("webgl2");
-                return !!ctx;
+        let isCanvasOnly = false;
+        try {
+            isCanvasOnly = await page.evaluate(() => {
+                const canvases = document.querySelectorAll("canvas");
+                const hasRealContent = document.body.textContent.trim().length > 200;
+                const hasManyCanvases = canvases.length > 3;
+                const hasWebGL = Array.from(canvases).some((c) => {
+                    const ctx = c.getContext("webgl") || c.getContext("webgl2");
+                    return !!ctx;
+                });
+                return hasManyCanvases && hasWebGL && !hasRealContent;
             });
-            return hasManyCanvases && hasWebGL && !hasRealContent;
-        });
+        }
+        catch {
+            isCanvasOnly = false;
+        }
         if (isCanvasOnly) {
             result.note = "This website uses canvas/WebGL rendering. Design system cannot be extracted from DOM.";
             result.isCanvasOnly = true;
         }
         if (options.screenshotPath) {
-            await page.screenshot({ path: options.screenshotPath, fullPage: false });
+            try {
+                await page.screenshot({ path: options.screenshotPath, fullPage: false });
+            }
+            catch (e) {
+                degraded.push('screenshot');
+            }
         }
         if (options.includeRawColors) {
             result.colors.rawColors = colors._raw || [];
@@ -1041,6 +1080,8 @@ export async function extractBranding(url, spinner, browser, options = {}) {
                 result._discoveredLinks = [];
             }
         }
+        if (degraded.length)
+            result.meta.degraded = degraded;
         return result;
     }
     catch (error) {
