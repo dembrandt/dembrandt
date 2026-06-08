@@ -5,7 +5,7 @@
  * using Playwright's page.pdf() — no extra dependencies.
  */
 
-import { chromium } from 'playwright-core';
+import { loadBrowserEngines } from '../browser.js';
 import { convertColor, hexToRgb } from '../colors.js';
 
 /**
@@ -16,7 +16,11 @@ import { convertColor, hexToRgb } from '../colors.js';
 export async function generatePDF(data, outputPath, existingBrowser) {
   const html = buildHTML(data);
   const ownBrowser = !existingBrowser;
-  const browser = existingBrowser || await chromium.launch({ headless: true });
+  let browser = existingBrowser;
+  if (!browser) {
+    const { chromium } = await loadBrowserEngines();
+    browser = await chromium.launch({ headless: true });
+  }
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: 'networkidle' });
   await page.pdf({

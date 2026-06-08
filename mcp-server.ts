@@ -13,13 +13,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { chromium } from "playwright-core";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { loadBrowserEngines, PlaywrightMissingError } from "./lib/browser.js";
 import { extractBranding } from "./lib/extractors/index.js";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
-const pwVersion = createRequire(import.meta.url)("playwright-core/package.json").version;
 
 const server = new McpServer({
   name: "dembrandt",
@@ -44,6 +43,14 @@ const nullSpinner = {
 async function runExtraction(url: string, options: any = {}) {
   if (!/^https?:\/\//i.test(url)) url = "https://" + url;
   let browser;
+  let chromium;
+  try {
+    ({ chromium } = await loadBrowserEngines());
+  } catch (err) {
+    if (err instanceof PlaywrightMissingError) return { ok: false, error: err.message };
+    throw err;
+  }
+  const pwVersion = createRequire(import.meta.url)("playwright-core/package.json").version;
   try {
     browser = await chromium.launch({
       headless: true,

@@ -10,7 +10,7 @@
 import { program, Option } from "commander";
 import chalk from "chalk";
 import ora from "ora";
-import { chromium, firefox } from "playwright-core";
+import { loadBrowserEngines } from "./lib/browser.js";
 import { extractBranding } from "./lib/extractors/index.js";
 import { displayResults } from "./lib/formatters/terminal.js";
 import { color } from "./lib/formatters/theme.js";
@@ -101,6 +101,14 @@ program
       }
     } catch {
       // robots check is advisory; never block extraction
+    }
+
+    let chromium, firefox;
+    try {
+      ({ chromium, firefox } = await loadBrowserEngines());
+    } catch (err) {
+      spinner.fail(err.message);
+      process.exit(1);
     }
 
     let browser = null;
