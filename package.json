@@ -12,6 +12,10 @@
   "exports": {
     ".": "./dist/index.js",
     "./dtcg": "./dist/lib/dtcg/validate.js",
+    "./drift": {
+      "types": "./dist/lib/drift.d.ts",
+      "default": "./dist/lib/drift.js"
+    },
     "./normalize": "./dist/lib/normalize.js",
     "./types": {
       "types": "./dist/lib/types.d.ts",
@@ -61,9 +65,11 @@
     "chalk": "^5.3.0",
     "commander": "^11.1.0",
     "ora": "^7.0.1",
-    "playwright": "^1.57.0",
-    "playwright-core": "1.60.0",
     "zod": "4.3.6"
+  },
+  "optionalDependencies": {
+    "playwright": "^1.57.0",
+    "playwright-core": "1.60.0"
   },
   "engines": {
     "node": ">=18.0.0"
