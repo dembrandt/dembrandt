@@ -22,11 +22,12 @@ test/sites-chunk.json
 # Coverage
 coverage/
 
-# Local agent / editor config
+# Local agent / editor / tooling state
 .claude
 .agents
 .vscode/
 .idea/
+skills-lock.json
 
 # Environment
 .env
