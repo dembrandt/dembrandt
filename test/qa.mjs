@@ -78,7 +78,10 @@ function extractSite(domain) {
     );
     return data;
   } catch (err) {
+    const stderr = (err.stderr?.toString() || "").trim();
+    const detail = stderr ? stderr.split("\n").slice(-3).join("\n      ") : "";
     console.log(`    FAILED — ${err.message.split("\n")[0]}`);
+    if (detail) console.log(`      ${detail}`);
     return null;
   }
 }
@@ -109,7 +112,10 @@ function extractToTemp(domain) {
     fs.writeFileSync(path.join(tmpDir, "extraction.json"), JSON.stringify(data, null, 2));
     return { data, screenshotPath, dir: tmpDir };
   } catch (err) {
+    const stderr = (err.stderr?.toString() || "").trim();
+    const detail = stderr ? stderr.split("\n").slice(-3).join("\n      ") : "";
     console.log(`    FAILED — ${err.message.split("\n")[0]}`);
+    if (detail) console.log(`      ${detail}`);
     return null;
   }
 }

@@ -29,6 +29,9 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
+      - name: Build
+        run: npm run build
+
       - name: Split sites and extract chunk ${{ matrix.chunk }}
         run: |
           node -e "
