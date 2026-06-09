@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { toDtcgTokens } from '../lib/formatters/dtcg.js';
 import { validateTokensObject } from '../lib/dtcg/validate.js';
+import { SCHEMA_VERSION } from '../lib/version.js';
 
 /**
  * End-to-end guard: the DTCG formatter's own output must satisfy the DTCG
@@ -29,6 +30,14 @@ function loadFixture(name) {
 
 describe('DTCG formatter output is spec-valid', () => {
   for (const name of fixtures) {
+    it(`${name} matches the current output contract`, () => {
+      // A fixture from an older schema would validate a historical extraction
+      // shape, not what the formatter sees today. Fail loudly when it drifts so
+      // the fixtures get regenerated instead of silently rotting.
+      const fixture = loadFixture(name);
+      expect(fixture.meta.schemaVersion).toBe(SCHEMA_VERSION);
+    });
+
     it(`${name} -> toDtcgTokens -> validateTokensObject passes`, () => {
       const tokens = toDtcgTokens(loadFixture(name));
       const result = validateTokensObject(tokens);
