@@ -93,6 +93,21 @@ export async function extractColors(page) {
       ];
       if (nonColorUtilities.some(pattern => prop.includes(pattern))) continue;
 
+      // Non-brand semantic/status/noise custom properties. A marketing brand
+      // book is visual identity, not a status system, so errors/warnings,
+      // competitor colours and incidental UI noise are excluded.
+      const nonBrandNames = /(competitor|fuel|error|danger|destructive|invalid|warning|success|info|alert|notice|disabled|placeholder|skeleton|shimmer|scrim|overlay|backdrop|tooltip)/;
+      if (nonBrandNames.test(prop)) continue;
+
+      // Framework default-theme dumps: sites ship the entire Tailwind/Panda
+      // default palette as --colors-<hue>-<shade> custom properties (e.g.
+      // --colors-red-500). These are framework defaults, not brand tokens, so
+      // they never belong in a brand book. Brand-named tokens (--accent-color-*,
+      // --green-scale-*, --hero-background-*) do not match and are kept.
+      const frameworkPalette = /^--(?:tw-)?colors?-(?:slate|gray|grey|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|\d00|950)$/;
+      if (frameworkPalette.test(prop)) continue;
+      if (/^--(?:tw-)?colors?-(?:transparent|current|black|white|inherit)$/.test(prop)) continue;
+
       const value = styles.getPropertyValue(prop).trim();
       if (!value.match(/^(#|rgb|hsl|var\(--.*color|color\()/i)) continue;
       if (
@@ -109,6 +124,15 @@ export async function extractColors(page) {
       }
     }
 
+    // Declared :root custom properties carry brand-token provenance: the author
+    // named these colours deliberately. They outweigh ad-hoc computed colours in
+    // ranking, are never treated as structural, and are preferred as primary.
+    const tokenHexes = new Set();
+    for (const v of Object.values(cssVariables)) {
+      const n = normalizeColor(v as string);
+      if (typeof n === 'string' && /^#[0-9a-f]{6}$/.test(n)) tokenHexes.add(n);
+    }
+
     const elements = document.querySelectorAll("*");
     const totalElements = elements.length;
     const ctaPrimaryMap = new Map(); // normalized hex → original color for CTA backgrounds
@@ -116,6 +140,13 @@ export async function extractColors(page) {
     const contextScores = {
       logo: 5, brand: 5, primary: 4, cta: 4, hero: 3, button: 3, link: 2, header: 2, nav: 1,
     };
+
+    // Colours that appear only via status/feedback or warm-utility classes are
+    // not brand identity unless declared as a token or used as a CTA background.
+    // The semantic words cover Bootstrap (text-danger), MUI (Mui-error),
+    // Bulma (is-danger) and similar conventions; the second branch covers
+    // Tailwind's numbered warm utilities (text-red-600) that carry no word.
+    const statusContext = /\b(error|danger|destructive|invalid|warning|success|alert|notice|sale|discount|badge|toast|notification)\b|(?:text|bg|border|ring|fill|stroke|from|to|via|divide|outline|decoration|accent|caret)-(?:red|rose|orange|amber|yellow)-\d/;
 
     elements.forEach((el) => {
       const computed = getComputedStyle(el);
@@ -139,6 +170,7 @@ export async function extractColors(page) {
       for (const [keyword, weight] of Object.entries(contextScores)) {
         if (context.includes(keyword)) score = Math.max(score, weight);
       }
+      const isStatus = statusContext.test(context);
 
       const isCta = (context.includes('button') || context.includes('btn') || context.includes('cta')) &&
         bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent' &&
@@ -176,8 +208,9 @@ export async function extractColors(page) {
       allColors.forEach((color) => {
         if (color && color !== "rgba(0, 0, 0, 0)" && color !== "transparent" && colorAlpha(color) >= 0.3) {
           const normalized = normalizeColor(color);
-          const existing = colorMap.get(normalized) || { original: color, count: 0, bgCount: 0, score: 0, sources: new Set() };
+          const existing = colorMap.get(normalized) || { original: color, count: 0, bgCount: 0, score: 0, sources: new Set(), statusCount: 0, nonStatusCount: 0, isToken: tokenHexes.has(normalized) };
           existing.count++;
+          if (isStatus) existing.statusCount++; else existing.nonStatusCount++;
           if (extractColorsFromValue(bgColor).includes(color)) existing.bgCount++;
           existing.score += score;
           if (score > 1) {
@@ -212,6 +245,7 @@ export async function extractColors(page) {
     const threshold = Math.max(3, Math.floor(totalElements * 0.01));
 
     function isStructuralColor(data, totalElements) {
+      if (data.isToken) return false;
       const usagePercent = (data.count / totalElements) * 100;
       const normalized = normalizeColor(data.original);
       if (data.original === "rgba(0, 0, 0, 0)" || data.original === "transparent") return true;
@@ -269,8 +303,14 @@ export async function extractColors(page) {
       .map(([normalized, data]) => ({ color: data.original, normalized, count: data.count }));
 
     const palette = Array.from(colorMap.entries())
-      .filter(([, data]) => {
-        const highScore = data.score >= 10 || (data.count > 0 && data.score / data.count >= 3);
+      .filter(([norm, data]) => {
+        // Status/utility-only colours are not brand identity unless declared as
+        // a token or recurring as a CTA background.
+        const ctaEntry = ctaPrimaryMap.get(norm);
+        const isCtaPrimary = ctaEntry && ctaEntry.count >= 2;
+        if (!data.isToken && !isCtaPrimary && data.statusCount > 0 && data.nonStatusCount === 0) return false;
+        // Declared brand tokens always qualify regardless of element count.
+        const highScore = data.isToken || data.score >= 10 || (data.count > 0 && data.score / data.count >= 3);
         if (!highScore && data.count < threshold) return false;
         if (isStructuralColor(data, totalElements)) return false;
         return true;
@@ -279,7 +319,9 @@ export async function extractColors(page) {
         color: data.original,
         normalized: normalizedColor,
         count: data.count,
-        confidence: data.score > 20 ? "high" : data.score > 5 ? "medium" : "low",
+        confidence: data.isToken
+          ? (data.score > 5 ? "high" : "medium")
+          : data.score > 20 ? "high" : data.score > 5 ? "medium" : "low",
         sources: Array.from(data.sources).slice(0, 3),
       }))
       .sort((a, b) => b.count - a.count);
@@ -333,9 +375,14 @@ export async function extractColors(page) {
       }
       const best = perceptuallyDeduped
         .filter(c => c.confidence !== 'low')
-        .map(c => ({ c, chroma: chroma(c.normalized) }))
+        .map(c => ({ c, chroma: chroma(c.normalized), isToken: tokenHexes.has(c.normalized) }))
         .filter(({ chroma }) => chroma > 0.15)
-        .sort((a, b) => b.chroma - a.chroma)[0];
+        // Brand-token provenance is a bonus on top of prominence, not an
+        // override: a declared token beats incidental colours, but a dominant
+        // high-usage colour still wins over a barely-used token.
+        .sort((a, b) =>
+          ((b.c.count + (b.isToken ? 20 : 0)) - (a.c.count + (a.isToken ? 20 : 0)))
+          || (b.chroma - a.chroma))[0];
       if (best) semanticColors.primary = best.c.color;
     }
 
