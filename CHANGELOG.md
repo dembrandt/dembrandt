@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.1] - 2026-06-10
+
+### Fixed
+- Colour-valued `:root` custom properties are now captured regardless of their name, so brand tokens not named with `color`/`bg`/`text`/`brand` are no longer silently dropped
+- Framework default-theme palettes exposed as `--colors-<hue>-<shade>` custom properties no longer flood the extracted CSS variables
+- Status/utility-only colours (error/danger, framework warm utilities) no longer leak into the brand palette unless declared as a token or used as a recurring CTA background
+- `:root` custom-property colours are treated as brand tokens: never dropped as structural, always considered for the palette, and preferred when selecting the primary colour as a bonus over usage rather than an override
+
 ## [0.12.0] - 2026-05-10
 
 ### Fixed
