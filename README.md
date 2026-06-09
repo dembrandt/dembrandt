@@ -329,7 +329,7 @@ Dembrandt does not host, redistribute, or claim rights to any third-party brand 
 
 ## Sponsors
 
-The CLI is MIT-licensed and free forever. Sponsorship funds the enforcement layer: `--compare`, the ingest API, and `.dembrandtrc`.
+The CLI is MIT-licensed and free. Sponsorship funds the enforcement layer: `.dembrandtrc` baseline config, `--compare` and the ingest API for CI/CD drift gates, and the App platform (snapshot history, team drift dashboard, alerts to Slack, Linear, and GitHub).
 
 [![GitHub Sponsors](https://img.shields.io/badge/Sponsor-me-pink?style=flat&logo=github-sponsors)](https://github.com/sponsors/dembrandt)
 
