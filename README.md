@@ -327,6 +327,16 @@ Only run Dembrandt against sites whose Terms of Service permit automated access,
 
 Dembrandt does not host, redistribute, or claim rights to any third-party brand assets.
 
+## Sponsors
+
+The CLI is MIT-licensed and free forever. Sponsorship funds the enforcement layer: `--compare`, the ingest API, and `.dembrandtrc`.
+
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-me-pink?style=flat&logo=github-sponsors)](https://github.com/sponsors/dembrandt)
+
+<!-- sponsors -->
+<!-- Backer ($25+) and Lead sponsor ($500+) logos appear here. -->
+<!-- sponsors -->
+
 ## Contributing
 
 Bugs, weird sites, pull requests. All welcome.
