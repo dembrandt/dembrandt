@@ -1,7 +1,7 @@
 /**
  * Lazy loader for the playwright-core browser engines.
  *
- * playwright is an optionalDependency: consumers that use only the pure
+ * playwright is an optional peer dependency: consumers that use only the pure
  * exports (drift, types, normalize, dtcg) are not forced to install the
  * browser stack. Anything that actually drives a browser routes its import
  * through here, so a missing install surfaces a clear instruction instead of

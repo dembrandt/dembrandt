@@ -61,24 +61,42 @@
   "author": "thevangelist <info@esajuhana.com>",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
     "chalk": "^5.3.0",
     "commander": "^11.1.0",
-    "ora": "^7.0.1",
+    "ora": "^7.0.1"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "playwright": "^1.57.0",
+    "playwright-core": "1.60.0",
     "zod": "4.3.6"
   },
-  "optionalDependencies": {
-    "playwright": "^1.57.0",
-    "playwright-core": "1.60.0"
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
+    "playwright": {
+      "optional": true
+    },
+    "playwright-core": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@modelcontextprotocol/sdk": "1.29.0",
     "@types/node": "25.9.2",
     "eslint": "10.4.1",
+    "playwright": "^1.57.0",
+    "playwright-core": "1.60.0",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.60.1"
+    "typescript-eslint": "8.60.1",
+    "zod": "4.3.6"
   }
 }
