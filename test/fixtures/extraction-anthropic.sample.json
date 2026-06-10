@@ -3,7 +3,7 @@
   "extractedAt": "2026-06-09T08:23:48.670Z",
   "meta": {
     "dembrandtVersion": "0.17.0",
-    "schemaVersion": "1.0.0",
+    "schemaVersion": "1.1.0",
     "flags": {}
   },
   "siteName": null,
@@ -586,84 +586,98 @@
     "commonValues": [
       {
         "px": "2px",
+        "display": "2px",
         "rem": "0.13rem",
         "count": 100,
         "numericValue": 2
       },
       {
         "px": "4px",
+        "display": "4px",
         "rem": "0.25rem",
         "count": 82,
         "numericValue": 4
       },
       {
         "px": "5px",
+        "display": "5px",
         "rem": "0.31rem",
         "count": 1,
         "numericValue": 5
       },
       {
         "px": "8px",
+        "display": "8px",
         "rem": "0.50rem",
         "count": 137,
         "numericValue": 8
       },
       {
         "px": "12px",
+        "display": "12px",
         "rem": "0.75rem",
         "count": 22,
         "numericValue": 12
       },
       {
         "px": "16px",
+        "display": "16px",
         "rem": "1.00rem",
         "count": 22,
         "numericValue": 16
       },
       {
         "px": "22.4px",
+        "display": "22.4px",
         "rem": "1.40rem",
         "count": 24,
         "numericValue": 22.4
       },
       {
         "px": "24px",
+        "display": "24px",
         "rem": "1.50rem",
         "count": 8,
         "numericValue": 24
       },
       {
         "px": "32px",
+        "display": "32px",
         "rem": "2.00rem",
         "count": 15,
         "numericValue": 32
       },
       {
         "px": "48px",
+        "display": "48px",
         "rem": "3.00rem",
         "count": 1,
         "numericValue": 48
       },
       {
         "px": "64px",
+        "display": "64px",
         "rem": "4.00rem",
         "count": 2,
         "numericValue": 64
       },
       {
         "px": "68px",
+        "display": "68px",
         "rem": "4.25rem",
         "count": 1,
         "numericValue": 68
       },
       {
         "px": "80px",
+        "display": "80px",
         "rem": "5.00rem",
         "count": 2,
         "numericValue": 80
       },
       {
         "px": "96px",
+        "display": "96px",
         "rem": "6.00rem",
         "count": 2,
         "numericValue": 96

@@ -33,8 +33,16 @@
 
 // URL is a global in both the Node and DOM libs; no import needed.
 
-/** dembrandt output contract version. Bump per the policy documented above. */
-export const SCHEMA_VERSION = '1.0.0';
+/**
+ * dembrandt output contract version. Bump per the policy documented above.
+ *
+ *  1.1.0 — added SpacingValue.display, a guaranteed "Npx" string for rendering.
+ *          Additive: 1.0.x consumers ignore it. Read `display` instead of
+ *          formatting `px`, whose type narrows from "16px" to a number through
+ *          normalizeExtraction().
+ *  1.0.0 — baselined on the 0.16.0 shape.
+ */
+export const SCHEMA_VERSION = '1.1.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';

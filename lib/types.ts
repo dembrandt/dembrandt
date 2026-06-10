@@ -56,9 +56,17 @@ export interface Typography {
 }
 
 export interface SpacingValue {
-  px: number;
+  /**
+   * Numeric pixels for math and diffing. Raw extraction emits the "16px" string;
+   * normalizeExtraction() coerces it to a number. Read `display` for rendering.
+   */
+  px: number | string;
+  /** Guaranteed formatted value for display, e.g. "16px". Survives normalize. */
+  display: string;
   rem?: string;
   count?: number;
+  /** Numeric pixels as emitted by the extractor; mirror of px once normalized. */
+  numericValue?: number;
 }
 
 export interface Spacing {

@@ -19,6 +19,7 @@ export async function extractSpacing(page) {
       .slice(0, 20)
       .map(([px, count]) => ({
         px: px + "px",
+        display: px + "px",
         rem: (px / 16).toFixed(2) + "rem",
         count,
         numericValue: px,

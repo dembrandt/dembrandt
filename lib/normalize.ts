@@ -39,6 +39,7 @@ const toNumber = (v: unknown): number | undefined => {
  *
  *  - typography weight       : string | number  -> number
  *  - spacing px              : number | string  -> number
+ *  - spacing display         : guaranteed "Npx" string (backfilled if absent)
  *  - typography adobeFonts   : string[] | bool  -> string[]
  *  - components inputs/badges : array | object  -> array
  */
@@ -52,6 +53,9 @@ export function normalizeExtraction<T extends BrandingResult>(result: T): T {
   for (const v of out.spacing?.commonValues ?? []) {
     const px = toNumber(v.px);
     if (px !== undefined) v.px = px;
+    if (v.display === undefined) {
+      v.display = px !== undefined ? `${px}px` : String(v.px);
+    }
   }
   if (out.typography?.sources && typeof out.typography.sources.adobeFonts === 'boolean') {
     out.typography.sources.adobeFonts = [];

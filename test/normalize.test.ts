@@ -40,6 +40,8 @@ test('normalizeExtraction canonicalizes loose unions for diffing', () => {
   assert.strictEqual(out.typography.styles[0].weight, 700);        // string -> number
   assert.strictEqual(out.spacing.commonValues[0].px, 16);          // "16px" -> 16
   assert.strictEqual(out.spacing.commonValues[1].px, 24);          // already number
+  assert.strictEqual(out.spacing.commonValues[0].display, '16px'); // display backfilled
+  assert.strictEqual(out.spacing.commonValues[1].display, '24px'); // backfilled from number
   assert.deepStrictEqual(out.typography.sources.adobeFonts, []);   // false -> []
   assert.ok(Array.isArray(out.components.inputs));                 // object -> array
   assert.ok(Array.isArray(out.components.badges));
