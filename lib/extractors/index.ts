@@ -531,6 +531,46 @@ export async function extractBranding(url: string, spinner: Spinner, browser: an
           console.log(color.info(`  i No cookie banner detected`));
         }
 
+        spinner.start("Dismissing region/interstitial modals...");
+        const modalDismissed = await page.evaluate(async () => {
+          // Region selectors, age gates, and other interstitials block the page
+          // and have no bearing on branding. Close them rather than making a choice.
+          const closeSelectors = [
+            // Region / locale modals (e.g. uk-region-modal__close)
+            '[data-modal-close]',
+            '[class*="region-modal"] [class*="close"]',
+            '[class*="region"][class*="modal"] button[aria-label*="close" i]',
+            '[class*="locale"][class*="modal"] [class*="close"]',
+            // Generic modal/dialog close affordances
+            '[role="dialog"] button[aria-label*="close" i]',
+            '[class*="modal"] button[aria-label*="close" i]',
+            '[class*="modal"] button[class*="close"]',
+            '[class*="overlay"] button[aria-label*="close" i]',
+            'button[aria-label="Close" i]',
+            '[data-dismiss="modal"]',
+          ];
+          const isVisible = (el: HTMLElement) =>
+            el.offsetParent !== null ||
+            (el.getClientRects && el.getClientRects().length > 0);
+          for (const sel of closeSelectors) {
+            try {
+              const el = document.querySelector(sel) as HTMLElement | null;
+              if (el && isVisible(el)) {
+                el.click();
+                return sel;
+              }
+            } catch {}
+          }
+          return null;
+        });
+        spinner.stop();
+        if (modalDismissed) {
+          log(color.success(`  ✓ Interstitial modal closed (${modalDismissed})`));
+          await page.waitForTimeout(600);
+        } else {
+          console.log(color.info(`  i No interstitial modal detected`));
+        }
+
         spinner.start("Final content stabilization...");
         await waitForSettled(page, 4000 * timeoutMultiplier, 400);
         spinner.stop();
