@@ -72,13 +72,15 @@ jobs:
         with:
           node-version: 24
 
-      - name: Update dembrandt version in package.json
+      - name: Update dembrandt version references
         env:
           DEMBRANDT_VERSION: ${{ github.event.release.tag_name || github.event.inputs.tag }}
         run: |
           cd dembrandt-next
           VERSION="${DEMBRANDT_VERSION#v}"
           npm pkg set dependencies.dembrandt="${VERSION}"
+          # schema.org softwareVersion always tracks the CLI version (deterministic)
+          sed -i "s/\"softwareVersion\": \"[0-9][0-9.]*\"/\"softwareVersion\": \"${VERSION}\"/" app/layout.tsx
 
       - name: Create PR in dembrandt-next
         uses: peter-evans/create-pull-request@v6
@@ -91,11 +93,10 @@ jobs:
           body: |
             Automated bump triggered by [dembrandt ${{ github.event.release.tag_name || github.event.inputs.tag }}](${{ github.event.release.html_url || 'manual trigger' }}).
 
-            Updates `dembrandt` npm dependency to latest release. Run `npm install` after merging.
+            Updates `dembrandt` npm dependency to latest release and bumps `app/layout.tsx` schema.org `softwareVersion`. Run `npm install` after merging.
 
             **⚠ Manual check required before merging**
-            This automation only bumps the npm version in `package.json`. If this release added or changed CLI flags, update these manually before merging:
-            - `app/layout.tsx` — `softwareVersion` in schema.org JSON-LD
+            This automation bumps the npm version in `package.json` and the schema.org `softwareVersion`. If this release added or changed CLI flags, update these manually before merging:
             - `app/getting-started/page.tsx` — flags list
             - `app/blackpaper/page.tsx` — flags list
             - `app/page.tsx` — landing page flags (`new: true` for new ones)
