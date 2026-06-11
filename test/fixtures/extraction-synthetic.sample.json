@@ -1,0 +1,58 @@
+{
+  "url": "https://synthetic.example.com",
+  "extractedAt": "2026-06-11T00:00:00.000Z",
+  "meta": {
+    "schemaVersion": "1.1.0",
+    "dembrandtVersion": "0.17.0"
+  },
+  "colors": {
+    "semantic": {
+      "primary": "#1a73e8",
+      "background": { "color": "#ffffff" }
+    },
+    "palette": [
+      { "color": "#1a73e8", "count": 120, "confidence": "high" },
+      { "color": "#202124", "count": 80, "confidence": "medium" },
+      { "color": "#9aa0a6", "count": 5, "confidence": "low" }
+    ]
+  },
+  "typography": {
+    "styles": [
+      {
+        "family": "Inter",
+        "size": "16px",
+        "weight": 400,
+        "lineHeight": "1.5",
+        "letterSpacing": "0px",
+        "context": "body"
+      },
+      {
+        "family": "Inter",
+        "size": "32px",
+        "weight": 700,
+        "context": "heading"
+      }
+    ]
+  },
+  "spacing": {
+    "scaleType": "linear",
+    "commonValues": [
+      { "px": "16px", "display": "16px", "rem": "1.00rem", "count": 40, "numericValue": 16 },
+      { "px": "24px", "display": "24px", "rem": "1.50rem", "count": 22, "numericValue": 24 }
+    ]
+  },
+  "borderRadius": {
+    "values": [
+      { "value": "8px", "confidence": "high" },
+      { "value": "50%", "confidence": "medium" }
+    ]
+  },
+  "borders": {
+    "combinations": [
+      { "width": "1px", "style": "solid", "color": "#dadce0", "confidence": "high" }
+    ]
+  },
+  "shadows": [
+    { "shadow": "0px 1px 3px 0px #00000033", "confidence": "high" }
+  ]
+}
