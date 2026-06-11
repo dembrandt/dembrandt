@@ -532,93 +532,141 @@ export async function extractBranding(url: string, spinner: Spinner, browser: an
         }
 
         spinner.start("Dismissing region/interstitial modals...");
-        const modalActions = await page.evaluate(async () => {
-          const isVisible = (el: HTMLElement) =>
-            el.offsetParent !== null ||
-            (el.getClientRects && el.getClientRects().length > 0);
-          const actions: string[] = [];
+        // Defensive throughout: this runs on hostile third-party DOM, and a
+        // click can navigate the page (destroying the execution context). Every
+        // step is isolated so one failure never aborts extraction, and the
+        // page.evaluate call itself is guarded on the Node side.
+        let modalActions: string[] = [];
+        try {
+          modalActions = await page.evaluate(async () => {
+            const actions: string[] = [];
+            const MAX_CANDIDATES = 60; // bound work on pathological DOMs
+            const TEXT_CAP = 80; // cap before regex to avoid wasted work
 
-          // Pass 1 — close affordances. Region/locale selectors, newsletter and
-          // promo popups, and app-install banners block the page and have no
-          // bearing on branding. Close them rather than making a choice.
-          const closeSelectors = [
-            // Region / locale modals (e.g. uk-region-modal__close)
-            '[data-modal-close]',
-            '[class*="region-modal"] [class*="close"]',
-            '[class*="region"][class*="modal"] button[aria-label*="close" i]',
-            '[class*="locale"][class*="modal"] [class*="close"]',
-            // Newsletter / promo / discount popups (vendor-specific)
-            '.klaviyo-close-form',
-            '.privy-close', '[class*="privy"] [class*="close"]',
-            '[id^="om-"] .popup-close', '[id^="om-"] [class*="close"]',
-            '[class*="newsletter"] [aria-label*="close" i]',
-            '[class*="newsletter"] [class*="close"]',
-            '[class*="subscribe"] [aria-label*="close" i]',
-            '[class*="popup"] button[aria-label*="close" i]',
-            '[class*="popup"] button[class*="close"]',
-            // App-install / smart banners (render under --mobile)
-            '[class*="smart-banner"] [class*="close"]',
-            '[class*="app-banner"] [class*="dismiss"]',
-            '[class*="app-banner"] [class*="close"]',
-            // Generic modal/dialog close affordances
-            '[role="dialog"] button[aria-label*="close" i]',
-            '[class*="modal"] button[aria-label*="close" i]',
-            '[class*="modal"] button[class*="close"]',
-            '[class*="overlay"] button[aria-label*="close" i]',
-            'button[aria-label="Close" i]',
-            '[data-dismiss="modal"]',
-          ];
-          for (const sel of closeSelectors) {
+            const isVisible = (el: Element | null): boolean => {
+              try {
+                if (!el) return false;
+                const h = el as HTMLElement;
+                return (
+                  h.offsetParent !== null ||
+                  (typeof h.getClientRects === "function" && h.getClientRects().length > 0)
+                );
+              } catch {
+                return false;
+              }
+            };
+            const safeClick = (el: Element | null): boolean => {
+              try {
+                if (el && typeof (el as HTMLElement).click === "function") {
+                  (el as HTMLElement).click();
+                  return true;
+                }
+              } catch {}
+              return false;
+            };
+
+            // Pass 1 — close affordances. Region/locale selectors, newsletter
+            // and promo popups, and app-install banners block the page and have
+            // no bearing on branding. Close them rather than making a choice.
+            const closeSelectors = [
+              // Region / locale modals (e.g. uk-region-modal__close)
+              '[data-modal-close]',
+              '[class*="region-modal"] [class*="close"]',
+              '[class*="region"][class*="modal"] button[aria-label*="close" i]',
+              '[class*="locale"][class*="modal"] [class*="close"]',
+              // Newsletter / promo / discount popups (vendor-specific)
+              '.klaviyo-close-form',
+              '.privy-close', '[class*="privy"] [class*="close"]',
+              '[id^="om-"] .popup-close', '[id^="om-"] [class*="close"]',
+              '[class*="newsletter"] [aria-label*="close" i]',
+              '[class*="newsletter"] [class*="close"]',
+              '[class*="subscribe"] [aria-label*="close" i]',
+              '[class*="popup"] button[aria-label*="close" i]',
+              '[class*="popup"] button[class*="close"]',
+              // App-install / smart banners (render under --mobile)
+              '[class*="smart-banner"] [class*="close"]',
+              '[class*="app-banner"] [class*="dismiss"]',
+              '[class*="app-banner"] [class*="close"]',
+              // Generic modal/dialog close affordances
+              '[role="dialog"] button[aria-label*="close" i]',
+              '[class*="modal"] button[aria-label*="close" i]',
+              '[class*="modal"] button[class*="close"]',
+              '[class*="overlay"] button[aria-label*="close" i]',
+              'button[aria-label="Close" i]',
+              '[data-dismiss="modal"]',
+            ];
             try {
-              const el = document.querySelector(sel) as HTMLElement | null;
-              if (el && isVisible(el)) {
-                el.click();
-                actions.push(`close:${sel}`);
-                break;
+              for (const sel of closeSelectors) {
+                try {
+                  const el = document.querySelector(sel);
+                  if (el && isVisible(el) && safeClick(el)) {
+                    actions.push(`close:${sel}`);
+                    break;
+                  }
+                } catch {}
               }
             } catch {}
-          }
 
-          // Pass 2 — age gates. Alcohol/cannabis/tobacco gates have no close
-          // button; they require an affirmative click. Match button text and
-          // scope to a visible gate container so we never hit a "No" / decline
-          // path that redirects away.
-          const affirmative =
-            /^(yes|enter|i am over|i'?m over|over 18|over 21|18\+|21\+|enter site|i am of age|confirm.*age|agree)/i;
-          const decline = /\b(no|under|exit|leave|decline)\b/i;
-          const gateContainers = [
-            '[class*="age"][class*="gate"]',
-            '[class*="age"][class*="verif"]',
-            '[class*="age-check"]',
-            '[id*="age"][class*="modal"]',
-            '[role="dialog"][class*="age"]',
-          ];
-          gate: for (const csel of gateContainers) {
-            let container: HTMLElement | null = null;
-            try { container = document.querySelector(csel) as HTMLElement | null; } catch {}
-            if (!container || !isVisible(container)) continue;
-            const candidates = container.querySelectorAll<HTMLElement>(
-              'button, a, [role="button"], input[type="submit"], input[type="button"]'
-            );
-            for (const el of Array.from(candidates)) {
-              if (!isVisible(el)) continue;
-              const text = (
-                el.textContent || (el as HTMLInputElement).value || el.getAttribute('aria-label') || ''
-              ).trim();
-              if (affirmative.test(text) && !decline.test(text)) {
-                el.click();
-                actions.push(`age-gate:${csel}`);
-                break gate;
+            // Pass 2 — age gates. Alcohol/cannabis/tobacco gates have no close
+            // button; they require an affirmative click. Match button text and
+            // scope to a visible gate container so we never hit a "No" / decline
+            // path that redirects away.
+            const affirmative =
+              /^(yes|enter|i am over|i'?m over|over 18|over 21|18\+|21\+|enter site|i am of age|confirm.*age|agree)/i;
+            const decline = /\b(no|under|exit|leave|decline)\b/i;
+            const gateContainers = [
+              '[class*="age"][class*="gate"]',
+              '[class*="age"][class*="verif"]',
+              '[class*="age-check"]',
+              '[id*="age"][class*="modal"]',
+              '[role="dialog"][class*="age"]',
+            ];
+            try {
+              gate: for (const csel of gateContainers) {
+                let container: Element | null = null;
+                try { container = document.querySelector(csel); } catch {}
+                if (!container || !isVisible(container)) continue;
+                let candidates: Element[] = [];
+                try {
+                  candidates = Array.from(
+                    container.querySelectorAll(
+                      'button, a, [role="button"], input[type="submit"], input[type="button"]'
+                    )
+                  ).slice(0, MAX_CANDIDATES);
+                } catch {}
+                for (const el of candidates) {
+                  try {
+                    if (!isVisible(el)) continue;
+                    const raw =
+                      el.textContent ||
+                      (el as HTMLInputElement).value ||
+                      el.getAttribute("aria-label") ||
+                      "";
+                    const text = String(raw).trim().slice(0, TEXT_CAP);
+                    if (!text) continue;
+                    if (affirmative.test(text) && !decline.test(text)) {
+                      if (safeClick(el)) {
+                        actions.push(`age-gate:${csel}`);
+                        break gate;
+                      }
+                    }
+                  } catch {}
+                }
               }
-            }
-          }
+            } catch {}
 
-          return actions;
-        });
+            return actions;
+          });
+        } catch (err) {
+          // A click navigated the page and destroyed the execution context.
+          // That is a successful dismissal, not a failure — note it and move on;
+          // the stabilization wait below absorbs the navigation.
+          modalActions = ["dismissed (page navigated)"];
+        }
         spinner.stop();
         if (modalActions.length > 0) {
           log(color.success(`  ✓ Interstitial dismissed (${modalActions.join(", ")})`));
-          await page.waitForTimeout(600);
+          try { await page.waitForTimeout(600); } catch {}
         } else {
           console.log(color.info(`  i No interstitial modal detected`));
         }
