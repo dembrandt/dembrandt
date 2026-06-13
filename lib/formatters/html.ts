@@ -72,12 +72,12 @@ function safeCss(value: unknown): string {
 /* -------------------------------- styles -------------------------------- */
 
 const STYLE = `
-:root{--bg:#0f1115;--panel:#171a21;--panel2:#1d212b;--ink:#e6e9ef;--muted:#9aa3b2;--line:#2a2f3a;--accent:#7c9cff;--good:#3fb950;--warn:#d29922;--bad:#f85149}
+:root{--bg:#ffffff;--panel:#f7f8fa;--panel2:#eef1f5;--ink:#1a1d23;--muted:#6b7280;--line:#e6e8ec;--accent:#133174;--good:#15803d;--warn:#b45309;--bad:#b91c1c}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
 .wrap{max-width:980px;margin:0 auto;padding:32px 20px 64px}
-h1{font-size:22px;margin:0 0 4px}
-h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:32px 0 12px;border-bottom:1px solid var(--line);padding-bottom:6px}
+h1{font-size:22px;margin:0 0 4px;color:var(--accent)}
+h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:32px 0 12px;border-bottom:2px solid var(--accent);padding-bottom:6px}
 a{color:var(--accent)}
 .sub{color:var(--muted);font-size:13px}
 .grid{display:grid;gap:10px}
@@ -341,6 +341,19 @@ export function generateHtmlReport(result: BrandingResult, options: HtmlReportOp
     metaSection(result),
   ].join("\n");
 
+  // Self-theme: the report wears the brand it reported on. Accent = the extracted
+  // primary (the report of site X looks like site X), with a neutral readable base
+  // so it stays legible whatever the brand. Heading font follows the extracted
+  // heading family when present (declaration only — no external font fetch).
+  const semantic = result.colors?.semantic ?? {};
+  const accent =
+    semantic.primary || semantic.brand || semantic.accent ||
+    result.colors?.palette?.[0]?.normalized || result.colors?.palette?.[0]?.color || "#133174";
+  const headingStyle = (result.typography?.styles ?? []).find((s) => /head|display|title/i.test(s.context ?? ""));
+  const headingFamily = ((headingStyle ?? result.typography?.styles?.[0])?.family ?? "").split(",")[0].replace(/["']/g, "").trim();
+  const fontRule = /^[\w .-]+$/.test(headingFamily) && headingFamily ? `h1,h2{font-family:'${headingFamily}',system-ui,sans-serif}` : "";
+  const themed = `:root{--accent:${safeCss(accent) || "#133174"}}${fontRule}`;
+
   // Embed the machine-readable data so the report is also a data artifact,
   // re-parseable from the same file (Lighthouse pattern).
   const data = sanitizeJson({ result, drift: options.drift ?? null });
@@ -352,7 +365,8 @@ export function generateHtmlReport(result: BrandingResult, options: HtmlReportOp
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="generator" content="dembrandt${version ? " " + esc(version) : ""}">
 <title>Dembrandt report — ${esc(domain)}</title>
-<style>${STYLE}</style>
+<style>${STYLE}
+${themed}</style>
 </head>
 <body>
 <div class="wrap">

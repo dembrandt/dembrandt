@@ -22,7 +22,7 @@ import { computeDrift } from "./lib/drift.js";
 import { parseSitemap } from "./lib/discovery.js";
 import { mergeResults } from "./lib/merger.js";
 import { writeFileSync, mkdirSync, readFileSync } from "fs";
-import { join, dirname } from "path";
+import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { checkRobotsTxt } from "./lib/robots.js";
 
@@ -430,7 +430,7 @@ program
           const htmlDomain = new URL(url).hostname.replace("www.", "");
           let htmlPath;
           if (typeof opts.html === "string") {
-            htmlPath = join(process.cwd(), opts.html);
+            htmlPath = resolve(process.cwd(), opts.html);
             mkdirSync(dirname(htmlPath), { recursive: true });
           } else {
             const htmlStamp = new Date().toISOString().replace(/[:.]/g, "-").split(".")[0];
