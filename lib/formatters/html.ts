@@ -71,43 +71,52 @@ function safeCss(value: unknown): string {
 
 /* -------------------------------- styles -------------------------------- */
 
+// Dembrandt design system (dark, Linear-inspired). This is the report's *chrome* —
+// a Dembrandt report looks like Dembrandt. The extracted site's tokens are content
+// (swatches, values) shown inside it, never the skin. Tokens from dembrandt-next
+// design.md / globals.css. Brand fonts are declared with system fallbacks (the App
+// loads them; a standalone file falls back gracefully, staying self-contained).
 const STYLE = `
-:root{--bg:#ffffff;--panel:#f7f8fa;--panel2:#eef1f5;--ink:#1a1d23;--muted:#6b7280;--line:#e6e8ec;--accent:#133174;--good:#15803d;--warn:#b45309;--bad:#b91c1c}
+:root{--bg:#000000;--surface:#0D0D0D;--elevated:#1A1A1A;--line:#242424;--line-hover:#3F4150;--ink:#ffffff;--muted:#8A8F98;--tertiary:#5E6772;--accent:#38BDF8;--accent-hover:#7dd3fc;--warm:#EA580C;--good:#4ade80;--warn:#EA580C;--bad:#ef4444;--r-sm:6px;--r-md:8px;--r-lg:12px}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
-.wrap{max-width:980px;margin:0 auto;padding:32px 20px 64px}
-h1{font-size:22px;margin:0 0 4px;color:var(--accent)}
-h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:32px 0 12px;border-bottom:2px solid var(--accent);padding-bottom:6px}
-a{color:var(--accent)}
-.sub{color:var(--muted);font-size:13px}
-.grid{display:grid;gap:10px}
-.swatches{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
-.sw{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.sw .chip{height:64px}
-.sw .meta{padding:8px 10px;font-size:12px}
-.sw .hex{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-.sw .role{color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 'Red Hat Display',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1000px;margin:0 auto;padding:48px 24px 80px}
+.brand{font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--accent);margin:0 0 18px}
+h1{font-size:30px;font-weight:700;letter-spacing:-.02em;margin:0 0 6px;color:var(--ink)}
+h2{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:44px 0 16px}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-hover)}
+.sub{color:var(--muted);font-size:14px}
+.mono{font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace}
+.grid{display:grid;gap:12px}
+.swatches{grid-template-columns:repeat(auto-fill,minmax(132px,1fr))}
+.sw{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;transition:border-color .15s}
+.sw:hover{border-color:var(--line-hover)}
+.sw .chip{height:72px}
+.sw .meta{padding:10px 12px;font-size:12px}
+.sw .hex{font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;color:var(--ink)}
+.sw .role{color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin-top:3px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
-.tok{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.tok{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:5px 11px;font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink)}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
-.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600}
-.b-good{background:rgba(63,185,80,.15);color:var(--good)}
-.b-warn{background:rgba(210,153,34,.15);color:var(--warn)}
-.b-bad{background:rgba(248,81,73,.15);color:var(--bad)}
-.b-mut{background:var(--panel2);color:var(--muted)}
-.drift{border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:8px 0 0;background:var(--panel)}
-.drift.is-drift{border-color:rgba(248,81,73,.5)}
-.drift.is-stable{border-color:rgba(63,185,80,.4)}
-.score{font-size:34px;font-weight:700;line-height:1}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600}
+.b-good{background:rgba(74,222,128,.14);color:var(--good)}
+.b-warn{background:rgba(234,88,12,.16);color:var(--warm)}
+.b-bad{background:rgba(239,68,68,.16);color:var(--bad)}
+.b-mut{background:var(--elevated);color:var(--muted)}
+.drift{border:1px solid var(--line);border-radius:var(--r-lg);padding:20px 22px;margin:8px 0 0;background:var(--surface)}
+.drift.is-drift{border-color:rgba(239,68,68,.45)}
+.drift.is-stable{border-color:rgba(74,222,128,.4)}
+.score{font-size:40px;font-weight:700;line-height:1;letter-spacing:-.02em}
 .row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.previewbtn{border:0;cursor:default}
-.shadowbox{width:80px;height:48px;border-radius:8px;background:#fff;display:inline-block}
+.previewbtn{cursor:pointer}
+.shadowbox{width:84px;height:52px;border-radius:var(--r-md);background:var(--elevated);display:inline-block}
 .muted{color:var(--muted)}
-.kvs{display:flex;flex-wrap:wrap;gap:6px 18px}
-footer{margin-top:48px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:14px}
+.kvs{display:flex;flex-wrap:wrap;gap:8px 20px}
+header{border-bottom:1px solid var(--line);padding-bottom:22px}
+footer{margin-top:56px;color:var(--tertiary);font-size:12px;border-top:1px solid var(--line);padding-top:16px}
 `;
 
 /* ------------------------------ components ------------------------------ */
@@ -341,19 +350,6 @@ export function generateHtmlReport(result: BrandingResult, options: HtmlReportOp
     metaSection(result),
   ].join("\n");
 
-  // Self-theme: the report wears the brand it reported on. Accent = the extracted
-  // primary (the report of site X looks like site X), with a neutral readable base
-  // so it stays legible whatever the brand. Heading font follows the extracted
-  // heading family when present (declaration only — no external font fetch).
-  const semantic = result.colors?.semantic ?? {};
-  const accent =
-    semantic.primary || semantic.brand || semantic.accent ||
-    result.colors?.palette?.[0]?.normalized || result.colors?.palette?.[0]?.color || "#133174";
-  const headingStyle = (result.typography?.styles ?? []).find((s) => /head|display|title/i.test(s.context ?? ""));
-  const headingFamily = ((headingStyle ?? result.typography?.styles?.[0])?.family ?? "").split(",")[0].replace(/["']/g, "").trim();
-  const fontRule = /^[\w .-]+$/.test(headingFamily) && headingFamily ? `h1,h2{font-family:'${headingFamily}',system-ui,sans-serif}` : "";
-  const themed = `:root{--accent:${safeCss(accent) || "#133174"}}${fontRule}`;
-
   // Embed the machine-readable data so the report is also a data artifact,
   // re-parseable from the same file (Lighthouse pattern).
   const data = sanitizeJson({ result, drift: options.drift ?? null });
@@ -365,12 +361,12 @@ export function generateHtmlReport(result: BrandingResult, options: HtmlReportOp
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="generator" content="dembrandt${version ? " " + esc(version) : ""}">
 <title>Dembrandt report — ${esc(domain)}</title>
-<style>${STYLE}
-${themed}</style>
+<style>${STYLE}</style>
 </head>
 <body>
 <div class="wrap">
 <header>
+<div class="brand">dembrandt</div>
 <h1>${esc(domain)}</h1>
 <div class="sub"><a href="${esc(result.url)}">${esc(result.url)}</a> · extracted ${esc(result.extractedAt)}</div>
 <div class="sub">${esc(summary)}</div>
