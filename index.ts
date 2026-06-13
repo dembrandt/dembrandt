@@ -40,6 +40,23 @@ function spinnerOptions(useStderr = false) {
   return { stream, isEnabled: Boolean(stream.isTTY) && !process.env.CI };
 }
 
+/**
+ * CI exit-code contract. A pipeline branches on these to tell apart "design
+ * drifted" (review the diff) from "extraction broke" (retry / investigate):
+ *   0  success / stable      1  drift detected (--compare)
+ *   2  extraction failure    67 navigation/connection timeout (retryable, try --slow)
+ */
+const EXIT = { OK: 0, DRIFT: 1, RUNTIME: 2, TIMEOUT: 67 };
+
+/** Classify an extraction failure into a stable {code, exit} for CI consumers. */
+function classifyError(err: any): { code: string; exit: number } {
+  const m = String(err?.message ?? "");
+  if (/Timeout|net::ERR_|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|ERR_NAME_NOT_RESOLVED/i.test(m)) {
+    return { code: "NAVIGATION_TIMEOUT", exit: EXIT.TIMEOUT };
+  }
+  return { code: "EXTRACTION_FAILED", exit: EXIT.RUNTIME };
+}
+
 program
   .name("dembrandt")
   .description("Extract design tokens from any website.")
@@ -112,7 +129,11 @@ program
       ({ chromium, firefox } = await loadBrowserEngines());
     } catch (err) {
       spinner.fail(err.message);
-      process.exit(1);
+      if (opts.jsonOnly) {
+        console.log = originalConsoleLog;
+        console.log(JSON.stringify({ url, error: { code: "BROWSER_UNAVAILABLE", message: err.message } }, null, 2));
+      }
+      process.exit(EXIT.RUNTIME);
     }
 
     let browser = null;
@@ -397,7 +418,7 @@ program
             )
           );
           // CI gate: drift beyond threshold fails the run, but the report still writes first.
-          if (driftReport.status === "drift") process.exitCode = 1;
+          if (driftReport.status === "drift") process.exitCode = EXIT.DRIFT;
         } catch (err) {
           console.log(color.warning(`! Could not compare against baseline: ${err.message}`));
         }
@@ -455,11 +476,18 @@ program
         for (const notice of savedNotices) console.log(notice);
       }
     } catch (err) {
+      const { code, exit } = classifyError(err);
       spinner.fail("Failed");
-      console.error(chalk.red("\n✗ Extraction failed"));
-      console.error(chalk.red(`  Error: ${err.message}`));
-      console.error(chalk.dim(`  URL: ${url}`));
-      process.exit(1);
+      if (opts.jsonOnly) {
+        console.log = originalConsoleLog;
+        console.log(JSON.stringify({ url, error: { code, message: err.message } }, null, 2));
+      } else {
+        console.error(chalk.red("\n✗ Extraction failed"));
+        console.error(chalk.red(`  Error [${code}]: ${err.message}`));
+        console.error(chalk.dim(`  URL: ${url}`));
+        if (exit === EXIT.TIMEOUT) console.error(chalk.dim("  Hint: retry with --slow"));
+      }
+      process.exit(exit);
     } finally {
       if (browser) await browser.close();
     }
