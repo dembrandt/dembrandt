@@ -128,6 +128,8 @@ details.card>summary::after{content:"";margin-left:auto;width:8px;height:8px;bor
 details.card[open]>summary::after{transform:rotate(-135deg)}
 details.card>summary:hover::after{border-color:var(--accent)}
 .cardbody{margin-top:16px}
+.cardrow{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0}
+.cardrow>details.card{flex:1 1 280px;margin:0}
 .colors{display:flex;flex-wrap:wrap;gap:14px}
 .color{display:flex;flex-direction:column;gap:5px;align-items:center;text-align:center}
 .color .sw2{width:36px;height:36px;border-radius:6px;box-shadow:inset 0 0 0 1px var(--swring)}
@@ -172,6 +174,13 @@ function confBadge(c?: string): string {
 function section(title: string, body: string, id?: string): string {
   if (!body.trim()) return "";
   return `<details class="card"${id ? ` id="${esc(id)}"` : ""} open><summary>${esc(title)}</summary><div class="cardbody">${body}</div></details>`;
+}
+
+/** Lay two (or more) small cards side by side — related scales read together. */
+function cardRow(...cards: string[]): string {
+  const present = cards.filter((c) => c.trim());
+  if (present.length < 2) return present.join("");
+  return `<div class="cardrow">${present.join("")}</div>`;
 }
 
 /** A Lighthouse-style circular score gauge (0-100), coloured by threshold. */
@@ -480,8 +489,7 @@ export function generateHtmlReport(result: BrandingResult, options: HtmlReportOp
     paletteSection(result),
     semanticSection(result),
     typographySection(result),
-    spacingSection(result),
-    radiusSection(result),
+    cardRow(spacingSection(result), radiusSection(result)),
     shadowsSection(result),
     buttonsSection(result),
     badgesSection(result),
