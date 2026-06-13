@@ -77,56 +77,63 @@ function safeCss(value: unknown): string {
 // design.md / globals.css. Brand fonts are declared with system fallbacks (the App
 // loads them; a standalone file falls back gracefully, staying self-contained).
 const STYLE = `
-:root{--bg:#000000;--surface:#0D0D0D;--elevated:#1A1A1A;--line:#242424;--line-hover:#3F4150;--ink:#ffffff;--muted:#8A8F98;--tertiary:#5E6772;--accent:#38BDF8;--accent-hover:#7dd3fc;--warm:#EA580C;--good:#4ade80;--warn:#EA580C;--bad:#ef4444;--r-sm:6px;--r-md:8px;--r-lg:12px}
+:root{--bg:#000000;--surface:#0D0D0D;--elevated:#1A1A1A;--line:#242424;--line-hover:#3F4150;--ink:#ffffff;--muted:#8A8F98;--accent:#38BDF8;--accent-hover:#7dd3fc;--warm:#EA580C;--good:#4ade80;--bad:#ef4444;--r-sm:6px;--r-md:8px;--r-lg:12px}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 'Red Hat Display',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}
-.wrap{max-width:1000px;margin:0 auto;padding:48px 24px 80px}
-.brand{font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--accent);margin:0 0 18px}
-h1{font-size:30px;font-weight:700;letter-spacing:-.02em;margin:0 0 6px;color:var(--ink)}
-h2{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:44px 0 16px}
 a{color:var(--accent);text-decoration:none}
 a:hover{color:var(--accent-hover)}
-.sub{color:var(--muted);font-size:14px}
 .mono{font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace}
-.grid{display:grid;gap:12px}
-.swatches{grid-template-columns:repeat(auto-fill,minmax(132px,1fr))}
-.sw{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;transition:border-color .15s}
-.sw:hover{border-color:var(--line-hover)}
-.sw .chip{height:72px}
-.sw .meta{padding:10px 12px;font-size:12px}
-.sw .hex{font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;color:var(--ink)}
-.sw .role{color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin-top:3px}
+.muted{color:var(--muted)}
+.sub{color:var(--muted);font-size:14px}
+.row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.kvs{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:14px}
+.topbar{position:sticky;top:0;z-index:10;background:rgba(0,0,0,.82);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 24px;display:flex;align-items:baseline;gap:12px}
+.topbar .bm{font-size:14px;font-weight:700;color:var(--accent);letter-spacing:.01em}
+.topbar .u{color:var(--muted);font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wrap{max-width:1000px;margin:0 auto;padding:8px 24px 88px}
+.cap{text-align:center;color:var(--muted);font-size:14px;margin:22px 0 4px}
+.gauges{display:flex;flex-wrap:wrap;gap:34px;justify-content:center;padding:18px 0 28px;border-bottom:1px solid var(--line)}
+.gauge{display:flex;flex-direction:column;align-items:center;gap:9px}
+.gring{width:84px;height:84px}
+.gring .gbg{fill:none;stroke:var(--line);stroke-width:8}
+.gring .gfg{fill:none;stroke-width:8;stroke-linecap:round}
+.gring.g-pass .gfg{stroke:var(--good)}.gring.g-pass .gnum{fill:var(--good)}
+.gring.g-avg .gfg{stroke:var(--warm)}.gring.g-avg .gnum{fill:var(--warm)}
+.gring.g-fail .gfg{stroke:var(--bad)}.gring.g-fail .gnum{fill:var(--bad)}
+.gnum{font:700 28px 'Red Hat Display',system-ui,sans-serif}
+.glabel{font-size:14px;color:var(--ink);font-weight:600}
+.gsub{font-size:14px;color:var(--muted)}
+details.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 20px;margin:14px 0}
+details.card>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+details.card>summary::-webkit-details-marker{display:none}
+details.card>summary::after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .15s}
+details.card[open]>summary::after{transform:rotate(-135deg)}
+.cardbody{margin-top:16px}
+.colors{display:flex;flex-wrap:wrap;gap:16px}
+.color{display:flex;flex-direction:column;gap:6px;width:104px}
+.color .sw2{width:100%;height:48px;border-radius:var(--r-md);box-shadow:0 0 0 1px rgba(255,255,255,.1)}
+.color .hex{font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:14px;color:var(--ink)}
+.color .cmeta{font-size:14px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.color .role{color:var(--accent);font-size:14px;text-transform:uppercase;letter-spacing:.03em}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
-.tok{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:5px 11px;font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink)}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
-th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
-.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600}
-.b-good{background:rgba(74,222,128,.14);color:var(--good)}
-.b-warn{background:rgba(234,88,12,.16);color:var(--warm)}
-.b-bad{background:rgba(239,68,68,.16);color:var(--bad)}
+.tok{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:6px 12px;font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:14px;color:var(--ink)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:14px;text-transform:uppercase;letter-spacing:.05em}
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:14px;font-weight:600}
+.b-good{background:rgba(74,222,128,.16);color:var(--good)}
+.b-warn{background:rgba(234,88,12,.18);color:var(--warm)}
+.b-bad{background:rgba(239,68,68,.18);color:var(--bad)}
 .b-mut{background:var(--elevated);color:var(--muted)}
-.drift{border:1px solid var(--line);border-radius:var(--r-lg);padding:20px 22px;margin:8px 0 0;background:var(--surface)}
+.drift{border:1px solid var(--line);border-radius:var(--r-lg);padding:20px 22px;margin:14px 0;background:var(--surface)}
 .drift.is-drift{border-color:rgba(239,68,68,.45)}
 .drift.is-stable{border-color:rgba(74,222,128,.4)}
 .score{font-size:40px;font-weight:700;line-height:1;letter-spacing:-.02em}
-.row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .previewbtn{cursor:pointer}
 .shadowbox{width:84px;height:52px;border-radius:var(--r-md);background:var(--elevated);display:inline-block}
-.muted{color:var(--muted)}
-.kvs{display:flex;flex-wrap:wrap;gap:8px 20px}
-header{border-bottom:1px solid var(--line);padding-bottom:22px}
-footer{margin-top:56px;color:var(--tertiary);font-size:12px;border-top:1px solid var(--line);padding-top:16px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 20px;margin:16px 0}
-.card h2{margin:0 0 14px}
-.colors{display:flex;flex-wrap:wrap;gap:14px}
-.color{display:flex;flex-direction:column;gap:6px;width:84px}
-.color .sw2{width:100%;height:46px;border-radius:var(--r-md);box-shadow:0 0 0 1px rgba(255,255,255,.1)}
-.color .hex{font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:11px;color:var(--ink)}
-.color .cmeta{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px}
-.color .role{color:var(--accent);font-size:10px;text-transform:uppercase;letter-spacing:.04em}
 .shadowpanel{background:#e5e5e5;border-radius:var(--r-md);padding:18px;display:flex;flex-wrap:wrap;gap:18px;align-items:center}
 .shadowpanel .sb{width:56px;height:56px;border-radius:var(--r-md);background:#fff}
+footer{margin-top:56px;color:var(--muted);font-size:14px;border-top:1px solid var(--line);padding-top:18px;text-align:center}
 `;
 
 /* ------------------------------ components ------------------------------ */
@@ -136,9 +143,39 @@ function confBadge(c?: string): string {
   return `<span class="badge ${cls}">${esc(c ?? "low")}</span>`;
 }
 
+// Collapsible section card (Lighthouse-style, native <details> — no JS, stays
+// self-contained). Open by default; the user can collapse any section.
 function section(title: string, body: string): string {
   if (!body.trim()) return "";
-  return `<section class="card"><h2>${esc(title)}</h2>${body}</section>`;
+  return `<details class="card" open><summary>${esc(title)}</summary><div class="cardbody">${body}</div></details>`;
+}
+
+/** A Lighthouse-style circular score gauge (0-100), coloured by threshold. */
+function gauge(value: number, label: string, sub?: string): string {
+  const v = Math.max(0, Math.min(100, Math.round(value)));
+  const cls = v >= 90 ? "g-pass" : v >= 50 ? "g-avg" : "g-fail";
+  const C = 339.292; // 2πr, r=54
+  const arc = ((C * v) / 100).toFixed(1);
+  return `<div class="gauge"><svg viewBox="0 0 120 120" class="gring ${cls}" role="img" aria-label="${esc(label)} ${v} of 100"><circle class="gbg" cx="60" cy="60" r="54"/><circle class="gfg" cx="60" cy="60" r="54" stroke-dasharray="${arc} ${C}" transform="rotate(-90 60 60)"/><text class="gnum" x="60" y="60" text-anchor="middle" dominant-baseline="central">${v}</text></svg><span class="glabel">${esc(label)}</span>${sub ? `<span class="gsub">${esc(sub)}</span>` : ""}</div>`;
+}
+
+/** The top "ranking" row — gauges that summarise the report's status. */
+function summaryGauges(result: BrandingResult, drift?: DriftReport): string {
+  const g: string[] = [];
+  if (drift) {
+    g.push(gauge(Math.max(0, 100 - Math.min(100, drift.score)), "Stability", `drift ${drift.score}`));
+  }
+  const wcag = result.wcag ?? [];
+  if (wcag.length) {
+    const passed = wcag.filter((p) => p.aa).length;
+    g.push(gauge((100 * passed) / wcag.length, "Accessibility", `${passed}/${wcag.length} AA`));
+  }
+  const palette = result.colors?.palette ?? [];
+  if (palette.length) {
+    const high = palette.filter((c) => c.confidence === "high").length;
+    g.push(gauge((100 * high) / palette.length, "Confidence", `${high}/${palette.length} high`));
+  }
+  return g.length ? `<div class="gauges">${g.join("")}</div>` : "";
 }
 
 function paletteSection(result: BrandingResult): string {
@@ -359,6 +396,7 @@ export function generateHtmlReport(result: BrandingResult, options: HtmlReportOp
   // Embed the machine-readable data so the report is also a data artifact,
   // re-parseable from the same file (Lighthouse pattern).
   const data = sanitizeJson({ result, drift: options.drift ?? null });
+  const gauges = summaryGauges(result, options.drift);
 
   return `<!doctype html>
 <html lang="en">
@@ -370,15 +408,12 @@ export function generateHtmlReport(result: BrandingResult, options: HtmlReportOp
 <style>${STYLE}</style>
 </head>
 <body>
+<div class="topbar"><span class="bm">dembrandt</span><span class="u">${esc(result.url)}</span></div>
 <div class="wrap">
-<header>
-<div class="brand">dembrandt</div>
-<h1>${esc(domain)}</h1>
-<div class="sub"><a href="${esc(result.url)}">${esc(result.url)}</a> · extracted ${esc(result.extractedAt)}</div>
-<div class="sub">${esc(summary)}</div>
-</header>
+<div class="cap">${esc(domain)} · extracted ${esc(result.extractedAt)}${version ? " · v" + esc(version) : ""} · ${esc(summary)}</div>
+${gauges}
 ${body}
-<footer>Generated by dembrandt${version ? " v" + esc(version) : ""} · self-contained report, no external resources.</footer>
+<footer>Generated by <a href="https://github.com/dembrandt/dembrandt">Dembrandt</a>${version ? " " + esc(version) : ""} · <a href="https://github.com/dembrandt/dembrandt/issues">File an issue</a></footer>
 </div>
 <script type="application/json" id="dembrandt-data">${data}</script>
 </body>
