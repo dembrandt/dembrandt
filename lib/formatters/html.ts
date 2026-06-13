@@ -88,7 +88,8 @@ a:hover{color:var(--accent-hover)}
 .row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .kvs{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:14px}
 .topbar{position:sticky;top:0;z-index:10;background:rgba(0,0,0,.82);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 24px;display:flex;align-items:baseline;gap:12px}
-.topbar .bm{font-size:14px;font-weight:700;color:var(--accent);letter-spacing:.01em}
+.topbar .bm{font-size:14px;font-weight:700;color:var(--accent);letter-spacing:.01em;display:inline-flex;align-items:center;gap:7px}
+.topbar .bm svg{height:15px;width:auto}
 .topbar .u{color:var(--muted);font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wrap{max-width:1000px;margin:0 auto;padding:8px 24px 88px}
 .cap{text-align:center;color:var(--muted);font-size:14px;margin:22px 0 4px}
@@ -135,6 +136,10 @@ th{color:var(--muted);font-weight:600;font-size:14px;text-transform:uppercase;le
 .shadowpanel .sb{width:56px;height:56px;border-radius:var(--r-md);background:#fff}
 footer{margin-top:56px;color:var(--muted);font-size:14px;border-top:1px solid var(--line);padding-top:18px;text-align:center}
 `;
+
+// Dembrandt brand mark (from dembrandt-next/components/AppMarkIcon.tsx). Inlined,
+// fill=currentColor so it inherits the topbar accent. Self-contained — no asset fetch.
+const LOGO = `<svg viewBox="0 0 316.6 310.01" fill="currentColor" aria-hidden="true"><path d="M81.48,20.83h-34.92C20.85,20.83,0,41.68,0,67.39v175.22c0,25.72,20.85,46.56,46.56,46.56h34.92c2.3,0,4.17-1.87,4.17-4.17V25c0-2.3-1.87-4.17-4.17-4.17Z"/><path d="M268.66,0H110.47c-2.3,0-4.17,1.87-4.17,4.17v301.67c0,2.3,1.87,4.17,4.17,4.17h158.18c26.48,0,47.95-21.47,47.95-47.95V47.95c0-26.48-21.47-47.95-47.95-47.95Z"/></svg>`;
 
 /* ------------------------------ components ------------------------------ */
 
@@ -408,7 +413,7 @@ export function generateHtmlReport(result: BrandingResult, options: HtmlReportOp
 <style>${STYLE}</style>
 </head>
 <body>
-<div class="topbar"><span class="bm">dembrandt</span><span class="u">${esc(result.url)}</span></div>
+<div class="topbar"><span class="bm">${LOGO}dembrandt</span><span class="u">${esc(result.url)}</span></div>
 <div class="wrap">
 <div class="cap">${esc(domain)} · extracted ${esc(result.extractedAt)}${version ? " · v" + esc(version) : ""} · ${esc(summary)}</div>
 ${gauges}
