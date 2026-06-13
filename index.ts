@@ -18,7 +18,7 @@ import { toDtcgTokens } from "./lib/formatters/dtcg.js";
 import { generatePDF } from "./lib/formatters/pdf.js";
 import { generateDesignMd } from "./lib/formatters/markdown.js";
 import { generateHtmlReport } from "./lib/formatters/html.js";
-import { computeDrift } from "./lib/drift.js";
+import { resolveCompare } from "./lib/compare.js";
 import { parseSitemap } from "./lib/discovery.js";
 import { mergeResults } from "./lib/merger.js";
 import { writeFileSync, mkdirSync, readFileSync } from "fs";
@@ -74,7 +74,7 @@ program
   .option("--brand-guide", "Export a brand guide PDF")
   .option("--design-md", "Export a DESIGN.md file")
   .option("--html [path]", "Write a self-contained HTML report (default: output/<domain>/<timestamp>.html)")
-  .option("--compare <baseline>", "Compare against a baseline extraction JSON (as saved by --save-output); reports drift and exits 1 on drift")
+  .option("--compare <baseline>", "Drift-compare against a baseline: a local JSON file, or an App baseline id (posts to the .dembrandtrc endpoint, default dembrandt.com). Exits 1 on drift.")
   .option("--no-sandbox", "Disable browser sandbox (needed for Docker/CI)")
   .option("--raw-colors", "Include pre-filter raw colors in JSON output")
   .option("--screenshot <path>", "Save a viewport screenshot of the page (not full-page)")
@@ -402,23 +402,30 @@ program
         }
       }
 
-      // Compare against a baseline extraction (deterministic, structured-token diff)
+      // Compare against a baseline: a local file (free, offline) or an App
+      // baseline id (platform). resolveCompare dispatches on file-vs-id.
       let driftReport;
       if (opts.compare) {
         try {
-          const baseline = JSON.parse(readFileSync(opts.compare, "utf-8"));
-          driftReport = computeDrift(baseline, result);
-          const verdict = driftReport.status === "drift"
-            ? color.warning(`drift ${driftReport.score} (threshold ${driftReport.threshold})`)
-            : color.accent(`stable ${driftReport.score}`);
+          // The App endpoint for baseline-id compares comes from .dembrandtrc.
+          let apiBase;
+          try {
+            const rc = JSON.parse(readFileSync(join(process.cwd(), ".dembrandtrc"), "utf-8"));
+            if (typeof rc.endpoint === "string") apiBase = rc.endpoint;
+          } catch { /* no .dembrandtrc, or unreadable — use the default */ }
+          const { report, source, mode } = await resolveCompare(opts.compare, result, apiBase ? { api: apiBase } : {});
+          driftReport = report;
+          const verdict = report.status === "drift"
+            ? color.warning(`drift ${report.score} (threshold ${report.threshold})`)
+            : color.accent(`stable ${report.score}`);
           savedNotices.push(
             chalk.dim(
-              `⟂ Drift vs ${opts.compare}: ${verdict} — ` +
-              `${driftReport.summary.changed} changed, ${driftReport.summary.added} added, ${driftReport.summary.removed} removed`
+              `⟂ Drift vs ${source} (${mode}): ${verdict} — ` +
+              `${report.summary.changed} changed, ${report.summary.added} added, ${report.summary.removed} removed`
             )
           );
-          // CI gate: drift beyond threshold fails the run, but the report still writes first.
-          if (driftReport.status === "drift") process.exitCode = EXIT.DRIFT;
+          // CI gate: drift fails the run, but the report still writes first.
+          if (report.status === "drift") process.exitCode = EXIT.DRIFT;
         } catch (err) {
           console.log(color.warning(`! Could not compare against baseline: ${err.message}`));
         }
