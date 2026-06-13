@@ -14,6 +14,8 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { loadBrowserEngines, PlaywrightMissingError } from "./lib/browser.js";
 import { extractBranding } from "./lib/extractors/index.js";
+import { computeDrift } from "./lib/drift.js";
+import { generateHtmlReport } from "./lib/formatters/html.js";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
@@ -327,6 +329,37 @@ async function main() {
       iconSystem: d.iconSystem,
       breakpoints: d.breakpoints,
     })),
+  );
+
+  // ── Drift & report tools (synchronous, no browser) ─────────────────────
+
+  const extract = z.record(z.any()).describe("A dembrandt extraction object, as returned by get_design_tokens");
+
+  (server.tool as any)(
+    "compute_drift",
+    "Compare two dembrandt extractions and return a design-drift report: a 0-100 score (0 = identical), a stable/drift verdict, per-category scores, and the list of changed/added/removed tokens (colors, typography, spacing, radius, shadows). Pure and synchronous — no browser. Use it to check whether generated or updated UI has drifted from a brand baseline.",
+    {
+      baseline: extract,
+      candidate: extract,
+      failThreshold: z.number().optional().describe("Score above this yields a 'drift' verdict (default 10)"),
+    },
+    ({ baseline, candidate, failThreshold }: any) => {
+      const report = computeDrift(baseline, candidate, failThreshold != null ? { failThreshold } : {});
+      return jsonResult(report);
+    },
+  );
+
+  (server.tool as any)(
+    "render_report",
+    "Render a self-contained HTML report (inline CSS, no external resources) from a dembrandt extraction, optionally including a drift diff. Returns the HTML as text — write it to a .html file to open offline or attach as a CI artifact.",
+    {
+      result: extract,
+      drift: z.any().optional().describe("A drift report from compute_drift, to render the diff banner"),
+    },
+    ({ result, drift }: any) => {
+      const html = generateHtmlReport(result, { drift: drift ?? undefined });
+      return { content: [{ type: "text", text: html }] };
+    },
   );
 
   // ── Job management tools ───────────────────────────────────────────────
