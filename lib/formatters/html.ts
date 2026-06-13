@@ -117,6 +117,16 @@ th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;le
 .kvs{display:flex;flex-wrap:wrap;gap:8px 20px}
 header{border-bottom:1px solid var(--line);padding-bottom:22px}
 footer{margin-top:56px;color:var(--tertiary);font-size:12px;border-top:1px solid var(--line);padding-top:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 20px;margin:16px 0}
+.card h2{margin:0 0 14px}
+.colors{display:flex;flex-wrap:wrap;gap:14px}
+.color{display:flex;flex-direction:column;gap:6px;width:84px}
+.color .sw2{width:100%;height:46px;border-radius:var(--r-md);box-shadow:0 0 0 1px rgba(255,255,255,.1)}
+.color .hex{font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:11px;color:var(--ink)}
+.color .cmeta{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px}
+.color .role{color:var(--accent);font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+.shadowpanel{background:#e5e5e5;border-radius:var(--r-md);padding:18px;display:flex;flex-wrap:wrap;gap:18px;align-items:center}
+.shadowpanel .sb{width:56px;height:56px;border-radius:var(--r-md);background:#fff}
 `;
 
 /* ------------------------------ components ------------------------------ */
@@ -128,7 +138,7 @@ function confBadge(c?: string): string {
 
 function section(title: string, body: string): string {
   if (!body.trim()) return "";
-  return `<h2>${esc(title)}</h2>${body}`;
+  return `<section class="card"><h2>${esc(title)}</h2>${body}</section>`;
 }
 
 function paletteSection(result: BrandingResult): string {
@@ -143,10 +153,10 @@ function paletteSection(result: BrandingResult): string {
     .map((c: PaletteColor) => {
       const hex = c.normalized || c.color;
       const role = roleByHex.get(String(hex).toLowerCase());
-      return `<div class="sw"><div class="chip" style="background:${safeCss(hex) || "transparent"}"></div><div class="meta"><div class="hex">${esc(hex)}</div><div class="sub">${esc(c.count ?? 0)}× ${confBadge(c.confidence)}</div>${role ? `<div class="role">${esc(role)}</div>` : ""}</div></div>`;
+      return `<div class="color"><div class="sw2" style="background:${safeCss(hex) || "transparent"}"></div><div class="hex">${esc(hex)}</div><div class="cmeta">${esc(c.count ?? 0)}× ${confBadge(c.confidence)}</div>${role ? `<div class="role">${esc(role)}</div>` : ""}</div>`;
     })
     .join("");
-  return section("Palette", `<div class="grid swatches">${cards}</div>`);
+  return section("Palette", `<div class="colors">${cards}</div>`);
 }
 
 function semanticSection(result: BrandingResult): string {
@@ -155,10 +165,10 @@ function semanticSection(result: BrandingResult): string {
   const chips = sem
     .map(
       ([role, hex]) =>
-        `<div class="sw" style="min-width:120px"><div class="chip" style="height:40px;background:${safeCss(hex) || "transparent"}"></div><div class="meta"><div class="role">${esc(role)}</div><div class="hex">${esc(hex)}</div></div></div>`
+        `<div class="color"><div class="sw2" style="background:${safeCss(hex) || "transparent"}"></div><div class="role">${esc(role)}</div><div class="hex">${esc(hex)}</div></div>`
     )
     .join("");
-  return section("Semantic colors", `<div class="chips">${chips}</div>`);
+  return section("Semantic colors", `<div class="colors">${chips}</div>`);
 }
 
 function typographySection(result: BrandingResult): string {
@@ -210,13 +220,9 @@ function radiusSection(result: BrandingResult): string {
 function shadowsSection(result: BrandingResult): string {
   const shadows = result.shadows ?? [];
   if (!shadows.length) return "";
-  const rows = shadows
-    .map(
-      (s) =>
-        `<div class="row" style="margin-bottom:8px"><span class="shadowbox" style="box-shadow:${safeCss(s.shadow)}"></span><span class="mono sub">${esc(s.shadow)}</span></div>`
-    )
-    .join("");
-  return section("Shadows", rows);
+  const boxes = shadows.map((s) => `<span class="sb" style="box-shadow:${safeCss(s.shadow)}"></span>`).join("");
+  const list = shadows.map((s) => `<div class="mono sub">${esc(s.shadow)}</div>`).join("");
+  return section("Shadows", `<div class="shadowpanel">${boxes}</div><div style="margin-top:12px;display:grid;gap:4px">${list}</div>`);
 }
 
 function buttonsSection(result: BrandingResult): string {
