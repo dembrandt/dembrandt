@@ -6,8 +6,9 @@ import { computeDrift } from '../lib/drift.js';
 /**
  * generateHtmlReport is a pure result -> string formatter. These assertions pin
  * the contract that makes it usable as a CI artifact: self-contained (no external
- * resources), correct escaping of untrusted extracted strings, an embedded
- * machine-readable payload that round-trips, and the drift banner in Mode B.
+ * resources), correct escaping of untrusted extracted strings, and the drift
+ * banner in Mode B. The report is the rendered HTML only — no embedded JSON
+ * (dropped for size; the machine-readable form is --json-only).
  */
 
 function fixture(overrides: any = {}): any {
@@ -46,33 +47,56 @@ test('renders a self-contained document with no external resources', () => {
   assert.doesNotMatch(html, /@import/i);
 });
 
-test('embeds a machine-readable payload that round-trips', () => {
-  const html = generateHtmlReport(fixture());
-  const m = html.match(/<script type="application\/json" id="dembrandt-data">([\s\S]*?)<\/script>/);
-  assert.ok(m, 'embedded data script present');
-  const data = JSON.parse(m![1]);
-  assert.equal(data.result.colors.palette.length, 2);
-  assert.equal(data.drift, null);
-});
-
-test('escapes untrusted extracted strings (no script/style breakout)', () => {
-  const evil = '</script><img src=x onerror=alert(1)>';
-  const html = generateHtmlReport(fixture({ siteName: evil, colors: { palette: [{ color: evil, normalized: evil, count: 1, confidence: 'low' }], semantic: {}, cssVariables: {} } }));
-  // The raw breakout sequence must never appear unescaped in the document.
+test('escapes untrusted extracted strings (no breakout into the document)', () => {
+  const evil = '</style><img src=x onerror=alert(1)>';
+  const html = generateHtmlReport(fixture({
+    siteName: evil,
+    colors: { palette: [{ color: evil, normalized: evil, count: 1, confidence: 'low' }], semantic: {}, cssVariables: {} },
+  }));
+  // The raw breakout sequence must never appear unescaped; the injected string
+  // must render in its escaped form (the only legit </style> is the real one).
   assert.doesNotMatch(html, /<img src=x onerror=/);
-  // The embedded JSON must not contain a literal closing script tag.
-  const m = html.match(/id="dembrandt-data">([\s\S]*?)<\/script>/);
-  assert.ok(m);
-  assert.ok(!m![1].includes('</script>'));
+  assert.match(html, /&lt;\/style&gt;&lt;img src=x onerror=alert\(1\)&gt;/);
 });
 
-test('Mode B renders a drift banner when a report is supplied', () => {
+test('the summary header always shows a Consistency gauge + a counts caption', () => {
+  // Consistency is always computable, so the header is always present; the
+  // counts caption replaces the dropped (useless) Token-coverage gauge.
+  const baseHtml = generateHtmlReport(fixture());
+  assert.match(baseHtml, /class="gauges"/);
+  assert.match(baseHtml, />Consistency</);
+  assert.match(baseHtml, />Contrast</); // always-on, self-computed from colours
+  assert.match(baseHtml, /class="counts"/);
+  assert.match(baseHtml, /text style/); // honest count, not a score
+  // Without WCAG data the Contrast gauge links to the findings, not a WCAG card.
+  assert.doesNotMatch(baseHtml, /href="#wcag"/);
+  // WCAG present → the Contrast gauge uses real pairs and links to the WCAG card.
+  const wcag = generateHtmlReport(fixture({ wcag: [{ fg: '#000', bg: '#fff', ratio: 21, aa: true, aaLarge: true, aaa: true }] }));
+  assert.match(wcag, /href="#wcag"/);
+});
+
+test('a CSS-only theme toggle is present (dark default, light when checked)', () => {
+  const html = generateHtmlReport(fixture());
+  assert.match(html, /id="theme"/);
+  assert.match(html, /:root:has\(#theme:checked\)/);
+  assert.match(html, /color-scheme:dark/); // default
+});
+
+test('findings drive the report: a contrast smell surfaces in the Findings card', () => {
+  // A light primary fails AA on white → a Findings card with a warn badge.
+  const html = generateHtmlReport(fixture({
+    colors: { palette: [{ color: '#9aa0ff', normalized: '#9aa0ff', count: 5, confidence: 'high' }], semantic: { primary: '#9aa0ff' }, cssVariables: {} },
+  }));
+  assert.match(html, /id="findings"/);
+  assert.match(html, /low contrast on white/);
+});
+
+test('Mode B renders a drift banner and a Drift gauge', () => {
   const base = fixture();
   const cand = fixture({ colors: { palette: [{ color: '#0a0a0a', normalized: '#0a0a0a', count: 40, confidence: 'high' }], semantic: {}, cssVariables: {} } });
   const drift = computeDrift(base, cand);
   const html = generateHtmlReport(cand, { drift });
   assert.match(html, /class="drift is-(drift|stable)"/);
   assert.match(html, />(DRIFT|STABLE)</);
-  const data = JSON.parse(html.match(/id="dembrandt-data">([\s\S]*?)<\/script>/)![1]);
-  assert.equal(typeof data.drift.score, 'number');
+  assert.match(html, />Drift</);
 });

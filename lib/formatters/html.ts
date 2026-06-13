@@ -8,8 +8,9 @@
  * renders structured tokens and single-render contrast only, never re-derives
  * drift from rendered CSS. Mode B reuses the canonical `computeDrift` engine.
  *
- * Like Lighthouse's standalone report, the machine-readable result is embedded
- * in a <script> so the file is both a human view and a data artifact.
+ * The summary header is Lighthouse-style: big score gauges, each backed by a
+ * concrete finding (lib/findings.ts) so no number is a vanity metric. The file
+ * is the rendered view only — the machine-readable form is `--json-only`.
  */
 
 import type {
@@ -22,6 +23,8 @@ import type {
   CssState,
 } from "../types.js";
 import type { DriftReport, DriftChange } from "../drift.js";
+import { computeFindings } from "../findings.js";
+import type { FindingsReport, Finding } from "../findings.js";
 
 export interface HtmlReportOptions {
   /** When present, render a drift banner + changes at the top of the report. */
@@ -45,18 +48,6 @@ function esc(s: unknown): string {
 }
 
 /**
- * Sanitize a JSON string for inlining inside a <script> tag. Mirrors Lighthouse's
- * report-generator: `<` would let a `</script>` in the data break out of the tag,
- * and U+2028/U+2029 are valid JSON but terminate JS string literals.
- */
-function sanitizeJson(object: unknown): string {
-  return JSON.stringify(object)
-    .replace(/</g, "\\u003c")
-    .replace(/\u2028/g, "\\u2028")
-    .replace(/\u2029/g, "\\u2029");
-}
-
-/**
  * Allow only safe CSS color/length-ish tokens into inline style values, so
  * extracted site CSS cannot inject `}` / `<` / `url()` etc. into the report.
  * Anything outside the allowlist is dropped.
@@ -73,68 +64,92 @@ function safeCss(value: unknown): string {
 
 // Dembrandt design system (dark, Linear-inspired). This is the report's *chrome* —
 // a Dembrandt report looks like Dembrandt. The extracted site's tokens are content
-// (swatches, values) shown inside it, never the skin. Tokens from dembrandt-next
-// design.md / globals.css. Brand fonts are declared with system fallbacks (the App
-// loads them; a standalone file falls back gracefully, staying self-contained).
+/*
+ * Dark by default (matching the App at /app), with a CSS-only light toggle — no
+ * JS, just `:root:has(#theme:checked)` flipping the token block. System fonts,
+ * no web fonts, no embedded JSON: stays small at scale. color-scheme is pinned
+ * per theme so a browser's own dark mode can't repaint it.
+ */
 const STYLE = `
-:root{--bg:#000000;--surface:#0D0D0D;--elevated:#1A1A1A;--line:#242424;--line-hover:#3F4150;--ink:#ffffff;--muted:#8A8F98;--accent:#38BDF8;--accent-hover:#7dd3fc;--warm:#EA580C;--good:#4ade80;--bad:#ef4444;--r-sm:6px;--r-md:8px;--r-lg:12px}
+:root{color-scheme:dark;--bg:#000;--surface:#0D0D0D;--elevated:#1A1A1A;--line:#242424;--ink:#fff;--muted:#8A8F98;--accent:#38BDF8;--good:#4ade80;--avg:#fbbf24;--bad:#f87171;--swring:rgba(255,255,255,.12);--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+:root:has(#theme:checked){color-scheme:light;--bg:#fff;--surface:#f7f7f7;--elevated:#f0f0f0;--line:#e0e0e0;--ink:#1f1f1f;--muted:#5c5c5c;--accent:#0c6ae0;--good:#0a8c4a;--avg:#b36b00;--bad:#c0392b;--swring:rgba(0,0,0,.12)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 'Red Hat Display',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.55}
 a{color:var(--accent);text-decoration:none}
-a:hover{color:var(--accent-hover)}
-.mono{font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace}
+a:hover{text-decoration:underline}
+.mono{font-family:var(--mono)}
 .muted{color:var(--muted)}
 .sub{color:var(--muted);font-size:14px}
 .row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .kvs{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:14px}
-.topbar{position:sticky;top:0;z-index:10;background:rgba(0,0,0,.82);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 24px;display:flex;align-items:baseline;gap:12px}
-.topbar .bm{font-size:14px;font-weight:700;color:var(--accent);letter-spacing:.01em;display:inline-flex;align-items:center;gap:7px}
-.topbar .bm svg{height:15px;width:auto}
-.topbar .u{color:var(--muted);font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.wrap{max-width:1000px;margin:0 auto;padding:8px 24px 88px}
-.cap{text-align:center;color:var(--muted);font-size:14px;margin:22px 0 4px}
+.kvs span{white-space:nowrap}
+.topbar{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line);padding:8px 24px;display:flex;align-items:center;gap:12px}
+.topbar .bm{display:inline-flex;align-items:center;color:var(--ink);flex:none}
+.topbar .bm svg{height:16px;width:auto;display:block}
+.tt{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
+.ttl{cursor:pointer;font-size:14px;color:var(--muted);user-select:none}
+.ttl:hover{color:var(--ink)}
+.ttl::after{content:"Light"}
+:root:has(#theme:checked) .ttl::after{content:"Dark"}
+.counts{text-align:center;color:var(--muted);font-size:14px;margin:0;padding:14px 24px 0}
+.topbar .u{color:var(--muted);font-family:var(--mono);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar .meta{margin-left:auto;color:var(--muted);font-size:14px;white-space:nowrap}
+.wrap{max-width:960px;margin:0 auto;padding:8px 24px 80px}
 .gauges{display:flex;flex-wrap:wrap;gap:34px;justify-content:center;padding:18px 0 28px;border-bottom:1px solid var(--line)}
-.gauge{display:flex;flex-direction:column;align-items:center;gap:9px}
+.gauge{display:flex;flex-direction:column;align-items:center;gap:9px;text-decoration:none;color:inherit}
+a.gauge:hover .glabel{text-decoration:underline}
+.fgroup{margin-bottom:16px}
+.fgroup:last-child{margin-bottom:0}
+.fgrouph{font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding-bottom:8px;border-bottom:1px solid var(--line);margin-bottom:10px}
+.findings{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.findings li{display:grid;grid-template-columns:56px 1fr;gap:12px;align-items:baseline;font-size:14px}
+.conf{font-size:14px;font-weight:600}
+.c-high{color:var(--good)}.c-med{color:var(--avg)}.c-low{color:var(--muted)}
+.sev{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.s-err{color:var(--bad)}.s-warn{color:var(--avg)}
 .gring{width:84px;height:84px}
 .gring .gbg{fill:none;stroke:var(--line);stroke-width:8}
 .gring .gfg{fill:none;stroke-width:8;stroke-linecap:round}
 .gring.g-pass .gfg{stroke:var(--good)}.gring.g-pass .gnum{fill:var(--good)}
-.gring.g-avg .gfg{stroke:var(--warm)}.gring.g-avg .gnum{fill:var(--warm)}
+.gring.g-avg .gfg{stroke:var(--avg)}.gring.g-avg .gnum{fill:var(--avg)}
 .gring.g-fail .gfg{stroke:var(--bad)}.gring.g-fail .gnum{fill:var(--bad)}
-.gnum{font:700 28px 'Red Hat Display',system-ui,sans-serif}
+.gnum{font-weight:700;font-size:30px}
 .glabel{font-size:14px;color:var(--ink);font-weight:600}
 .gsub{font-size:14px;color:var(--muted)}
-details.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 20px;margin:14px 0}
-details.card>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+details.card{border:1px solid var(--line);border-radius:8px;padding:16px 20px;margin:14px 0}
+details.card>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 details.card>summary::-webkit-details-marker{display:none}
 details.card>summary::after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .15s}
 details.card[open]>summary::after{transform:rotate(-135deg)}
+details.card>summary:hover::after{border-color:var(--accent)}
 .cardbody{margin-top:16px}
-.colors{display:flex;flex-wrap:wrap;gap:16px}
-.color{display:flex;flex-direction:column;gap:6px;width:104px}
-.color .sw2{width:100%;height:48px;border-radius:var(--r-md);box-shadow:0 0 0 1px rgba(255,255,255,.1)}
-.color .hex{font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:14px;color:var(--ink)}
-.color .cmeta{font-size:14px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.colors{display:flex;flex-wrap:wrap;gap:14px}
+.color{display:flex;flex-direction:column;gap:5px;align-items:flex-start}
+.color .sw2{width:36px;height:36px;border-radius:6px;box-shadow:inset 0 0 0 1px var(--swring)}
+.color .hex{font-family:var(--mono);font-size:14px;color:var(--ink)}
+.color .cmeta{font-size:14px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap}
 .color .role{color:var(--accent);font-size:14px;text-transform:uppercase;letter-spacing:.03em}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
-.tok{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:6px 12px;font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:14px;color:var(--ink)}
+.tok{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 12px;font-family:var(--mono);font-size:14px;color:var(--ink)}
 table{width:100%;border-collapse:collapse;font-size:14px}
-th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
-th{color:var(--muted);font-weight:600;font-size:14px;text-transform:uppercase;letter-spacing:.05em}
+th,td{text-align:left;padding:8px 12px;vertical-align:top}
+thead th{border-bottom:1px solid var(--line);color:var(--muted);font-weight:600;font-size:14px;text-transform:uppercase;letter-spacing:.04em}
 .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:14px;font-weight:600}
-.b-good{background:rgba(74,222,128,.16);color:var(--good)}
-.b-warn{background:rgba(234,88,12,.18);color:var(--warm)}
-.b-bad{background:rgba(239,68,68,.18);color:var(--bad)}
-.b-mut{background:var(--elevated);color:var(--muted)}
-.drift{border:1px solid var(--line);border-radius:var(--r-lg);padding:20px 22px;margin:14px 0;background:var(--surface)}
-.drift.is-drift{border-color:rgba(239,68,68,.45)}
-.drift.is-stable{border-color:rgba(74,222,128,.4)}
-.score{font-size:40px;font-weight:700;line-height:1;letter-spacing:-.02em}
+.b-good{background:rgba(10,140,74,.14);color:var(--good)}
+.b-warn{background:rgba(179,107,0,.16);color:var(--avg)}
+.b-bad{background:rgba(192,57,43,.14);color:var(--bad)}
+.b-mut{background:var(--surface);color:var(--muted)}
+.badgepv{display:inline-block;padding:3px 12px;border:1px solid var(--line);border-radius:999px;font-size:14px}
+.drift{border:1px solid var(--line);border-radius:8px;padding:20px 22px;margin:14px 0}
+.drift.is-drift{border-color:var(--bad)}
+.drift.is-stable{border-color:var(--good)}
+.score{font-size:38px;font-weight:700;line-height:1;letter-spacing:-.02em}
 .previewbtn{cursor:pointer}
-.shadowbox{width:84px;height:52px;border-radius:var(--r-md);background:var(--elevated);display:inline-block}
-.shadowpanel{background:#e5e5e5;border-radius:var(--r-md);padding:18px;display:flex;flex-wrap:wrap;gap:18px;align-items:center}
-.shadowpanel .sb{width:56px;height:56px;border-radius:var(--r-md);background:#fff}
-footer{margin-top:56px;color:var(--muted);font-size:14px;border-top:1px solid var(--line);padding-top:18px;text-align:center}
+.shadowbox{width:84px;height:52px;border-radius:8px;background:#fff;display:inline-block;border:1px solid var(--line)}
+.shadowpanel{background:#f0f0f0;border-radius:8px;padding:18px;display:flex;flex-wrap:wrap;gap:18px;align-items:center}
+.shadowpanel .sb{width:56px;height:56px;border-radius:8px;background:#fff}
+footer{margin-top:48px;color:var(--muted);font-size:14px;text-align:center}
 `;
 
 // Dembrandt brand mark (from dembrandt-next/components/AppMarkIcon.tsx). Inlined,
@@ -144,43 +159,98 @@ const LOGO = `<svg viewBox="0 0 316.6 310.01" fill="currentColor" aria-hidden="t
 /* ------------------------------ components ------------------------------ */
 
 function confBadge(c?: string): string {
-  const cls = c === "high" ? "b-good" : c === "medium" ? "b-warn" : "b-mut";
-  return `<span class="badge ${cls}">${esc(c ?? "low")}</span>`;
+  const cls = c === "high" ? "c-high" : c === "medium" ? "c-med" : "c-low";
+  return `<span class="conf ${cls}">${esc(c ?? "low")}</span>`;
 }
 
 // Collapsible section card (Lighthouse-style, native <details> — no JS, stays
 // self-contained). Open by default; the user can collapse any section.
-function section(title: string, body: string): string {
+function section(title: string, body: string, id?: string): string {
   if (!body.trim()) return "";
-  return `<details class="card" open><summary>${esc(title)}</summary><div class="cardbody">${body}</div></details>`;
+  return `<details class="card"${id ? ` id="${esc(id)}"` : ""} open><summary>${esc(title)}</summary><div class="cardbody">${body}</div></details>`;
 }
 
 /** A Lighthouse-style circular score gauge (0-100), coloured by threshold. */
-function gauge(value: number, label: string, sub?: string): string {
+function gauge(value: number, label: string, sub?: string, invert = false, href?: string): string {
   const v = Math.max(0, Math.min(100, Math.round(value)));
-  const cls = v >= 90 ? "g-pass" : v >= 50 ? "g-avg" : "g-fail";
+  const cls = (invert ? v <= 10 : v >= 90) ? "g-pass" : (invert ? v <= 40 : v >= 50) ? "g-avg" : "g-fail";
   const C = 339.292; // 2πr, r=54
   const arc = ((C * v) / 100).toFixed(1);
-  return `<div class="gauge"><svg viewBox="0 0 120 120" class="gring ${cls}" role="img" aria-label="${esc(label)} ${v} of 100"><circle class="gbg" cx="60" cy="60" r="54"/><circle class="gfg" cx="60" cy="60" r="54" stroke-dasharray="${arc} ${C}" transform="rotate(-90 60 60)"/><text class="gnum" x="60" y="60" text-anchor="middle" dominant-baseline="central">${v}</text></svg><span class="glabel">${esc(label)}</span>${sub ? `<span class="gsub">${esc(sub)}</span>` : ""}</div>`;
+  const inner = `<svg viewBox="0 0 120 120" class="gring ${cls}" role="img" aria-label="${esc(label)} ${v} of 100"><circle class="gbg" cx="60" cy="60" r="54"/><circle class="gfg" cx="60" cy="60" r="54" stroke-dasharray="${arc} ${C}" transform="rotate(-90 60 60)"/><text class="gnum" x="60" y="60" text-anchor="middle" dominant-baseline="central">${v}</text></svg><span class="glabel">${esc(label)}</span>${sub ? `<span class="gsub">${esc(sub)}</span>` : ""}`;
+  return href
+    ? `<a class="gauge" href="${esc(href)}">${inner}</a>`
+    : `<div class="gauge">${inner}</div>`;
 }
 
-/** The top "ranking" row — gauges that summarise the report's status. */
-function summaryGauges(result: BrandingResult, drift?: DriftReport): string {
+/** A Lighthouse-style fraction tile (e.g. token coverage 6/6). */
+/**
+ * The top "ranking" row — Dembrandt's axes, not Lighthouse's. Drift (did it
+ * change vs a baseline) and Contrast (WCAG AA) appear only when that data
+ * exists; Consistency is always computable. Every gauge links to the card that
+ * explains it, so no number is a mystery.
+ */
+function summaryGauges(result: BrandingResult, fr: FindingsReport, drift?: DriftReport): string {
   const g: string[] = [];
   if (drift) {
-    g.push(gauge(Math.max(0, 100 - Math.min(100, drift.score)), "Stability", `drift ${drift.score}`));
+    g.push(gauge(drift.score, "Drift", drift.status === "drift" ? "vs baseline" : "stable", true, "#drift"));
   }
+  const cIssues = fr.findings.filter((f) => f.category !== "contrast").length;
+  g.push(gauge(fr.consistency, "Consistency", cIssues ? `${cIssues} issue${cIssues === 1 ? "" : "s"}` : "clean", false, "#findings"));
+  // Contrast is always present: real WCAG pairs when --wcag ran, else the
+  // self-computed contrast findings.
   const wcag = result.wcag ?? [];
   if (wcag.length) {
     const passed = wcag.filter((p) => p.aa).length;
-    g.push(gauge((100 * passed) / wcag.length, "Accessibility", `${passed}/${wcag.length} AA`));
+    g.push(gauge((100 * passed) / wcag.length, "Contrast", `${passed}/${wcag.length} pairs AA`, false, "#wcag"));
+  } else {
+    const xIssues = fr.findings.filter((f) => f.category === "contrast").length;
+    g.push(gauge(fr.contrast, "Contrast", xIssues ? `${xIssues} issue${xIssues === 1 ? "" : "s"}` : "clean", false, "#findings"));
   }
-  const palette = result.colors?.palette ?? [];
-  if (palette.length) {
-    const high = palette.filter((c) => c.confidence === "high").length;
-    g.push(gauge((100 * high) / palette.length, "Confidence", `${high}/${palette.length} high`));
+  return `<div class="gauges">${g.join("")}</div>`;
+}
+
+/** An at-a-glance executive line of token counts — honest, no score. */
+function summaryCounts(result: BrandingResult): string {
+  const n = (a: unknown) => (Array.isArray(a) ? a.length : 0);
+  const plural = (c: number, one: string, many = one + "s") => `${c} ${c === 1 ? one : many}`;
+  const parts: string[] = [];
+  const colors = n(result.colors?.palette);
+  if (colors) parts.push(plural(colors, "color"));
+  const styles = n(result.typography?.styles);
+  if (styles) parts.push(plural(styles, "text style"));
+  const spacing = n(result.spacing?.commonValues);
+  if (spacing) parts.push(`${spacing} spacing`);
+  const radii = n(result.borderRadius?.values);
+  if (radii) parts.push(plural(radii, "radius", "radii"));
+  const shadows = n(result.shadows);
+  if (shadows) parts.push(plural(shadows, "shadow"));
+  const bps = n(result.breakpoints);
+  if (bps) parts.push(plural(bps, "breakpoint"));
+  return parts.length ? `<p class="counts">${esc(parts.join(" · "))}</p>` : "";
+}
+
+/** Actionable findings — the audits behind the scores, Lighthouse-style. */
+function findingsSection(fr: FindingsReport): string {
+  if (!fr.findings.length) return "";
+  const sev = (s: Finding["severity"]) =>
+    s === "error" ? `<span class="sev s-err">error</span>` : `<span class="sev s-warn">warn</span>`;
+  // Group by display group (Gestalt proximity) so the list reads as Color /
+  // Typography / Spacing / Contrast rather than a flat mixed stream.
+  const groups = new Map<string, Finding[]>();
+  for (const f of fr.findings) {
+    const arr = groups.get(f.group) ?? [];
+    arr.push(f);
+    groups.set(f.group, arr);
   }
-  return g.length ? `<div class="gauges">${g.join("")}</div>` : "";
+  const blocks = [...groups.entries()]
+    .map(([group, items]) => {
+      const rows = items
+        .map((f) => `<li>${sev(f.severity)}<span>${esc(f.message)}</span></li>`)
+        .join("");
+      return `<div class="fgroup"><div class="fgrouph">${esc(group)} <span class="muted">${items.length}</span></div><ul class="findings">${rows}</ul></div>`;
+    })
+    .join("");
+  return `<details class="card" id="findings" open><summary>Findings (${fr.findings.length})</summary><div class="cardbody">${blocks}</div></details>`;
 }
 
 function paletteSection(result: BrandingResult): string {
@@ -195,7 +265,7 @@ function paletteSection(result: BrandingResult): string {
     .map((c: PaletteColor) => {
       const hex = c.normalized || c.color;
       const role = roleByHex.get(String(hex).toLowerCase());
-      return `<div class="color"><div class="sw2" style="background:${safeCss(hex) || "transparent"}"></div><div class="hex">${esc(hex)}</div><div class="cmeta">${esc(c.count ?? 0)}× ${confBadge(c.confidence)}</div>${role ? `<div class="role">${esc(role)}</div>` : ""}</div>`;
+      return `<div class="color"><div class="sw2" style="background:${safeCss(hex) || "transparent"}"></div><div class="hex">${esc(hex)}</div>${role ? `<div class="role">${esc(role)}</div>` : `<div class="cmeta">${confBadge(c.confidence)}</div>`}</div>`;
     })
     .join("");
   return section("Palette", `<div class="colors">${cards}</div>`);
@@ -301,13 +371,11 @@ function badgesSection(result: BrandingResult): string {
       const style = [
         bd.backgroundColor ? `background:${safeCss(bd.backgroundColor)}` : "",
         bd.color ? `color:${safeCss(bd.color)}` : "",
-        bd.borderRadius ? `border-radius:${safeCss(bd.borderRadius)}` : "border-radius:999px",
-        bd.padding ? `padding:${safeCss(bd.padding)}` : "padding:2px 10px",
-        bd.fontSize ? `font-size:${safeCss(bd.fontSize)}` : "font-size:12px",
+        bd.borderRadius ? `border-radius:${safeCss(bd.borderRadius)}` : "",
       ]
         .filter(Boolean)
         .join(";");
-      return `<span style="${esc(style)}">${esc(bd.styleType || "Badge")}</span>`;
+      return `<span class="badgepv" style="${esc(style)}">${esc(bd.styleType || "badge")}</span>`;
     })
     .join(" ");
   return section("Badges", `<div class="row">${chips}</div>`);
@@ -325,7 +393,8 @@ function wcagSection(result: BrandingResult): string {
     .join("");
   return section(
     "WCAG contrast",
-    `<table><thead><tr><th>bg</th><th>Foreground</th><th>Background</th><th>Ratio</th><th>AA</th></tr></thead><tbody>${rows}</tbody></table>`
+    `<table><thead><tr><th>bg</th><th>Foreground</th><th>Background</th><th>Ratio</th><th>AA</th></tr></thead><tbody>${rows}</tbody></table>`,
+    "wcag"
   );
 }
 
@@ -365,7 +434,7 @@ function driftSection(drift: DriftReport, baselineLabel?: string): string {
     })
     .join("");
   const more = drift.changes.length > 120 ? `<p class="sub">… ${drift.changes.length - 120} more changes</p>` : "";
-  return `<div class="drift ${cls}"><div class="row"><div class="score">${esc(drift.score)}</div><div><div>${verdict} <span class="sub">threshold ${esc(drift.threshold)}</span></div><div class="sub">${esc(drift.summary.changed)} changed · ${esc(drift.summary.added)} added · ${esc(drift.summary.removed)} removed${baselineLabel ? ` · vs ${esc(baselineLabel)}` : ""}</div></div></div>${
+  return `<div class="drift ${cls}" id="drift"><div class="row"><div class="score">${esc(drift.score)}</div><div><div>${verdict} <span class="sub">threshold ${esc(drift.threshold)}</span></div><div class="sub">${esc(drift.summary.changed)} changed · ${esc(drift.summary.added)} added · ${esc(drift.summary.removed)} removed${baselineLabel ? ` · vs ${esc(baselineLabel)}` : ""}</div></div></div>${
     cats ? `<table style="margin-top:14px"><thead><tr><th>Category</th><th>Score</th><th>Δ</th><th>+</th><th>−</th></tr></thead><tbody>${cats}</tbody></table>` : ""
   }${
     changes ? `<table style="margin-top:10px"><thead><tr><th>Category</th><th>Kind</th><th>Token</th><th>Change</th><th>Δ</th></tr></thead><tbody>${changes}</tbody></table>${more}` : ""
@@ -381,11 +450,12 @@ export function generateHtmlReport(result: BrandingResult, options: HtmlReportOp
   } catch {
     /* leave as-is */
   }
-  const summary = `${result.colors?.palette?.length ?? 0} colors · ${result.typography?.styles?.length ?? 0} text styles · ${result.spacing?.commonValues?.length ?? 0} spacing · ${result.breakpoints?.length ?? 0} breakpoints`;
   const version = options.version ?? result.meta?.dembrandtVersion ?? "";
+  const fr = computeFindings(result);
 
   const body = [
     options.drift ? driftSection(options.drift, options.baselineLabel) : "",
+    findingsSection(fr),
     paletteSection(result),
     semanticSection(result),
     typographySection(result),
@@ -398,10 +468,7 @@ export function generateHtmlReport(result: BrandingResult, options: HtmlReportOp
     metaSection(result),
   ].join("\n");
 
-  // Embed the machine-readable data so the report is also a data artifact,
-  // re-parseable from the same file (Lighthouse pattern).
-  const data = sanitizeJson({ result, drift: options.drift ?? null });
-  const gauges = summaryGauges(result, options.drift);
+  const gauges = summaryGauges(result, fr, options.drift);
 
   return `<!doctype html>
 <html lang="en">
@@ -413,14 +480,14 @@ export function generateHtmlReport(result: BrandingResult, options: HtmlReportOp
 <style>${STYLE}</style>
 </head>
 <body>
-<div class="topbar"><span class="bm">${LOGO}</span><span class="u">${esc(result.url)}</span></div>
+<input type="checkbox" id="theme" class="tt">
+<div class="topbar"><span class="bm">${LOGO}</span><span class="u">${esc(result.url)}</span><span class="meta">${esc(result.extractedAt)}${version ? " · v" + esc(version) : ""}</span><label for="theme" class="ttl" title="Toggle light / dark"></label></div>
 <div class="wrap">
-<div class="cap">${esc(domain)} · extracted ${esc(result.extractedAt)}${version ? " · v" + esc(version) : ""} · ${esc(summary)}</div>
 ${gauges}
+${summaryCounts(result)}
 ${body}
 <footer>Generated by <a href="https://github.com/dembrandt/dembrandt">Dembrandt</a>${version ? " " + esc(version) : ""} · <a href="https://github.com/dembrandt/dembrandt/issues">File an issue</a></footer>
 </div>
-<script type="application/json" id="dembrandt-data">${data}</script>
 </body>
 </html>`;
 }
