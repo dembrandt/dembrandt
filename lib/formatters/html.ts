@@ -67,46 +67,50 @@ function safeCss(value: unknown): string {
 /*
  * Dark by default (matching the App at /app), with a CSS-only light toggle — no
  * JS, just `:root:has(#theme:checked)` flipping the token block. System fonts,
- * no web fonts, no embedded JSON: stays small at scale. color-scheme is pinned
- * per theme so a browser's own dark mode can't repaint it.
+ * no embedded JSON: stays small at scale. Typography is generic/system on
+ * purpose (no Red Hat Display / web fonts — keeps the file light); the fluid
+ * type scale, brand surfaces, #38BDF8 accent and tight Linear radii still mirror
+ * the App's design system (dembrandt-next/app/globals.css). color-scheme is
+ * pinned per theme so a browser's own dark mode can't repaint it. Type steps
+ * stay >=14px (the App's 2xs/xs at 11-13px are dropped for the no-sub-14px rule).
  */
 const STYLE = `
-:root{color-scheme:dark;--bg:#000;--surface:#0D0D0D;--elevated:#1A1A1A;--line:#242424;--ink:#fff;--muted:#8A8F98;--accent:#38BDF8;--good:#4ade80;--avg:#fbbf24;--bad:#f87171;--swring:rgba(255,255,255,.12);--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
-:root:has(#theme:checked){color-scheme:light;--bg:#fff;--surface:#f7f7f7;--elevated:#f0f0f0;--line:#e0e0e0;--ink:#1f1f1f;--muted:#5c5c5c;--accent:#0c6ae0;--good:#0a8c4a;--avg:#b36b00;--bad:#c0392b;--swring:rgba(0,0,0,.12)}
+:root{color-scheme:dark;--bg:#000;--surface:#0D0D0D;--elevated:#1A1A1A;--line:#242424;--ink:#fff;--muted:#8A8F98;--tertiary:#5E6772;--accent:#38BDF8;--accent-hover:#7dd3fc;--good:#4ade80;--avg:#fbbf24;--bad:#ef4444;--swring:rgba(255,255,255,.12);--sans:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;--t-sm:clamp(0.875rem,0.85rem + 0.15vw,0.938rem);--t-base:clamp(1rem,0.975rem + 0.125vw,1.063rem);--t-md:clamp(1.125rem,1.075rem + 0.25vw,1.25rem);--t-lg:clamp(1.25rem,1.175rem + 0.375vw,1.5rem);--t-xl:clamp(1.5rem,1.375rem + 0.625vw,1.875rem);--t-2xl:clamp(1.875rem,1.675rem + 1vw,2.5rem)}
+:root:has(#theme:checked){color-scheme:light;--bg:#F5F5F7;--surface:#ffffff;--elevated:#ECECEF;--line:#D8D8DE;--ink:#111827;--muted:#5E6772;--tertiary:#8A8F98;--accent:#0C6AE0;--accent-hover:#0a55b5;--good:#0a8c4a;--avg:#b36b00;--bad:#c0392b;--swring:rgba(0,0,0,.12)}
 *{box-sizing:border-box}
 html{background:var(--bg)}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.55}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:var(--t-base);line-height:1.55;-webkit-font-smoothing:antialiased}
 a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
+a:hover{color:var(--accent-hover);text-decoration:underline;text-underline-offset:3px}
 .mono{font-family:var(--mono)}
 .muted{color:var(--muted)}
-.sub{color:var(--muted);font-size:14px}
+.sub{color:var(--muted);font-size:var(--t-sm)}
 .row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.kvs{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:14px}
+.kvs{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:var(--t-sm)}
 .kvs span{white-space:nowrap}
 .topbar{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line);padding:8px 24px;display:flex;align-items:center;gap:12px}
 .topbar .bm{display:inline-flex;align-items:center;color:var(--ink);flex:none}
 .topbar .bm svg{height:16px;width:auto;display:block}
 .tt{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
-.ttl{cursor:pointer;font-size:14px;color:var(--muted);user-select:none}
+.ttl{cursor:pointer;font-size:var(--t-sm);color:var(--muted);user-select:none}
 .ttl:hover{color:var(--ink)}
 .ttl::after{content:"Light"}
 :root:has(#theme:checked) .ttl::after{content:"Dark"}
-.counts{text-align:center;color:var(--muted);font-size:14px;margin:0;padding:14px 24px 0}
-.topbar .u{color:var(--muted);font-family:var(--mono);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.topbar .meta{margin-left:auto;color:var(--muted);font-size:14px;white-space:nowrap}
+.counts{text-align:center;color:var(--muted);font-size:var(--t-sm);margin:0;padding:14px 24px 0}
+.topbar .u{color:var(--muted);font-family:var(--mono);font-size:var(--t-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar .meta{margin-left:auto;color:var(--muted);font-size:var(--t-sm);white-space:nowrap}
 .wrap{max-width:960px;margin:0 auto;padding:8px 24px 80px}
 .gauges{display:flex;flex-wrap:wrap;gap:34px;justify-content:center;padding:18px 0 28px;border-bottom:1px solid var(--line)}
 .gauge{display:flex;flex-direction:column;align-items:center;gap:9px;text-decoration:none;color:inherit}
 a.gauge:hover .glabel{text-decoration:underline}
 .fgroup{margin-bottom:16px}
 .fgroup:last-child{margin-bottom:0}
-.fgrouph{font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding-bottom:8px;border-bottom:1px solid var(--line);margin-bottom:10px}
+.fgrouph{font-size:var(--t-sm);font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding-bottom:8px;border-bottom:1px solid var(--line);margin-bottom:10px}
 .findings{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
-.findings li{display:grid;grid-template-columns:56px 1fr;gap:12px;align-items:baseline;font-size:14px}
-.conf{font-size:14px;font-weight:600}
+.findings li{display:grid;grid-template-columns:56px 1fr;gap:12px;align-items:baseline;font-size:var(--t-sm)}
+.conf{font-size:var(--t-sm);font-weight:600}
 .c-high{color:var(--good)}.c-med{color:var(--avg)}.c-low{color:var(--muted)}
-.sev{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.sev{font-size:var(--t-sm);font-weight:700;text-transform:uppercase;letter-spacing:.03em}
 .s-err{color:var(--bad)}.s-warn{color:var(--avg)}
 .gring{width:84px;height:84px}
 .gring .gbg{fill:none;stroke:var(--line);stroke-width:8}
@@ -114,42 +118,42 @@ a.gauge:hover .glabel{text-decoration:underline}
 .gring.g-pass .gfg{stroke:var(--good)}.gring.g-pass .gnum{fill:var(--good)}
 .gring.g-avg .gfg{stroke:var(--avg)}.gring.g-avg .gnum{fill:var(--avg)}
 .gring.g-fail .gfg{stroke:var(--bad)}.gring.g-fail .gnum{fill:var(--bad)}
-.gnum{font-weight:700;font-size:30px}
-.glabel{font-size:14px;color:var(--ink);font-weight:600}
-.gsub{font-size:14px;color:var(--muted)}
+.gnum{font-weight:700;font-size:var(--t-2xl)}
+.glabel{font-size:var(--t-sm);color:var(--ink);font-weight:600}
+.gsub{font-size:var(--t-sm);color:var(--muted)}
 details.card{border:1px solid var(--line);border-radius:8px;padding:16px 20px;margin:14px 0}
-details.card>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+details.card>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;font-size:var(--t-sm);font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 details.card>summary::-webkit-details-marker{display:none}
 details.card>summary::after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .15s}
 details.card[open]>summary::after{transform:rotate(-135deg)}
 details.card>summary:hover::after{border-color:var(--accent)}
 .cardbody{margin-top:16px}
 .colors{display:flex;flex-wrap:wrap;gap:14px}
-.color{display:flex;flex-direction:column;gap:5px;align-items:flex-start}
+.color{display:flex;flex-direction:column;gap:5px;align-items:center;text-align:center}
 .color .sw2{width:36px;height:36px;border-radius:6px;box-shadow:inset 0 0 0 1px var(--swring)}
-.color .hex{font-family:var(--mono);font-size:14px;color:var(--ink)}
-.color .cmeta{font-size:14px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap}
-.color .role{color:var(--accent);font-size:14px;text-transform:uppercase;letter-spacing:.03em}
+.color .hex{font-family:var(--mono);font-size:var(--t-sm);color:var(--ink)}
+.color .cmeta{font-size:var(--t-sm);color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.color .role{color:var(--accent);font-size:var(--t-sm);text-transform:uppercase;letter-spacing:.03em}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
-.tok{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 12px;font-family:var(--mono);font-size:14px;color:var(--ink)}
-table{width:100%;border-collapse:collapse;font-size:14px}
+.tok{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 12px;font-family:var(--mono);font-size:var(--t-sm);color:var(--ink)}
+table{width:100%;border-collapse:collapse;font-size:var(--t-sm)}
 th,td{text-align:left;padding:8px 12px;vertical-align:top}
-thead th{border-bottom:1px solid var(--line);color:var(--muted);font-weight:600;font-size:14px;text-transform:uppercase;letter-spacing:.04em}
-.badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:14px;font-weight:600}
+thead th{border-bottom:1px solid var(--line);color:var(--muted);font-weight:600;font-size:var(--t-sm);text-transform:uppercase;letter-spacing:.04em}
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:var(--t-sm);font-weight:600}
 .b-good{background:rgba(10,140,74,.14);color:var(--good)}
 .b-warn{background:rgba(179,107,0,.16);color:var(--avg)}
 .b-bad{background:rgba(192,57,43,.14);color:var(--bad)}
 .b-mut{background:var(--surface);color:var(--muted)}
-.badgepv{display:inline-block;padding:3px 12px;border:1px solid var(--line);border-radius:999px;font-size:14px}
+.badgepv{display:inline-block;padding:3px 12px;border:1px solid var(--line);border-radius:999px;font-size:var(--t-sm)}
 .drift{border:1px solid var(--line);border-radius:8px;padding:20px 22px;margin:14px 0}
 .drift.is-drift{border-color:var(--bad)}
 .drift.is-stable{border-color:var(--good)}
-.score{font-size:38px;font-weight:700;line-height:1;letter-spacing:-.02em}
+.score{font-size:var(--t-2xl);font-weight:700;line-height:1;letter-spacing:-.02em}
 .previewbtn{cursor:pointer}
 .shadowbox{width:84px;height:52px;border-radius:8px;background:#fff;display:inline-block;border:1px solid var(--line)}
 .shadowpanel{background:#f0f0f0;border-radius:8px;padding:18px;display:flex;flex-wrap:wrap;gap:18px;align-items:center}
 .shadowpanel .sb{width:56px;height:56px;border-radius:8px;background:#fff}
-footer{margin-top:48px;color:var(--muted);font-size:14px;text-align:center}
+footer{margin-top:48px;color:var(--muted);font-size:var(--t-sm);text-align:center}
 `;
 
 // Dembrandt brand mark (from dembrandt-next/components/AppMarkIcon.tsx). Inlined,
@@ -306,10 +310,27 @@ function typographySection(result: BrandingResult): string {
   );
 }
 
-function tokenChips(values: { value?: string; display?: string; px?: number | string; count?: number }[]): string {
+type TokenValue = { value?: string; display?: string; px?: number | string; numericValue?: number; count?: number };
+
+/** Numeric px of a token value, for ordering a scale low → high. */
+function tokenPx(v: TokenValue): number {
+  if (typeof v.numericValue === "number") return v.numericValue;
+  if (typeof v.px === "number") return v.px;
+  const m = String(v.display ?? v.value ?? v.px ?? "").match(/-?\d+(?:\.\d+)?/);
+  return m ? parseFloat(m[0]) : Number.POSITIVE_INFINITY;
+}
+
+/** Sort token values ascending so a scale reads in order. */
+function sortByPx(values: TokenValue[]): TokenValue[] {
+  return [...values].sort((a, b) => tokenPx(a) - tokenPx(b));
+}
+
+function tokenChips(values: TokenValue[]): string {
   return values
     .map((v) => {
-      const label = v.display ?? v.value ?? (v.px != null ? `${v.px}px` : "");
+      // px may already be a string like "2px" (pre-1.1.0 extractions); don't
+      // re-append the unit.
+      const label = v.display ?? v.value ?? (typeof v.px === "string" ? v.px : v.px != null ? `${v.px}px` : "");
       if (!label) return "";
       return `<span class="tok">${esc(label)}${v.count != null ? ` <span class="muted">${esc(v.count)}×</span>` : ""}</span>`;
     })
@@ -320,13 +341,13 @@ function spacingSection(result: BrandingResult): string {
   const vals = result.spacing?.commonValues ?? [];
   if (!vals.length) return "";
   const scale = result.spacing?.scaleType ? `<p class="sub">Scale: ${esc(result.spacing.scaleType)}</p>` : "";
-  return section("Spacing", `<div class="chips">${tokenChips(vals as any)}</div>${scale}`);
+  return section("Spacing", `<div class="chips">${tokenChips(sortByPx(vals as TokenValue[]))}</div>${scale}`);
 }
 
 function radiusSection(result: BrandingResult): string {
   const vals = result.borderRadius?.values ?? [];
   if (!vals.length) return "";
-  return section("Border radius", `<div class="chips">${tokenChips(vals as any)}</div>`);
+  return section("Border radius", `<div class="chips">${tokenChips(sortByPx(vals as TokenValue[]))}</div>`);
 }
 
 function shadowsSection(result: BrandingResult): string {
