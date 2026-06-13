@@ -16,6 +16,10 @@
       "types": "./dist/lib/drift.d.ts",
       "default": "./dist/lib/drift.js"
     },
+    "./report": {
+      "types": "./dist/lib/formatters/html.d.ts",
+      "default": "./dist/lib/formatters/html.js"
+    },
     "./normalize": "./dist/lib/normalize.js",
     "./types": {
       "types": "./dist/lib/types.d.ts",

@@ -17,6 +17,8 @@ import { color } from "./lib/formatters/theme.js";
 import { toDtcgTokens } from "./lib/formatters/dtcg.js";
 import { generatePDF } from "./lib/formatters/pdf.js";
 import { generateDesignMd } from "./lib/formatters/markdown.js";
+import { generateHtmlReport } from "./lib/formatters/html.js";
+import { computeDrift } from "./lib/drift.js";
 import { parseSitemap } from "./lib/discovery.js";
 import { mergeResults } from "./lib/merger.js";
 import { writeFileSync, mkdirSync, readFileSync } from "fs";
@@ -54,6 +56,8 @@ program
   .option("--slow", "3x longer timeouts for slow-loading sites")
   .option("--brand-guide", "Export a brand guide PDF")
   .option("--design-md", "Export a DESIGN.md file")
+  .option("--html [path]", "Write a self-contained HTML report (default: output/<domain>/<timestamp>.html)")
+  .option("--compare <baseline>", "Compare against a baseline extraction JSON (as saved by --save-output); reports drift and exits 1 on drift")
   .option("--no-sandbox", "Disable browser sandbox (needed for Docker/CI)")
   .option("--raw-colors", "Include pre-filter raw colors in JSON output")
   .option("--screenshot <path>", "Save a viewport screenshot of the page (not full-page)")
@@ -377,6 +381,59 @@ program
         }
       }
 
+      // Compare against a baseline extraction (deterministic, structured-token diff)
+      let driftReport;
+      if (opts.compare) {
+        try {
+          const baseline = JSON.parse(readFileSync(opts.compare, "utf-8"));
+          driftReport = computeDrift(baseline, result);
+          const verdict = driftReport.status === "drift"
+            ? color.warning(`drift ${driftReport.score} (threshold ${driftReport.threshold})`)
+            : color.accent(`stable ${driftReport.score}`);
+          savedNotices.push(
+            chalk.dim(
+              `⟂ Drift vs ${opts.compare}: ${verdict} — ` +
+              `${driftReport.summary.changed} changed, ${driftReport.summary.added} added, ${driftReport.summary.removed} removed`
+            )
+          );
+          // CI gate: drift beyond threshold fails the run, but the report still writes first.
+          if (driftReport.status === "drift") process.exitCode = 1;
+        } catch (err) {
+          console.log(color.warning(`! Could not compare against baseline: ${err.message}`));
+        }
+      }
+
+      // Generate self-contained HTML report
+      if (opts.html !== undefined) {
+        try {
+          const htmlDomain = new URL(url).hostname.replace("www.", "");
+          let htmlPath;
+          if (typeof opts.html === "string") {
+            htmlPath = join(process.cwd(), opts.html);
+            mkdirSync(dirname(htmlPath), { recursive: true });
+          } else {
+            const htmlStamp = new Date().toISOString().replace(/[:.]/g, "-").split(".")[0];
+            const htmlDir = join(process.cwd(), "output", htmlDomain);
+            mkdirSync(htmlDir, { recursive: true });
+            htmlPath = join(htmlDir, `${htmlStamp}_v${version}.html`);
+          }
+          writeFileSync(
+            htmlPath,
+            generateHtmlReport(result, {
+              version,
+              drift: driftReport,
+              baselineLabel: opts.compare,
+            })
+          );
+          const htmlLabel = typeof opts.html === "string" ? opts.html : `output/${htmlDomain}/${htmlPath.split("/").pop()}`;
+          savedNotices.push(
+            chalk.dim(`💾 HTML report saved (--html): ${color.info(htmlLabel)}`)
+          );
+        } catch (err) {
+          console.log(color.warning(`! Could not write HTML report: ${err.message}`));
+        }
+      }
+
       // Output to terminal
       const summaryLine =
         color.accent('✨ Analysis summary: ') +
@@ -412,8 +469,8 @@ program
 // so render them via a custom formatHelp. Subcommands keep a single flat list.
 const OPTION_GROUPS = [
   ["Extraction", ["--dark-mode", "--mobile", "--slow", "--crawl", "--sitemap", "--browser"]],
-  ["Output & export", ["--json-only", "--save-output", "--dtcg", "--brand-guide", "--design-md", "--screenshot", "--raw-colors"]],
-  ["Analysis", ["--wcag"]],
+  ["Output & export", ["--json-only", "--save-output", "--dtcg", "--brand-guide", "--design-md", "--html", "--screenshot", "--raw-colors"]],
+  ["Analysis", ["--wcag", "--compare"]],
   ["Network & auth", ["--cookie", "--header", "--user-agent", "--locale", "--timezone", "--accept-language", "--screen-size"]],
   ["Anti-detection", ["--stealth", "--no-sandbox"]],
 ];
