@@ -413,7 +413,7 @@ export function generateHtmlReport(result: BrandingResult, options: HtmlReportOp
 <style>${STYLE}</style>
 </head>
 <body>
-<div class="topbar"><span class="bm">${LOGO}dembrandt</span><span class="u">${esc(result.url)}</span></div>
+<div class="topbar"><span class="bm">${LOGO}</span><span class="u">${esc(result.url)}</span></div>
 <div class="wrap">
 <div class="cap">${esc(domain)} · extracted ${esc(result.extractedAt)}${version ? " · v" + esc(version) : ""} · ${esc(summary)}</div>
 ${gauges}
