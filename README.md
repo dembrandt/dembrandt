@@ -62,7 +62,7 @@ Load extractions, track token drift, and compare snapshots. **[dembrandt.com/app
 
 ## Recipes
 
-**[dembrandt.com/recipes](https://www.dembrandt.com/recipes)** — 38 ready-to-run workflows. Copy a command, paste a prompt, get a result. Covers competitor benchmarking, WCAG audits, CI/CD drift detection, Figma token push, and agentic design system builds. Filterable by role.
+**[dembrandt.com/recipes](https://www.dembrandt.com/recipes)** — ready-to-run workflows. Copy a command, paste a prompt, get a result. Covers competitor benchmarking, WCAG audits, CI/CD drift detection, Figma token push, and agentic design system builds. Filterable by role.
 
 ## What to expect from extraction?
 
@@ -143,11 +143,23 @@ dembrandt example.com --browser=firefox --save-output --dtcg
 - WSL environments where headless Chromium may struggle
 
 **Installation:**
-Firefox browser is installed automatically with `npm install`. If you need to install manually:
+Browsers are installed on demand, not by `npm install` (dembrandt depends on the lean `playwright-core`, which carries no browser binaries). Fetch the engine you need, matched to the installed `playwright-core`:
 
 ```bash
+npm run install-browser   # chromium (default)
+# or a specific engine:
 npx playwright@$(node -p "require('playwright-core/package.json').version") install firefox
 ```
+
+### Connect to an existing browser (CDP)
+
+Skip the bundled browser entirely and drive an already-running Chromium over the DevTools Protocol. Useful in CI or containers where a browser is already up, and it needs no local browser download at all:
+
+```bash
+BROWSER_CDP_ENDPOINT=http://localhost:9222 dembrandt example.com --browser chromium
+```
+
+CDP is supported only with `--browser chromium`.
 
 ### W3C Design Tokens (DTCG) Format
 
