@@ -333,7 +333,9 @@ async function main() {
 
   // ── Drift & report tools (synchronous, no browser) ─────────────────────
 
-  const extract = z.record(z.any()).describe("A dembrandt extraction object, as returned by get_design_tokens");
+  // zod 4: z.record needs explicit key + value types; z.record(z.any()) treats
+  // the lone arg as the KEY and leaves value undefined, which crashes tools/list.
+  const extract = z.record(z.string(), z.any()).describe("A dembrandt extraction object, as returned by get_design_tokens");
 
   (server.tool as any)(
     "compute_drift",
