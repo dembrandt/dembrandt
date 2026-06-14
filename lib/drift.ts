@@ -10,7 +10,7 @@
  * to compare against. Two-baseline workflows just call this twice.
  */
 
-import type { BrandingResult as ExtractionResult, TypographyStyle } from "./types.js";
+import type { BrandingResult as ExtractionResult, TypographyStyle, Confidence } from "./types.js";
 
 export interface DriftConfig {
   /** ΔE at or below this: colors treated as identical. */
@@ -399,6 +399,14 @@ function isSupportedShadow(s: string): boolean {
   return Boolean(s) && !s.includes("oklab(") && !s.includes("oklch(") && !s.includes("color(");
 }
 
+/** Low-confidence tokens are single-use, margin-of-detection elements the
+ * extractor itself is unsure about. They surface inconsistently between two
+ * extractions of the same design, so counting them produces phantom drift.
+ * Only compare tokens the extractor is reasonably sure are real. */
+function notLowConfidence(t: { confidence?: Confidence }): boolean {
+  return t.confidence !== "low";
+}
+
 export function computeDrift(
   baseline: ExtractionResult,
   candidate: ExtractionResult,
@@ -424,16 +432,16 @@ export function computeDrift(
     {
       ...compareDimensions(
         "radius",
-        (baseline.borderRadius?.values ?? []).map((r) => r.value).filter(isRealisticDimension),
-        (candidate.borderRadius?.values ?? []).map((r) => r.value).filter(isRealisticDimension),
+        (baseline.borderRadius?.values ?? []).filter(notLowConfidence).map((r) => r.value).filter(isRealisticDimension),
+        (candidate.borderRadius?.values ?? []).filter(notLowConfidence).map((r) => r.value).filter(isRealisticDimension),
         cfg
       ),
       w: cfg.weights.radius,
     },
     {
       ...compareShadows(
-        (baseline.shadows ?? []).map((s) => s.shadow).filter(isSupportedShadow),
-        (candidate.shadows ?? []).map((s) => s.shadow).filter(isSupportedShadow)
+        (baseline.shadows ?? []).filter(notLowConfidence).map((s) => s.shadow).filter(isSupportedShadow),
+        (candidate.shadows ?? []).filter(notLowConfidence).map((s) => s.shadow).filter(isSupportedShadow)
       ),
       w: cfg.weights.shadow,
     },
