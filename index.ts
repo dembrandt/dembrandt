@@ -456,7 +456,12 @@ program
         );
       if (opts.jsonOnly) {
         console.log = originalConsoleLog;
-        console.log(JSON.stringify(outputData, null, 2));
+        // Attach the drift report to the JSON stream (only here, so --save-output
+        // and baseline files stay pure extractions). Lets consumers — e.g. a CI
+        // gate posting a PR comment — read the per-token changes machine-readably
+        // instead of scraping the HTML report.
+        const jsonOut = driftReport ? { ...outputData, drift: driftReport } : outputData;
+        console.log(JSON.stringify(jsonOut, null, 2));
         console.error(summaryLine);
         for (const notice of savedNotices) console.error(notice);
       } else {
