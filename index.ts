@@ -26,6 +26,7 @@ import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { checkRobotsTxt } from "./lib/robots.js";
 import { EXIT, classifyError } from "./lib/exit-codes.js";
+import { activeFlags, pathSummary } from "./lib/run-summary.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"));
@@ -476,6 +477,14 @@ program
           `${result.typography?.styles?.length ?? 0} text styles, ` +
           `${result.breakpoints?.length ?? 0} breakpoints.`
         );
+
+      // Surface what shaped this run (DEM-99) — active flags and merged paths —
+      // so the summary confirms what was asked for, not just what was extracted.
+      const flagBits = activeFlags(opts);
+      const flagsLine = flagBits.length ? chalk.dim(`   Flags: ${flagBits.join(' ')}`) : null;
+      const pathBits = pathSummary(paths, result.pages?.length ?? 0);
+      const pathsLine = pathBits.length ? chalk.dim(`   Paths: ${pathBits.join(' ')}`) : null;
+
       if (opts.jsonOnly) {
         console.log = originalConsoleLog;
         // Attach the drift report to the JSON stream (only here, so --save-output
@@ -485,12 +494,16 @@ program
         const jsonOut = driftReport ? { ...outputData, drift: driftReport } : outputData;
         console.log(JSON.stringify(jsonOut, null, 2));
         console.error(summaryLine);
+        if (pathsLine) console.error(pathsLine);
+        if (flagsLine) console.error(flagsLine);
         for (const notice of savedNotices) console.error(notice);
       } else {
         console.log();
         displayResults(result);
         console.log();
         console.log(summaryLine);
+        if (pathsLine) console.log(pathsLine);
+        if (flagsLine) console.log(flagsLine);
         for (const notice of savedNotices) console.log(notice);
       }
     } catch (err) {
