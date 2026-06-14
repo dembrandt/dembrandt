@@ -454,16 +454,43 @@ program
           `${result.typography?.styles?.length ?? 0} text styles, ` +
           `${result.breakpoints?.length ?? 0} breakpoints.`
         );
+
+      // Surface the flags that shaped this run, so the summary confirms what
+      // was asked for, not just what was extracted. Artifact flags (--html,
+      // --dtcg, --compare, ...) already print a path notice below; this also
+      // captures behaviour-only flags that otherwise leave no trace.
+      const flagBits: string[] = [];
+      if (opts.darkMode) flagBits.push('--dark-mode');
+      if (opts.mobile) flagBits.push('--mobile');
+      if (opts.slow) flagBits.push('--slow');
+      if (opts.stealth) flagBits.push('--stealth');
+      if (opts.wcag) flagBits.push('--wcag');
+      if (opts.crawl != null) flagBits.push(`--crawl ${opts.crawl}`);
+      if (opts.sitemap) flagBits.push('--sitemap');
+      if (opts.browser && opts.browser !== 'chromium') flagBits.push(`--browser ${opts.browser}`);
+      if (opts.sandbox === false) flagBits.push('--no-sandbox');
+      if (opts.rawColors) flagBits.push('--raw-colors');
+      if (opts.dtcg) flagBits.push('--dtcg');
+      if (opts.saveOutput) flagBits.push('--save-output');
+      if (opts.html !== undefined) flagBits.push('--html');
+      if (opts.compare) flagBits.push('--compare');
+      if (opts.brandGuide) flagBits.push('--brand-guide');
+      if (opts.designMd) flagBits.push('--design-md');
+      if (opts.screenshot) flagBits.push('--screenshot');
+      const flagsLine = flagBits.length ? chalk.dim(`   Flags: ${flagBits.join(' ')}`) : null;
+
       if (opts.jsonOnly) {
         console.log = originalConsoleLog;
         console.log(JSON.stringify(outputData, null, 2));
         console.error(summaryLine);
+        if (flagsLine) console.error(flagsLine);
         for (const notice of savedNotices) console.error(notice);
       } else {
         console.log();
         displayResults(result);
         console.log();
         console.log(summaryLine);
+        if (flagsLine) console.log(flagsLine);
         for (const notice of savedNotices) console.log(notice);
       }
     } catch (err) {
