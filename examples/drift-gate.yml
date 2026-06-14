@@ -1,0 +1,86 @@
+# Design drift gate — copy into .github/workflows/ of your app repo.
+#
+# On every successful preview deploy, extracts the preview and compares its
+# design tokens against production. Fails the check when the drift score crosses
+# the threshold, writes a per-page verdict to the run summary, and uploads a
+# self-contained HTML report. No design-review meeting needed to catch that a
+# color or spacing step quietly changed.
+#
+# Requires: dembrandt 0.19+ (ships --compare / --html). playwright is a peer dep,
+# so install it explicitly.
+
+name: Design drift
+on:
+  deployment_status            # fires when Vercel/Netlify finish a preview deploy
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    if: github.event.deployment_status.state == 'success' && github.event.deployment_status.environment != 'Production'
+    runs-on: ubuntu-latest
+    env:
+      PREVIEW: ${{ github.event.deployment_status.environment_url }}
+      PROD: https://example.com          # your production URL (the pinned baseline)
+      # Preview deployments are often behind host auth (e.g. Vercel Deployment
+      # Protection). Without a bypass, the extractor is redirected to a login
+      # page and every page reads as 100% drift. Enable "Protection Bypass for
+      # Automation" and store the secret as VERCEL_AUTOMATION_BYPASS_SECRET.
+      BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dembrandt + Playwright
+        run: |
+          npm i -g dembrandt playwright
+          npx playwright install --with-deps chromium
+
+      - name: Drift gate
+        run: |
+          set +e   # handle each page's exit code; never abort the loop
+          mkdir -p reports
+          fail=0
+          {
+            echo "## Design drift: preview vs production"
+            echo ""
+            echo "| Page | Verdict | Score | Changed | Added | Removed |"
+            echo "|------|---------|------:|--------:|------:|--------:|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          HDR=()
+          [ -n "$BYPASS" ] && HDR=(--header "x-vercel-protection-bypass: ${BYPASS}")
+          # one entry per tracked page: "name:path"
+          for entry in "home:/" "pricing:/pricing" "app:/app"; do
+            name="${entry%%:*}"; path="${entry#*:}"
+            echo "-> $name ($path)"
+            if ! dembrandt "${PROD}${path}" --json-only > "reports/${name}.baseline.json"; then
+              echo "| \`${path}\` | prod extract failed | - | - | - | - |" >> "$GITHUB_STEP_SUMMARY"
+              fail=1; continue
+            fi
+            dembrandt "${PREVIEW}${path}" "${HDR[@]}" \
+              --compare "reports/${name}.baseline.json" --html "reports/${name}.html" \
+              > "reports/${name}.log" 2>&1
+            code=$?
+            score=$(grep -oiE '(stable|drift) [0-9]+' "reports/${name}.log" | tail -1 | grep -oE '[0-9]+')
+            chg=$(grep -oE '[0-9]+ changed' "reports/${name}.log" | tail -1 | grep -oE '[0-9]+')
+            add=$(grep -oE '[0-9]+ added'   "reports/${name}.log" | tail -1 | grep -oE '[0-9]+')
+            rem=$(grep -oE '[0-9]+ removed' "reports/${name}.log" | tail -1 | grep -oE '[0-9]+')
+            case "$code" in
+              0) verdict="stable" ;;
+              1) verdict="DRIFT"; fail=1 ;;
+              *) verdict="FAILED ${code}"; fail=1 ;;
+            esac
+            echo "| \`${path}\` | ${verdict} | ${score:--} | ${chg:--} | ${add:--} | ${rem:--} |" >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Score is 0-100 (0 = identical); threshold is 10. Full HTML reports in the artifact below." >> "$GITHUB_STEP_SUMMARY"
+          exit $fail
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: drift-reports
+          path: reports/*.html
+          if-no-files-found: ignore

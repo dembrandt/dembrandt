@@ -235,6 +235,8 @@ dembrandt https://app.example.com --json-only > baseline.json
 dembrandt https://app.example.com --compare baseline.json --html report.html
 ```
 
+A ready-to-use GitHub Actions workflow (preview vs production, run summary, report artifact, host-auth bypass) is in [`examples/drift-gate.yml`](examples/drift-gate.yml).
+
 ### Exit codes
 
 A pipeline can branch on the exit code; "design drifted" and "extraction broke" are distinct:

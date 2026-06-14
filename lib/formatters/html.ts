@@ -97,7 +97,7 @@ a:hover{color:var(--accent-hover);text-decoration:underline;text-underline-offse
 .ttl::after{content:"Light"}
 :root:has(#theme:checked) .ttl::after{content:"Dark"}
 .counts{text-align:center;color:var(--muted);font-size:var(--t-sm);margin:0;padding:14px 24px 0}
-.topbar .u{color:var(--muted);font-family:var(--mono);font-size:var(--t-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar .u{flex:1;min-width:0;color:var(--muted);font-family:var(--mono);font-size:var(--t-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .topbar .meta{margin-left:auto;color:var(--muted);font-size:var(--t-sm);white-space:nowrap}
 .wrap{max-width:960px;margin:0 auto;padding:8px 24px 80px}
 .gauges{display:flex;flex-wrap:wrap;gap:34px;justify-content:center;padding:18px 0 28px;border-bottom:1px solid var(--line)}
@@ -431,7 +431,12 @@ function wcagSection(result: BrandingResult): string {
 function metaSection(result: BrandingResult): string {
   const fw = (result.frameworks ?? []).map((f) => f.name);
   const icons = (result.iconSystem ?? []).map((i) => i.name);
-  const bps = (result.breakpoints ?? []).map((b) => `${b.px}px`);
+  const bps = (result.breakpoints ?? []).map((b) => {
+    // b.px may be a bare number (360) or already a CSS length ("360px", "20rem").
+    // Only append the unit when it is a bare number, else we get "360pxpx".
+    const s = String(b.px).trim();
+    return /^\d+(\.\d+)?$/.test(s) ? `${s}px` : s;
+  });
   const items: string[] = [];
   if (fw.length) items.push(`<span><span class="muted">Frameworks:</span> ${esc(fw.join(", "))}</span>`);
   if (icons.length) items.push(`<span><span class="muted">Icons:</span> ${esc(icons.join(", "))}</span>`);
