@@ -1,13 +1,20 @@
 # Design drift gate — copy into .github/workflows/ of your app repo.
 #
 # On every successful preview deploy, extracts the preview and compares its
-# design tokens against production. Fails the check when the drift score crosses
-# the threshold, writes a per-page verdict to the run summary, and uploads a
-# self-contained HTML report. No design-review meeting needed to catch that a
-# color or spacing step quietly changed.
+# design tokens against production. Fails the check on drift, posts a per-page
+# verdict plus the exact tokens that changed as a PR comment (and the run
+# summary), and uploads self-contained HTML reports. No design-review meeting
+# needed to catch that a colour or spacing step quietly changed.
 #
-# Requires: dembrandt 0.19+ (ships --compare / --html). playwright is a peer dep,
-# so install it explicitly.
+# This is the GitHub Actions reference. The gate itself is platform-neutral —
+# `--compare` gives an exit code (0 stable / 1 drift / 2 failure) and, with
+# --json-only, the drift report as JSON. Only the surfacing below (annotations,
+# PR comment) is GitHub-specific; the same extract → compare → branch core maps
+# to GitLab CI, Jenkins, or Azure DevOps.
+#
+# Requires dembrandt 0.19.4+ (ships --compare, --approve, and the drift report
+# under a `drift` key in --json-only). Installed locally so the matching browser
+# (playwright-core) resolves automatically.
 
 name: Design drift
 on:
@@ -15,17 +22,18 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write         # post the drift summary as a PR comment
 
 jobs:
   drift:
-    if: github.event.deployment_status.state == 'success' && github.event.deployment_status.environment != 'Production'
+    if: github.event.deployment_status.state == 'success' && github.event.deployment_status.environment != 'Production' && github.event.deployment_status.environment_url != ''
     runs-on: ubuntu-latest
     env:
       PREVIEW: ${{ github.event.deployment_status.environment_url }}
       PROD: https://example.com          # your production URL (the pinned baseline)
-      # Preview deployments are often behind host auth (e.g. Vercel Deployment
-      # Protection). Without a bypass, the extractor is redirected to a login
-      # page and every page reads as 100% drift. Enable "Protection Bypass for
+      # Preview deploys are often behind host auth (e.g. Vercel Deployment
+      # Protection). Without a bypass the extractor is redirected to a login page
+      # and every page reads as 100% drift. Enable "Protection Bypass for
       # Automation" and store the secret as VERCEL_AUTOMATION_BYPASS_SECRET.
       BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
     steps:
@@ -33,50 +41,122 @@ jobs:
         with:
           node-version: 24
 
-      - name: Install dembrandt + Playwright
+      - name: Install dembrandt + Chromium
+        # Local install pulls playwright-core (the pinned browser driver) as a
+        # regular dependency; fetch the browser binary via its own installer.
+        # Avoids the version-mismatch pitfall of installing `playwright` globally.
         run: |
-          npm i -g dembrandt playwright
-          npx playwright install --with-deps chromium
+          npm i dembrandt
+          npx playwright-core install --with-deps chromium
 
-      - name: Drift gate
+      - name: Drift gate — preview vs production
         run: |
           set +e   # handle each page's exit code; never abort the loop
           mkdir -p reports
-          fail=0
-          {
-            echo "## Design drift: preview vs production"
-            echo ""
-            echo "| Page | Verdict | Score | Changed | Added | Removed |"
-            echo "|------|---------|------:|--------:|------:|--------:|"
-          } >> "$GITHUB_STEP_SUMMARY"
+          fail=0; drifted=0
+          : > reports/_rows.md; : > reports/_hl.md
           HDR=()
           [ -n "$BYPASS" ] && HDR=(--header "x-vercel-protection-bypass: ${BYPASS}")
           # one entry per tracked page: "name:path"
           for entry in "home:/" "pricing:/pricing" "app:/app"; do
             name="${entry%%:*}"; path="${entry#*:}"
             echo "-> $name ($path)"
-            if ! dembrandt "${PROD}${path}" --json-only > "reports/${name}.baseline.json"; then
-              echo "| \`${path}\` | prod extract failed | - | - | - | - |" >> "$GITHUB_STEP_SUMMARY"
+            # production is the pinned baseline: any token change in the PR shows as drift
+            if ! npx dembrandt "${PROD}${path}" --json-only > "reports/${name}.baseline.json" 2> "reports/${name}.prod.log"; then
+              echo "::error title=Baseline failed::${name} (${path}) prod extraction failed"
+              echo "| \`${path}\` | ⚠️ | prod extract failed |" >> reports/_rows.md
               fail=1; continue
             fi
-            dembrandt "${PREVIEW}${path}" "${HDR[@]}" \
-              --compare "reports/${name}.baseline.json" --html "reports/${name}.html" \
-              > "reports/${name}.log" 2>&1
+            # --html for the artifact; --json-only carries the structured drift report
+            npx dembrandt "${PREVIEW}${path}" "${HDR[@]}" \
+              --compare "reports/${name}.baseline.json" --html "reports/${name}.html" --json-only \
+              > "reports/${name}.json" 2> "reports/${name}.log"
             code=$?
-            score=$(grep -oiE '(stable|drift) [0-9]+' "reports/${name}.log" | tail -1 | grep -oE '[0-9]+')
-            chg=$(grep -oE '[0-9]+ changed' "reports/${name}.log" | tail -1 | grep -oE '[0-9]+')
-            add=$(grep -oE '[0-9]+ added'   "reports/${name}.log" | tail -1 | grep -oE '[0-9]+')
-            rem=$(grep -oE '[0-9]+ removed' "reports/${name}.log" | tail -1 | grep -oE '[0-9]+')
-            case "$code" in
-              0) verdict="stable" ;;
-              1) verdict="DRIFT"; fail=1 ;;
-              *) verdict="FAILED ${code}"; fail=1 ;;
-            esac
-            echo "| \`${path}\` | ${verdict} | ${score:--} | ${chg:--} | ${add:--} | ${rem:--} |" >> "$GITHUB_STEP_SUMMARY"
+            score=$(jq -r '.drift.score'          "reports/${name}.json")
+            chg=$(jq -r '.drift.summary.changed'  "reports/${name}.json")
+            add=$(jq -r '.drift.summary.added'    "reports/${name}.json")
+            rem=$(jq -r '.drift.summary.removed'  "reports/${name}.json")
+            if [ "$code" = "0" ]; then
+              icon="✅"; echo "::notice title=Stable::${name} (${path}) matches production"
+            elif [ "$code" = "1" ]; then
+              icon="🔴"; fail=1; drifted=$((drifted+1))
+              echo "::error title=Design drift::${name} (${path}) drift ${score:-?} — see the PR comment or drift-reports artifact"
+            else
+              icon="⚠️"; fail=1
+              echo "::error title=Extraction failed::${name} (${path}) exit ${code}"
+            fi
+            # Spell out only the non-zero counts, e.g. "2 removed" or "1 changed, 2 removed".
+            delta=""
+            [ "${chg:-0}" != "0" ] && delta="${chg} changed"
+            [ "${add:-0}" != "0" ] && delta="${delta:+$delta, }${add} added"
+            [ "${rem:-0}" != "0" ] && delta="${delta:+$delta, }${rem} removed"
+            [ -z "$delta" ] && delta="—"
+            echo "| \`${path}\` | ${icon} | ${delta} |" >> reports/_rows.md
+            # Per-token highlights for drifting pages, from the drift JSON.
+            if [ "$code" = "1" ] && jq -e '.drift.changes | length > 0' "reports/${name}.json" >/dev/null 2>&1; then
+              {
+                echo ""
+                echo "**\`${path}\`**"
+                jq -r '
+                  (.drift.changes | sort_by(.delta // 0) | reverse)[:8][] |
+                  (if .kind=="added" then "+" elif .kind=="removed" then "-" else "~" end) as $s |
+                  if .kind=="changed" then "- `\($s)` \(.category) `\(.before)` → `\(.after)`" + (if .delta then " (Δ \(.delta))" else "" end)
+                  elif .kind=="added" then "- `\($s)` \(.category) `\(.after // .label)`"
+                  else "- `\($s)` \(.category) `\(.before // .label)`" end
+                ' "reports/${name}.json"
+                more=$(jq -r '.drift.changes | length' "reports/${name}.json")
+                [ "${more:-0}" -gt 8 ] && echo "- …and $((more-8)) more"
+              } >> reports/_hl.md
+            fi
           done
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Score is 0-100 (0 = identical); threshold is 10. Full HTML reports in the artifact below." >> "$GITHUB_STEP_SUMMARY"
+
+          # Assemble one comment, reused for the job summary. The marker lets the
+          # comment step update its previous comment instead of posting a new one.
+          SUMMARY=reports/summary.md
+          {
+            echo "<!-- drift-gate -->"
+            echo "## 🎨 Design drift — preview vs production"
+            echo ""
+            if [ "$fail" = "0" ]; then echo "✅ **Stable** — preview matches production across all pages."
+            elif [ "$drifted" -gt 0 ]; then echo "🔴 **Drift detected** on ${drifted} page(s). Review below, or accept if intended."
+            else echo "⚠️ **Extraction failed** — see the run logs."; fi
+            echo ""
+            echo "| Page | | Changes |"
+            echo "|------|:--:|:--|"
+            cat reports/_rows.md
+            if [ -s reports/_hl.md ]; then
+              echo ""
+              echo "<details><summary>What changed</summary>"
+              cat reports/_hl.md
+              echo ""
+              echo "</details>"
+            fi
+            echo ""
+            echo "Accept intended changes locally: \`dembrandt <url> --compare <baseline.json> --approve\`"
+            echo ""
+            echo "<sub>In **What changed**: \`~\` changed · \`+\` added · \`-\` removed token vs production. The gate fails when a page drifts beyond its threshold. Full HTML reports: **drift-reports** artifact on this run.</sub>"
+          } > "$SUMMARY"
+          cat "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"
           exit $fail
+
+      - name: Comment drift summary on the PR
+        # deployment_status carries no PR number, so resolve it from the deployed
+        # commit; upsert a single comment via the marker.
+        if: always() && hashFiles('reports/summary.md') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.deployment.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          pr=$(gh api "repos/${REPO}/commits/${SHA}/pulls" --jq 'map(select(.state=="open")) | .[0].number // empty' 2>/dev/null)
+          [ -z "$pr" ] && { echo "No open PR for ${SHA}; skipping comment."; exit 0; }
+          id=$(gh api "repos/${REPO}/issues/${pr}/comments" --paginate \
+            --jq 'map(select(.body | startswith("<!-- drift-gate -->"))) | .[0].id // empty' 2>/dev/null)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/${REPO}/issues/comments/${id}" -F body=@reports/summary.md >/dev/null
+          else
+            gh api -X POST "repos/${REPO}/issues/${pr}/comments" -F body=@reports/summary.md >/dev/null
+          fi
 
       - uses: actions/upload-artifact@v4
         if: always()

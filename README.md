@@ -247,7 +247,28 @@ dembrandt https://app.example.com --json-only > baseline.json
 dembrandt https://app.example.com --compare baseline.json --html report.html
 ```
 
-A ready-to-use GitHub Actions workflow (preview vs production, run summary, report artifact, host-auth bypass) is in [`examples/drift-gate.yml`](examples/drift-gate.yml).
+When the change is intended, accept it as the new baseline — `--approve` overwrites the local baseline file and passes instead of failing:
+
+```bash
+dembrandt https://app.example.com --compare baseline.json --approve
+```
+
+Add `--json-only` to a `--compare` run to get the drift report as machine-readable JSON under a `drift` key — `score`, `status`, `summary`, and per-token `changes[]` (each with `category`, `kind`, `before`, `after`, `delta`). A CI gate can render exactly which tokens moved (e.g. in a PR comment) from this instead of parsing the HTML report:
+
+```bash
+dembrandt https://app.example.com --compare baseline.json --json-only
+```
+
+**Any CI.** The gate is platform-neutral — it is just the exit code plus the drift JSON, so it drops into any runner:
+
+```bash
+dembrandt "$PREVIEW/checkout" --compare base.json --json-only > drift.json
+# exit 1 = drift. Read drift.json (.drift.changes) and surface it however your
+# platform does: a GitLab MR note, an Azure DevOps PR thread, a Jenkins status,
+# a Slack message, or an auto-filed Jira/Linear ticket.
+```
+
+A ready-to-use **GitHub Actions** workflow (preview vs production, per-page PR comment with the exact tokens that changed, run summary, report artifact, host-auth bypass) is in [`examples/drift-gate.yml`](examples/drift-gate.yml) as one full reference. The result-surfacing step (annotations, PR comment) is the only platform-specific part; the extract → compare → branch-on-exit-code core is identical on GitLab CI, Jenkins, and Azure DevOps.
 
 ### Exit codes
 
