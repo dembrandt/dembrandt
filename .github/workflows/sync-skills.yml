@@ -79,6 +79,10 @@ jobs:
           cd dembrandt-next
           VERSION="${DEMBRANDT_VERSION#v}"
           npm pkg set dependencies.dembrandt="${VERSION}"
+          # Keep package-lock.json in sync with package.json. Without this the
+          # lock still pins the old version and `npm ci` (CI, the drift gate)
+          # fails before anyone can run `npm install`.
+          npm install --package-lock-only
           # schema.org softwareVersion always tracks the CLI version (deterministic)
           sed -i "s/\"softwareVersion\": \"[0-9][0-9.]*\"/\"softwareVersion\": \"${VERSION}\"/" app/layout.tsx
 
@@ -93,7 +97,7 @@ jobs:
           body: |
             Automated bump triggered by [dembrandt ${{ github.event.release.tag_name || github.event.inputs.tag }}](${{ github.event.release.html_url || 'manual trigger' }}).
 
-            Updates `dembrandt` npm dependency to latest release and bumps `app/layout.tsx` schema.org `softwareVersion`. Run `npm install` after merging.
+            Updates `dembrandt` npm dependency to latest release (package.json + package-lock.json) and bumps `app/layout.tsx` schema.org `softwareVersion`.
 
             **⚠ Manual check required before merging**
             This automation bumps the npm version in `package.json` and the schema.org `softwareVersion`. If this release added or changed CLI flags, update these manually before merging:
