@@ -1172,6 +1172,13 @@ export async function extractBranding(url: string, spinner: Spinner, browser: an
       }
     }
 
+    // Self-hosted font files, deduped and sorted. fontRequests is a Set filled
+    // in network-arrival order, which varies run-to-run; sorting keeps the
+    // extraction deterministic so the drift gate doesn't report phantom changes.
+    const fontFiles = [...new Set(
+      [...fontRequests].map(u => u.split('/').pop().split('?')[0])
+    )].sort();
+
     const result: any = {
       url: page.url(),
       extractedAt: new Date().toISOString(),
@@ -1200,10 +1207,12 @@ export async function extractBranding(url: string, spinner: Spinner, browser: an
         ...typography,
         sources: {
           ...typography.sources,
-          selfHostedFonts: [...fontRequests].map(u => u.split('/').pop().split('?')[0]),
+          // Sort: fontRequests is filled in network-arrival order, which differs
+          // run-to-run and otherwise surfaces as phantom drift.
+          selfHostedFonts: fontFiles,
           customFonts: typography.sources?.customFonts?.length
-            ? typography.sources.customFonts
-            : fontRequests.size > 0 ? [...fontRequests].map(u => u.split('/').pop().split('?')[0]) : [],
+            ? [...typography.sources.customFonts].sort()
+            : fontFiles,
         }
       },
       spacing,
