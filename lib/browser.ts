@@ -1,17 +1,19 @@
 /**
  * Lazy loader for the playwright-core browser engines.
  *
- * playwright is an optional peer dependency: consumers that use only the pure
- * exports (drift, types, normalize, dtcg) are not forced to install the
- * browser stack. Anything that actually drives a browser routes its import
- * through here, so a missing install surfaces a clear instruction instead of
- * a raw ERR_MODULE_NOT_FOUND at startup. Static `import` would fail at module
- * load, before any guard could run; dynamic `import()` defers it to use.
+ * playwright-core (the driver, ~10MB, no browser download) is a regular
+ * dependency, so the import resolves on a plain install without pulling the
+ * ~150MB browser binaries onto every consumer — library-only importers
+ * (drift, types, normalize, dtcg) and Vercel/CI installs stay lean. The actual
+ * browser binary is fetched on demand (`npx playwright install chromium` or
+ * `npm run install-browser`), so only callers that really extract pay for it.
+ * The import is still routed through here and guarded so a missing engine
+ * surfaces a clear instruction; dynamic `import()` defers resolution to use.
  */
 
 export class PlaywrightMissingError extends Error {
   constructor() {
-    super('playwright not installed, run: npm i playwright');
+    super('browser engine not available, run: npx playwright install chromium');
     this.name = 'PlaywrightMissingError';
   }
 }

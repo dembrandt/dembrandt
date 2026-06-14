@@ -1,6 +1,6 @@
 {
   "name": "dembrandt",
-  "version": "0.19.2",
+  "version": "0.19.3",
   "description": "Extract design tokens and publicly visible CSS information from any website",
   "mcpName": "io.github.dembrandt/dembrandt",
   "main": "dist/index.js",
@@ -67,25 +67,22 @@
   "dependencies": {
     "chalk": "^5.3.0",
     "commander": "^11.1.0",
-    "ora": "^7.0.1"
+    "ora": "^7.0.1",
+    "playwright-core": "^1.60.0"
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",
-    "playwright": "^1.57.0",
-    "playwright-core": "1.60.0",
+    "playwright": "^1.60.0",
     "zod": "4.3.6"
   },
   "peerDependenciesMeta": {
     "@modelcontextprotocol/sdk": {
       "optional": true
     },
-    "playwright": {
-      "optional": true
-    },
-    "playwright-core": {
-      "optional": true
-    },
     "zod": {
+      "optional": true
+    },
+    "playwright": {
       "optional": true
     }
   },
