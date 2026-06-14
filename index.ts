@@ -59,6 +59,7 @@ program
   .option("--design-md", "Export a DESIGN.md file")
   .option("--html [path]", "Write a self-contained HTML report (default: output/<domain>/<timestamp>.html)")
   .option("--compare <baseline>", "Drift-compare against a baseline: a local JSON file, or an App baseline id (posts to the .dembrandtrc endpoint, default dembrandt.com). Exits 1 on drift.")
+  .option("--approve", "With --compare <file>: accept the current extraction as the new baseline by overwriting that local file, and pass instead of failing. Ignored for App baseline ids.")
   .option("--no-sandbox", "Disable browser sandbox (needed for Docker/CI)")
   .option("--raw-colors", "Include pre-filter raw colors in JSON output")
   .option("--screenshot <path>", "Save a viewport screenshot of the page (not full-page)")
@@ -84,6 +85,10 @@ program
     let url = input;
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
       url = "https://" + url;
+    }
+
+    if (opts.approve && !opts.compare) {
+      console.error(color.warning("! --approve has no effect without --compare <file>."));
     }
 
     // In --json-only mode, redirect all status output to stderr so stdout is clean JSON
@@ -408,8 +413,25 @@ program
               `${report.summary.changed} changed, ${report.summary.added} added, ${report.summary.removed} removed`
             )
           );
-          // CI gate: drift fails the run, but the report still writes first.
-          if (report.status === "drift") process.exitCode = EXIT.DRIFT;
+          // --approve: accept the current extraction as the new baseline.
+          // Only local files can be overwritten; App baseline ids are read-only.
+          if (opts.approve) {
+            if (mode === "local") {
+              writeFileSync(resolve(process.cwd(), source), JSON.stringify(result, null, 2));
+              savedNotices.push(
+                chalk.dim(`✓ Baseline accepted (--approve): ${color.info(source)}`)
+              );
+              // Accepted — pass the run regardless of drift.
+            } else {
+              savedNotices.push(
+                color.warning("! --approve only updates local baseline files, not App baseline ids — drift stands.")
+              );
+              if (report.status === "drift") process.exitCode = EXIT.DRIFT;
+            }
+          } else if (report.status === "drift") {
+            // CI gate: drift fails the run, but the report still writes first.
+            process.exitCode = EXIT.DRIFT;
+          }
         } catch (err) {
           console.log(color.warning(`! Could not compare against baseline: ${err.message}`));
         }
@@ -494,7 +516,7 @@ program
 const OPTION_GROUPS = [
   ["Extraction", ["--dark-mode", "--mobile", "--slow", "--crawl", "--sitemap", "--browser"]],
   ["Output & export", ["--json-only", "--save-output", "--dtcg", "--brand-guide", "--design-md", "--html", "--screenshot", "--raw-colors"]],
-  ["Analysis", ["--wcag", "--compare"]],
+  ["Analysis", ["--wcag", "--compare", "--approve"]],
   ["Network & auth", ["--cookie", "--header", "--user-agent", "--locale", "--timezone", "--accept-language", "--screen-size"]],
   ["Anti-detection", ["--stealth", "--no-sandbox"]],
 ];
