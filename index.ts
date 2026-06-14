@@ -479,10 +479,21 @@ program
       if (opts.screenshot) flagBits.push('--screenshot');
       const flagsLine = flagBits.length ? chalk.dim(`   Flags: ${flagBits.join(' ')}`) : null;
 
+      // Explicit paths are positional, not flags, but they shape the run just as
+      // much (multi-page merge). Surface them so `dembrandt site.com /a /b` shows
+      // what was merged. --crawl/--sitemap auto-discover pages instead and report
+      // via the flag above plus the merged page count.
+      const mergedPages = result.pages?.length ?? 0;
+      const pathBits: string[] = [];
+      if (paths && paths.length) pathBits.push(...paths);
+      if (mergedPages > 1) pathBits.push(`(${mergedPages} pages merged)`);
+      const pathsLine = pathBits.length ? chalk.dim(`   Paths: ${pathBits.join(' ')}`) : null;
+
       if (opts.jsonOnly) {
         console.log = originalConsoleLog;
         console.log(JSON.stringify(outputData, null, 2));
         console.error(summaryLine);
+        if (pathsLine) console.error(pathsLine);
         if (flagsLine) console.error(flagsLine);
         for (const notice of savedNotices) console.error(notice);
       } else {
@@ -490,6 +501,7 @@ program
         displayResults(result);
         console.log();
         console.log(summaryLine);
+        if (pathsLine) console.log(pathsLine);
         if (flagsLine) console.log(flagsLine);
         for (const notice of savedNotices) console.log(notice);
       }
