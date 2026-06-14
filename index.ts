@@ -26,6 +26,7 @@ import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { checkRobotsTxt } from "./lib/robots.js";
 import { EXIT, classifyError } from "./lib/exit-codes.js";
+import { activeFlags, pathSummary } from "./lib/run-summary.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"));
@@ -455,38 +456,11 @@ program
           `${result.breakpoints?.length ?? 0} breakpoints.`
         );
 
-      // Surface the flags that shaped this run, so the summary confirms what
-      // was asked for, not just what was extracted. Artifact flags (--html,
-      // --dtcg, --compare, ...) already print a path notice below; this also
-      // captures behaviour-only flags that otherwise leave no trace.
-      const flagBits: string[] = [];
-      if (opts.darkMode) flagBits.push('--dark-mode');
-      if (opts.mobile) flagBits.push('--mobile');
-      if (opts.slow) flagBits.push('--slow');
-      if (opts.stealth) flagBits.push('--stealth');
-      if (opts.wcag) flagBits.push('--wcag');
-      if (opts.crawl != null) flagBits.push(`--crawl ${opts.crawl}`);
-      if (opts.sitemap) flagBits.push('--sitemap');
-      if (opts.browser && opts.browser !== 'chromium') flagBits.push(`--browser ${opts.browser}`);
-      if (opts.sandbox === false) flagBits.push('--no-sandbox');
-      if (opts.rawColors) flagBits.push('--raw-colors');
-      if (opts.dtcg) flagBits.push('--dtcg');
-      if (opts.saveOutput) flagBits.push('--save-output');
-      if (opts.html !== undefined) flagBits.push('--html');
-      if (opts.compare) flagBits.push('--compare');
-      if (opts.brandGuide) flagBits.push('--brand-guide');
-      if (opts.designMd) flagBits.push('--design-md');
-      if (opts.screenshot) flagBits.push('--screenshot');
+      // Surface what shaped this run (DEM-99) — active flags and merged paths —
+      // so the summary confirms what was asked for, not just what was extracted.
+      const flagBits = activeFlags(opts);
       const flagsLine = flagBits.length ? chalk.dim(`   Flags: ${flagBits.join(' ')}`) : null;
-
-      // Explicit paths are positional, not flags, but they shape the run just as
-      // much (multi-page merge). Surface them so `dembrandt site.com /a /b` shows
-      // what was merged. --crawl/--sitemap auto-discover pages instead and report
-      // via the flag above plus the merged page count.
-      const mergedPages = result.pages?.length ?? 0;
-      const pathBits: string[] = [];
-      if (paths && paths.length) pathBits.push(...paths);
-      if (mergedPages > 1) pathBits.push(`(${mergedPages} pages merged)`);
+      const pathBits = pathSummary(paths, result.pages?.length ?? 0);
       const pathsLine = pathBits.length ? chalk.dim(`   Paths: ${pathBits.join(' ')}`) : null;
 
       if (opts.jsonOnly) {
