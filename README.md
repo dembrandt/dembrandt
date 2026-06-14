@@ -223,6 +223,31 @@ npx playwright@$(node -p "require('playwright-core/package.json').version") inst
 
 A mismatched version fails with "Executable doesn't exist". The container image avoids this entirely — just match its tag (`v1.60.0`) to the `playwright-core` version.
 
+### Drift gate
+
+Compare an extraction against a committed baseline and fail the job on drift:
+
+```bash
+# capture a baseline once (same environment you will check against)
+dembrandt https://app.example.com --json-only > baseline.json
+
+# in CI — exits non-zero on drift; writes a report artifact
+dembrandt https://app.example.com --compare baseline.json --html report.html
+```
+
+### Exit codes
+
+A pipeline can branch on the exit code; "design drifted" and "extraction broke" are distinct:
+
+| Code | Meaning |
+|---|---|
+| `0` | Success, or stable (no drift) under `--compare` |
+| `1` | Drift detected (`--compare`) |
+| `2` | Extraction failure (`EXTRACTION_FAILED`, `BROWSER_UNAVAILABLE`) |
+| `67` | Navigation/connection timeout (`NAVIGATION_TIMEOUT`) — retryable, try `--slow` |
+
+With `--json-only`, a failure also prints a machine-readable `{ "error": { "code", "message" } }` to stdout.
+
 ## Recipes
 
 **Quick brand scan**

@@ -17,12 +17,15 @@ import { color } from "./lib/formatters/theme.js";
 import { toDtcgTokens } from "./lib/formatters/dtcg.js";
 import { generatePDF } from "./lib/formatters/pdf.js";
 import { generateDesignMd } from "./lib/formatters/markdown.js";
+import { generateHtmlReport } from "./lib/formatters/html.js";
+import { resolveCompare } from "./lib/compare.js";
 import { parseSitemap } from "./lib/discovery.js";
 import { mergeResults } from "./lib/merger.js";
 import { writeFileSync, mkdirSync, readFileSync } from "fs";
-import { join, dirname } from "path";
+import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { checkRobotsTxt } from "./lib/robots.js";
+import { EXIT, classifyError } from "./lib/exit-codes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"));
@@ -54,6 +57,8 @@ program
   .option("--slow", "3x longer timeouts for slow-loading sites")
   .option("--brand-guide", "Export a brand guide PDF")
   .option("--design-md", "Export a DESIGN.md file")
+  .option("--html [path]", "Write a self-contained HTML report (default: output/<domain>/<timestamp>.html)")
+  .option("--compare <baseline>", "Drift-compare against a baseline: a local JSON file, or an App baseline id (posts to the .dembrandtrc endpoint, default dembrandt.com). Exits 1 on drift.")
   .option("--no-sandbox", "Disable browser sandbox (needed for Docker/CI)")
   .option("--raw-colors", "Include pre-filter raw colors in JSON output")
   .option("--screenshot <path>", "Save a viewport screenshot of the page (not full-page)")
@@ -108,7 +113,11 @@ program
       ({ chromium, firefox } = await loadBrowserEngines());
     } catch (err) {
       spinner.fail(err.message);
-      process.exit(1);
+      if (opts.jsonOnly) {
+        console.log = originalConsoleLog;
+        console.log(JSON.stringify({ url, error: { code: "BROWSER_UNAVAILABLE", message: err.message } }, null, 2));
+      }
+      process.exit(EXIT.RUNTIME);
     }
 
     let browser = null;
@@ -377,6 +386,66 @@ program
         }
       }
 
+      // Compare against a baseline: a local file (free, offline) or an App
+      // baseline id (platform). resolveCompare dispatches on file-vs-id.
+      let driftReport;
+      if (opts.compare) {
+        try {
+          // The App endpoint for baseline-id compares comes from .dembrandtrc.
+          let apiBase;
+          try {
+            const rc = JSON.parse(readFileSync(join(process.cwd(), ".dembrandtrc"), "utf-8"));
+            if (typeof rc.endpoint === "string") apiBase = rc.endpoint;
+          } catch { /* no .dembrandtrc, or unreadable — use the default */ }
+          const { report, source, mode } = await resolveCompare(opts.compare, result, apiBase ? { api: apiBase } : {});
+          driftReport = report;
+          const verdict = report.status === "drift"
+            ? color.warning(`drift ${report.score} (threshold ${report.threshold})`)
+            : color.accent(`stable ${report.score}`);
+          savedNotices.push(
+            chalk.dim(
+              `⟂ Drift vs ${source} (${mode}): ${verdict} — ` +
+              `${report.summary.changed} changed, ${report.summary.added} added, ${report.summary.removed} removed`
+            )
+          );
+          // CI gate: drift fails the run, but the report still writes first.
+          if (report.status === "drift") process.exitCode = EXIT.DRIFT;
+        } catch (err) {
+          console.log(color.warning(`! Could not compare against baseline: ${err.message}`));
+        }
+      }
+
+      // Generate self-contained HTML report
+      if (opts.html !== undefined) {
+        try {
+          const htmlDomain = new URL(url).hostname.replace("www.", "");
+          let htmlPath;
+          if (typeof opts.html === "string") {
+            htmlPath = resolve(process.cwd(), opts.html);
+            mkdirSync(dirname(htmlPath), { recursive: true });
+          } else {
+            const htmlStamp = new Date().toISOString().replace(/[:.]/g, "-").split(".")[0];
+            const htmlDir = join(process.cwd(), "output", htmlDomain);
+            mkdirSync(htmlDir, { recursive: true });
+            htmlPath = join(htmlDir, `${htmlStamp}_v${version}.html`);
+          }
+          writeFileSync(
+            htmlPath,
+            generateHtmlReport(result, {
+              version,
+              drift: driftReport,
+              baselineLabel: opts.compare,
+            })
+          );
+          const htmlLabel = typeof opts.html === "string" ? opts.html : `output/${htmlDomain}/${htmlPath.split("/").pop()}`;
+          savedNotices.push(
+            chalk.dim(`💾 HTML report saved (--html): ${color.info(htmlLabel)}`)
+          );
+        } catch (err) {
+          console.log(color.warning(`! Could not write HTML report: ${err.message}`));
+        }
+      }
+
       // Output to terminal
       const summaryLine =
         color.accent('✨ Analysis summary: ') +
@@ -398,11 +467,18 @@ program
         for (const notice of savedNotices) console.log(notice);
       }
     } catch (err) {
+      const { code, exit } = classifyError(err);
       spinner.fail("Failed");
-      console.error(chalk.red("\n✗ Extraction failed"));
-      console.error(chalk.red(`  Error: ${err.message}`));
-      console.error(chalk.dim(`  URL: ${url}`));
-      process.exit(1);
+      if (opts.jsonOnly) {
+        console.log = originalConsoleLog;
+        console.log(JSON.stringify({ url, error: { code, message: err.message } }, null, 2));
+      } else {
+        console.error(chalk.red("\n✗ Extraction failed"));
+        console.error(chalk.red(`  Error [${code}]: ${err.message}`));
+        console.error(chalk.dim(`  URL: ${url}`));
+        if (exit === EXIT.TIMEOUT) console.error(chalk.dim("  Hint: retry with --slow"));
+      }
+      process.exit(exit);
     } finally {
       if (browser) await browser.close();
     }
@@ -412,8 +488,8 @@ program
 // so render them via a custom formatHelp. Subcommands keep a single flat list.
 const OPTION_GROUPS = [
   ["Extraction", ["--dark-mode", "--mobile", "--slow", "--crawl", "--sitemap", "--browser"]],
-  ["Output & export", ["--json-only", "--save-output", "--dtcg", "--brand-guide", "--design-md", "--screenshot", "--raw-colors"]],
-  ["Analysis", ["--wcag"]],
+  ["Output & export", ["--json-only", "--save-output", "--dtcg", "--brand-guide", "--design-md", "--html", "--screenshot", "--raw-colors"]],
+  ["Analysis", ["--wcag", "--compare"]],
   ["Network & auth", ["--cookie", "--header", "--user-agent", "--locale", "--timezone", "--accept-language", "--screen-size"]],
   ["Anti-detection", ["--stealth", "--no-sandbox"]],
 ];

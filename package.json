@@ -1,6 +1,6 @@
 {
   "name": "dembrandt",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "description": "Extract design tokens and publicly visible CSS information from any website",
   "mcpName": "io.github.dembrandt/dembrandt",
   "main": "dist/index.js",
@@ -15,6 +15,10 @@
     "./drift": {
       "types": "./dist/lib/drift.d.ts",
       "default": "./dist/lib/drift.js"
+    },
+    "./report": {
+      "types": "./dist/lib/formatters/html.d.ts",
+      "default": "./dist/lib/formatters/html.js"
     },
     "./normalize": "./dist/lib/normalize.js",
     "./types": {
