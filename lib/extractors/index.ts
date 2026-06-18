@@ -12,7 +12,7 @@ import { extractWcagPairs } from './colors.js';
 import { SCHEMA_VERSION } from '../version.js';
 import { buildContextOptions, parseCookies, parseScreenSize, DEFAULT_LOCALE } from './context-config.js';
 import { guardExtractor } from './guard.js';
-import type { Browser } from 'playwright';
+import type { Browser, Page } from 'playwright';
 import type { ExtractOptions, BrandingResult, Spinner, ExtractorError } from '../types.js';
 
 // Gaussian noise via Box-Muller
@@ -24,19 +24,19 @@ function gaussian(mean = 0, std = 1) {
 }
 
 // Cubic Bézier interpolation
-function bezier(t, p0, p1, p2, p3) {
+function bezier(t: number, p0: number, p1: number, p2: number, p3: number): number {
   const mt = 1 - t;
   return mt * mt * mt * p0 + 3 * mt * mt * t * p1 + 3 * mt * t * t * p2 + t * t * t * p3;
 }
 
 // Physiological tremor: ~8-12Hz oscillation, amplitude varies with fatigue
-function tremor(t, freq, amp) {
+function tremor(t: number, freq: number, amp: number): number {
   return amp * Math.sin(2 * Math.PI * freq * t) + gaussian(0, amp * 0.3);
 }
 
 // Velocity profile: ballistic phase + corrective phase (two-phase Fitts model)
 // Humans move fast toward target then make fine corrections — not smooth decel
-function velocityProfile(t, overshootProb = 0.3) {
+function velocityProfile(t: number, overshootProb = 0.3): number {
   const hasOvershoot = Math.random() < overshootProb;
   if (t < 0.05) return t / 0.05 * 0.2; // startup latency
   if (t < 0.55) return 0.2 + (t - 0.05) / 0.5; // ballistic acceleration
@@ -46,7 +46,7 @@ function velocityProfile(t, overshootProb = 0.3) {
 }
 
 // Sleep helper
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 /**
  * Adaptive readiness: resolve as soon as the page is actually settled — network
@@ -55,7 +55,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
  * fixed wait while typical pages finish in a fraction of the time. Every error
  * is swallowed: readiness is best-effort and must never abort extraction.
  */
-async function waitForSettled(page, capMs, quietMs = 500) {
+async function waitForSettled(page: Page, capMs: number, quietMs = 500) {
   const start = Date.now();
   try { await page.waitForLoadState("networkidle", { timeout: capMs }); } catch {}
   try { await page.evaluate(() => document.fonts?.ready ?? null); } catch {}
@@ -75,7 +75,7 @@ async function waitForSettled(page, capMs, quietMs = 500) {
   return Date.now() - start;
 }
 
-async function simulateHumanMouse(page) {
+async function simulateHumanMouse(page: Page) {
   const vw = 1920, vh = 1080;
 
   // Per-session behavioral fingerprint — each "user" has consistent quirks
