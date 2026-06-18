@@ -233,6 +233,49 @@ export interface DiscoveredLink {
   locationScore: number;
 }
 
+export interface MotionDuration {
+  value: string;
+  ms: number;
+  count?: number;
+}
+
+export interface MotionEasing {
+  value: string;
+  count: number;
+  type?: string;
+}
+
+export interface MotionAnimation {
+  name?: string;
+  value?: string;
+  count?: number;
+  contexts?: string[];
+}
+
+/** Per-semantic-context motion profile (nav, button, hero, ...). */
+export interface MotionContext {
+  count: number;
+  durations: string[];
+  easingType?: string;
+  props: string[];
+}
+
+/** Observed style change between rest and an interactive state. */
+export interface MotionDelta {
+  tag: string;
+  text: string;
+  pattern: string;
+  delta: unknown;
+}
+
+export interface Motion {
+  durations: MotionDuration[];
+  easings: MotionEasing[];
+  animations: MotionAnimation[];
+  contexts?: Record<string, MotionContext>;
+  interactiveDeltas?: MotionDelta[];
+}
+
 export interface WcagPair {
   fg: string;
   bg: string;
@@ -296,7 +339,7 @@ export interface BrandingResult {
   borders: Borders;
   shadows: Shadow[];
   gradients?: Gradient[];
-  motion?: any;
+  motion?: Motion;
   components: Components;
   breakpoints: Breakpoint[];
   iconSystem: IconSystem[];
