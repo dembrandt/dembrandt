@@ -13,7 +13,7 @@ import { SCHEMA_VERSION } from '../version.js';
 import { buildContextOptions, parseCookies, parseScreenSize, DEFAULT_LOCALE } from './context-config.js';
 import { guardExtractor } from './guard.js';
 import type { Browser, Page } from 'playwright';
-import type { ExtractOptions, BrandingResult, Spinner, ExtractorError } from '../types.js';
+import type { ExtractOptions, BrandingResult, Spinner, ExtractorError, WcagPair } from '../types.js';
 
 // Gaussian noise via Box-Muller
 function gaussian(mean = 0, std = 1) {
@@ -275,7 +275,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
   // Progress lines print only in verbose mode (the main `dembrandt <url>`
   // command). Report commands (drift/init/conformance) pass no verbose flag and
   // stay clean. Warnings are NOT routed through this — they always print.
-  const log = (...args) => { if (options.verbose) console.log(...args); };
+  const log = (...args: unknown[]) => { if (options.verbose) console.log(...args); };
 
   spinner.text = "Creating browser context...";
 
@@ -1104,14 +1104,14 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       console.log(color.info(`💡 Tip: Try running with ${chalk.bold('--slow')} flag for more reliable results on slow-loading sites`));
     }
 
-    let wcag = [];
+    let wcag: WcagPair[] = [];
     if (options.wcag) {
       spinner.start("Analyzing WCAG contrast pairs...");
       try {
         const { relativeLuminance } = await import('../colors.js');
 
-        function calcPair(fgRaw, bgRaw, extra = {}) {
-          const toHex = (c) => {
+        function calcPair(fgRaw: string, bgRaw: string, extra: Partial<WcagPair> = {}): WcagPair | null {
+          const toHex = (c: string) => {
             const m = c && c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
             if (!m) return null;
             return `#${parseInt(m[1]).toString(16).padStart(2,'0')}${parseInt(m[2]).toString(16).padStart(2,'0')}${parseInt(m[3]).toString(16).padStart(2,'0')}`;
