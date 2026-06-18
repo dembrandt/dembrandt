@@ -12,6 +12,7 @@ import { extractWcagPairs } from './colors.js';
 import { SCHEMA_VERSION } from '../version.js';
 import { buildContextOptions, parseCookies, parseScreenSize, DEFAULT_LOCALE } from './context-config.js';
 import { guardExtractor } from './guard.js';
+import type { Browser } from 'playwright';
 import type { ExtractOptions, BrandingResult, Spinner, ExtractorError } from '../types.js';
 
 // Gaussian noise via Box-Muller
@@ -265,7 +266,7 @@ async function simulateHumanMouse(page) {
  * @param {{ slow?: boolean, darkMode?: boolean, mobile?: boolean, wcag?: boolean, screenshotPath?: string, discoverLinks?: number|null, navigationTimeout?: number, stealth?: boolean, userAgent?: string, locale?: string, timezoneId?: string, acceptLanguage?: string, screenSize?: string }} [options]
  * @returns {Promise<BrandingResult>}
  */
-export async function extractBranding(url: string, spinner: Spinner, browser: any, options: ExtractOptions = {}): Promise<BrandingResult> {
+export async function extractBranding(url: string, spinner: Spinner, browser: Browser, options: ExtractOptions = {}): Promise<BrandingResult> {
   const timeoutMultiplier = options.slow ? 3 : 1;
   const timeouts = [];
   const degraded: string[] = []; // post-extraction stages that failed but did not abort the run
@@ -921,7 +922,8 @@ export async function extractBranding(url: string, spinner: Spinner, browser: an
 
         if (['input', 'textarea', 'select', 'button', 'a'].includes(beforeState.tag)) {
           try {
-            await element.focus({ timeout: 500 * timeoutMultiplier });
+            // ElementHandle.focus() takes no options; the focus is synchronous.
+            await element.focus();
             await page.waitForTimeout(100 * timeoutMultiplier);
             const afterFocus = await element.evaluate(el => {
               function findBg(node) {
