@@ -341,6 +341,22 @@ function displayTypography(typography) {
       }
     }
   }
+
+  // Variable-font axes actually exercised on the page (e.g. wght 300–800).
+  const axes = typography.sources?.variableAxes || [];
+  if (axes.length > 0) {
+    const list = axes
+      .map(a => chalk.bold(a.axis) + chalk.dim(a.min === a.max ? ` ${a.min}` : ` ${a.min}–${a.max}`))
+      .join('  ');
+    console.log(chalk.dim('│  ├─') + ' ' + chalk.dim('Variable axes: ') + list);
+  }
+
+  // Enabled OpenType features (stylistic sets, ligatures, etc.).
+  const otf = typography.sources?.openTypeFeatures || [];
+  if (otf.length > 0) {
+    console.log(chalk.dim('│  ├─') + ' ' + chalk.dim('OpenType: ') + otf.slice(0, 10).join(', '));
+  }
+
   console.log(chalk.dim('│'));
 }
 

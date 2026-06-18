@@ -1,6 +1,50 @@
+import type { VariableFontAxis } from '../types.js';
+
+/**
+ * Parse `font-variation-settings` strings (e.g. `"wght" 600, "slnt" -4`) into
+ * per-axis ranges across the page. Pure and exported so it is unit-testable
+ * without a browser. Only explicit variation settings count — we do not infer
+ * an axis from font-weight, which would conflate static and variable fonts.
+ */
+export function parseVariableAxes(settings: string[]): VariableFontAxis[] {
+  const map = new Map<string, VariableFontAxis>();
+  for (const setting of settings) {
+    for (const m of String(setting).matchAll(/"([^"]+)"\s+(-?\d+(?:\.\d+)?)/g)) {
+      const axis = m[1];
+      const val = parseFloat(m[2]);
+      const a = map.get(axis) || { axis, min: val, max: val, count: 0 };
+      a.min = Math.min(a.min, val);
+      a.max = Math.max(a.max, val);
+      a.count++;
+      map.set(axis, a);
+    }
+  }
+  return [...map.values()].sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Parse `font-feature-settings` strings (e.g. `"ss01" on, "tnum" off`) into a
+ * deduped, sorted list of *enabled* OpenType feature tags. Features explicitly
+ * turned off (`off` or `0`) are excluded — a brand's letterforms are defined by
+ * what is on, not what was switched off.
+ */
+export function parseOpenTypeFeatures(settings: string[]): string[] {
+  const set = new Set<string>();
+  for (const setting of settings) {
+    for (const m of String(setting).matchAll(/"([^"]+)"(?:\s+(on|off|\d+))?/g)) {
+      const state = m[2];
+      if (state === 'off' || state === '0') continue;
+      set.add(m[1]);
+    }
+  }
+  return [...set].sort();
+}
+
 export async function extractTypography(page) {
-  return await page.evaluate(() => {
+  const data = await page.evaluate(() => {
     const seen = new Map();
+    const variationSettings: string[] = [];
+    const featureSettings: string[] = [];
     const sources = {
       googleFonts: [],
       adobeFonts: false,
@@ -103,6 +147,10 @@ export async function extractTypography(page) {
 
       const isFluid = s.fontSize.includes('clamp') || s.fontSize.includes('vw') || s.fontSize.includes('vh');
       const fontFeatures = s.fontFeatureSettings !== 'normal' ? s.fontFeatureSettings : null;
+      if (fontFeatures) featureSettings.push(fontFeatures);
+      if (s.fontVariationSettings && s.fontVariationSettings !== 'normal') {
+        variationSettings.push(s.fontVariationSettings);
+      }
 
       let context = "body";
       const className = typeof el.className === 'string' ? el.className : ((el as any).className.baseVal || '');
@@ -168,6 +216,22 @@ export async function extractTypography(page) {
         adobeFonts: sources.adobeFonts,
         variableFonts: [...sources.variableFonts].length > 0,
       },
+      variationSettings,
+      featureSettings,
     };
   });
+
+  // Aggregate the raw variation/feature strings in Node so the parsing stays
+  // unit-testable. Attach to sources only when present — no empty arrays.
+  const variableAxes = parseVariableAxes(data.variationSettings);
+  const openTypeFeatures = parseOpenTypeFeatures(data.featureSettings);
+
+  return {
+    styles: data.styles,
+    sources: {
+      ...data.sources,
+      ...(variableAxes.length ? { variableAxes } : {}),
+      ...(openTypeFeatures.length ? { openTypeFeatures } : {}),
+    },
+  };
 }
