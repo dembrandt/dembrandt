@@ -21,8 +21,8 @@ export type ErrorCode = "NAVIGATION_TIMEOUT" | "EXTRACTION_FAILED";
  * is a generic RUNTIME failure. Reads only `err.message`, so a bare string or a
  * malformed error never throws.
  */
-export function classifyError(err: any): { code: ErrorCode; exit: number } {
-  const m = String(err?.message ?? "");
+export function classifyError(err: unknown): { code: ErrorCode; exit: number } {
+  const m = String((err as { message?: unknown })?.message ?? "");
   if (/Timeout|net::ERR_|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|ERR_NAME_NOT_RESOLVED/i.test(m)) {
     return { code: "NAVIGATION_TIMEOUT", exit: EXIT.TIMEOUT };
   }
