@@ -218,6 +218,21 @@ export interface Favicon {
   sizes: string | null;
 }
 
+/** PWA web app manifest fields consumed during extraction (theme/name seeding). */
+export interface WebManifest {
+  name?: string;
+  shortName?: string;
+  themeColor?: string;
+  backgroundColor?: string;
+}
+
+/** A same-origin link found during crawl discovery, scored by DOM location. */
+export interface DiscoveredLink {
+  href: string;
+  pathname: string;
+  locationScore: number;
+}
+
 export interface WcagPair {
   fg: string;
   bg: string;
@@ -271,9 +286,9 @@ export interface BrandingResult {
   meta?: ExtractionMeta;
   siteName?: string | null;
   logo?: Logo | null;
-  logoInstances?: any[];
+  logoInstances?: Logo[];
   favicons?: Favicon[];
-  manifest?: any;
+  manifest?: WebManifest;
   colors: Colors;
   typography: Typography;
   spacing: Spacing;
@@ -296,9 +311,9 @@ export interface BrandingResult {
   note?: string;
   isCanvasOnly?: boolean;
   /** Internal/transient fields used during crawl + merge. Never persist; see stripTransient(). */
-  _discoveredLinks?: any[];
-  _extractedUrls?: any[];
-  _pageResults?: any[];
+  _discoveredLinks?: DiscoveredLink[];
+  _extractedUrls?: string[];
+  _pageResults?: BrandingResult[];
 }
 
 /**
