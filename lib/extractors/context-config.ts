@@ -3,21 +3,43 @@
  * size, locale) into Playwright context configuration. Split out of the
  * extraction orchestrator so the untrusted-input surface is unit-testable and
  * malformed input degrades to safe defaults instead of producing broken values.
+ *
+ * Written strict-clean (no implicit any, no null leaks) per the per-module
+ * strict ratchet, even though the global tsconfig is strict:false.
  */
 import type { ExtractOptions } from '../types.js';
 
 export interface ParsedCookie {
-  name: string;
-  value: string;
-  url: string;
+  readonly name: string;
+  readonly value: string;
+  readonly url: string;
 }
 
 export interface ScreenSize {
-  width: number;
-  height: number;
+  readonly width: number;
+  readonly height: number;
 }
 
-export const DEFAULT_SCREEN: ScreenSize = { width: 1920, height: 1080 };
+export type ColorScheme = 'light' | 'dark' | 'no-preference';
+
+/**
+ * The subset of Playwright's BrowserContextOptions that we set. Declared
+ * explicitly (rather than `Record<string, any>`) so the config the extraction
+ * engine depends on is type-checked at the one call site where `browser` is an
+ * untyped handle.
+ */
+export interface ContextOptions {
+  viewport: ScreenSize;
+  screen: ScreenSize;
+  userAgent: string;
+  locale: string;
+  timezoneId: string;
+  extraHTTPHeaders: Record<string, string>;
+  colorScheme: ColorScheme;
+  permissions?: string[];
+}
+
+export const DEFAULT_SCREEN: ScreenSize = Object.freeze({ width: 1920, height: 1080 });
 export const DEFAULT_LOCALE = 'en-US';
 export const DEFAULT_TIMEZONE = 'America/New_York';
 export const DEFAULT_USER_AGENT =
@@ -35,7 +57,7 @@ export function parseCookies(cookie: string | undefined, url: string): ParsedCoo
     const c = raw.trim();
     if (!c) continue;
     const eq = c.indexOf('=');
-    if (eq < 1) continue; // no "=", or "=value" with empty name
+    if (eq < 1) continue; // no "=", or "=value" with an empty name
     out.push({ name: c.slice(0, eq).trim(), value: c.slice(eq + 1).trim(), url });
   }
   return out;
@@ -57,16 +79,17 @@ export function parseHeader(header: string | undefined): Record<string, string> 
 /**
  * Parse a "WIDTHxHEIGHT" screen size. Falls back to the default when either
  * dimension is missing, non-numeric, or non-positive, so a typo never produces
- * a NaN viewport that silently breaks layout-dependent extraction.
+ * a NaN viewport that silently breaks layout-dependent extraction. Returns a
+ * fresh object so callers can never mutate the shared default.
  */
 export function parseScreenSize(screenSize: string | undefined): ScreenSize {
-  if (!screenSize) return { ...DEFAULT_SCREEN };
+  if (!screenSize) return { width: DEFAULT_SCREEN.width, height: DEFAULT_SCREEN.height };
   const parts = screenSize.split('x');
-  if (parts.length !== 2) return { ...DEFAULT_SCREEN };
+  if (parts.length !== 2) return { width: DEFAULT_SCREEN.width, height: DEFAULT_SCREEN.height };
   const width = Number(parts[0]);
   const height = Number(parts[1]);
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-    return { ...DEFAULT_SCREEN };
+    return { width: DEFAULT_SCREEN.width, height: DEFAULT_SCREEN.height };
   }
   return { width: Math.round(width), height: Math.round(height) };
 }
@@ -84,25 +107,24 @@ export function deriveAcceptLanguage(locale: string, explicit?: string): string 
 
 /**
  * Build the Playwright context options from CLI options. Pure: no browser
- * access. Cookies and init scripts are applied separately by the caller because
- * they are side effects on a live context.
+ * access, no mutation of the input. Cookies and init scripts are applied
+ * separately by the caller because they are side effects on a live context.
  */
-export function buildContextOptions(options: ExtractOptions, browserName: string): Record<string, any> {
+export function buildContextOptions(options: ExtractOptions, browserName: string): ContextOptions {
   const locale = options.locale || DEFAULT_LOCALE;
-  const timezoneId = options.timezoneId || DEFAULT_TIMEZONE;
-  const { width, height } = parseScreenSize(options.screenSize);
-  const extraHeaders: Record<string, string> = {
+  const size = parseScreenSize(options.screenSize);
+  const extraHTTPHeaders: Record<string, string> = {
     'Accept-Language': deriveAcceptLanguage(locale, options.acceptLanguage),
     ...parseHeader(options.header),
   };
 
-  const contextOptions: Record<string, any> = {
-    viewport: { width, height },
-    screen: { width, height },
+  const contextOptions: ContextOptions = {
+    viewport: { width: size.width, height: size.height },
+    screen: { width: size.width, height: size.height },
     userAgent: options.userAgent || DEFAULT_USER_AGENT,
     locale,
-    timezoneId,
-    extraHTTPHeaders: extraHeaders,
+    timezoneId: options.timezoneId || DEFAULT_TIMEZONE,
+    extraHTTPHeaders,
     colorScheme: 'light',
   };
 

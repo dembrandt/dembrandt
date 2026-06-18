@@ -14,6 +14,7 @@ import {
   DEFAULT_SCREEN,
   DEFAULT_USER_AGENT,
 } from '../lib/extractors/context-config.js';
+import type { ExtractOptions } from '../lib/types.js';
 
 const URL = 'https://example.com/';
 
@@ -74,7 +75,25 @@ test('parseScreenSize falls back to default for malformed input', () => {
 test('parseScreenSize never yields a NaN dimension', () => {
   const { width, height } = parseScreenSize('NaNxNaN');
   assert.ok(Number.isFinite(width) && Number.isFinite(height));
-  assert.deepEqual({ width, height }, DEFAULT_SCREEN);
+  assert.deepEqual({ width, height }, { width: DEFAULT_SCREEN.width, height: DEFAULT_SCREEN.height });
+});
+
+test('parseScreenSize rounds fractional dimensions to integers', () => {
+  assert.deepEqual(parseScreenSize('1280.7x719.4'), { width: 1281, height: 719 });
+});
+
+test('parseScreenSize returns a fresh object; mutating it cannot poison the default', () => {
+  const a = parseScreenSize('not-a-size') as { width: number; height: number };
+  a.width = 1;
+  const b = parseScreenSize('also-bad');
+  assert.equal(b.width, 1920);
+  assert.equal(DEFAULT_SCREEN.width, 1920);
+});
+
+test('DEFAULT_SCREEN is frozen against accidental mutation', () => {
+  assert.throws(() => {
+    (DEFAULT_SCREEN as { width: number }).width = 1;
+  }, TypeError);
 });
 
 test('deriveAcceptLanguage prefers explicit value, else builds from locale', () => {
@@ -102,4 +121,23 @@ test('buildContextOptions merges a custom header alongside Accept-Language', () 
   assert.deepEqual(opts.viewport, { width: 800, height: 600 });
   assert.equal(opts.extraHTTPHeaders['X-Token'], 'abc');
   assert.ok(opts.extraHTTPHeaders['Accept-Language']);
+});
+
+test('buildContextOptions does not mutate its input options', () => {
+  const input: ExtractOptions = { header: 'X-A: 1', screenSize: '640x480', locale: 'fi-FI' };
+  const snapshot = JSON.stringify(input);
+  buildContextOptions(input, 'chromium');
+  assert.equal(JSON.stringify(input), snapshot);
+});
+
+test('buildContextOptions keeps viewport and screen as separate objects', () => {
+  // Aliasing both to one object would let Playwright mutating one corrupt the other.
+  const opts = buildContextOptions({ screenSize: '800x600' }, 'chromium');
+  assert.notEqual(opts.viewport, opts.screen);
+  assert.deepEqual(opts.viewport, opts.screen);
+});
+
+test('buildContextOptions is deterministic for identical input', () => {
+  const opts: ExtractOptions = { locale: 'de-DE', screenSize: '1024x768', header: 'X-Z: y' };
+  assert.deepEqual(buildContextOptions(opts, 'chromium'), buildContextOptions(opts, 'chromium'));
 });
