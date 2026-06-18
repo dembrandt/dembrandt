@@ -43,6 +43,14 @@ export interface TypographyStyle {
   isFluid?: boolean;
 }
 
+/** A variable-font axis (e.g. "wght") with the value range seen across the page. */
+export interface VariableFontAxis {
+  axis: string;
+  min: number;
+  max: number;
+  count: number;
+}
+
 export interface Typography {
   styles: TypographyStyle[];
   sources: {
@@ -52,6 +60,10 @@ export interface Typography {
     customFonts?: string[];
     selfHostedFonts?: string[];
     fontDisplay?: string;
+    /** Variable-font axes actually exercised via font-variation-settings. */
+    variableAxes?: VariableFontAxis[];
+    /** OpenType features actively enabled via font-feature-settings (e.g. ss01, calt). */
+    openTypeFeatures?: string[];
   };
 }
 
@@ -236,6 +248,20 @@ export interface ExtractionMeta {
    * it in the UI instead.
    */
   degraded?: string[];
+  /**
+   * Scoped failures of individual extractors. Each parallel extractor is fault
+   * isolated: when one throws it records { stage, reason } here and falls back to
+   * an empty value, so a single broken extractor never aborts the whole run.
+   */
+  errors?: ExtractorError[];
+}
+
+/** A single fault-isolated extractor failure. */
+export interface ExtractorError {
+  /** Extractor name, e.g. 'colors', 'typography'. */
+  stage: string;
+  /** Failure message (err.message, or the stringified throw value). */
+  reason: string;
 }
 
 export interface BrandingResult {

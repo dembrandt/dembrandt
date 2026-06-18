@@ -11,7 +11,8 @@ import { extractTeach } from './teach.js';
 import { extractWcagPairs } from './colors.js';
 import { SCHEMA_VERSION } from '../version.js';
 import { buildContextOptions, parseCookies, parseScreenSize, DEFAULT_LOCALE } from './context-config.js';
-import type { ExtractOptions, BrandingResult, Spinner } from '../types.js';
+import { guardExtractor } from './guard.js';
+import type { ExtractOptions, BrandingResult, Spinner, ExtractorError } from '../types.js';
 
 // Gaussian noise via Box-Muller
 function gaussian(mean = 0, std = 1) {
@@ -267,7 +268,8 @@ async function simulateHumanMouse(page) {
 export async function extractBranding(url: string, spinner: Spinner, browser: any, options: ExtractOptions = {}): Promise<BrandingResult> {
   const timeoutMultiplier = options.slow ? 3 : 1;
   const timeouts = [];
-  const degraded = []; // post-extraction stages that failed but did not abort the run
+  const degraded: string[] = []; // post-extraction stages that failed but did not abort the run
+  const extractorErrors: ExtractorError[] = []; // scoped failures of the parallel extractors
 
   // Progress lines print only in verbose mode (the main `dembrandt <url>`
   // command). Report commands (drift/init/conformance) pass no verbose flag and
@@ -717,29 +719,36 @@ export async function extractBranding(url: string, spinner: Spinner, browser: an
       gradients,
       motion,
     ] = await Promise.all([
-      extractLogo(page, url).catch(() => ({ logo: null, instances: [], favicons: [], manifest: null })),
-      extractColors(page).catch(() => ({ semantic: {}, palette: [], cssVariables: [], _raw: [] })),
-      extractTypography(page).catch(() => ({ styles: [], sources: {} })),
-      extractSpacing(page).catch(() => ({ scaleType: 'unknown', commonValues: [] })),
-      extractBorderRadius(page).catch(() => ({ values: [] })),
-      extractBorders(page).catch(() => ({ combinations: [] })),
-      extractShadows(page).catch(() => []),
-      extractButtonStyles(page).catch(() => []),
-      extractInputStyles(page).catch(() => []),
-      extractLinkStyles(page).catch(() => []),
-      extractBadgeStyles(page).catch(() => ({ all: [], byVariant: {} })),
-      extractBreakpoints(page).catch(() => []),
-      detectIconSystem(page).catch(() => []),
-      detectFrameworks(page).catch(() => []),
-      extractSiteName(page).catch(() => null),
-      extractGradients(page).catch(() => []),
-      extractMotion(page).catch(() => ({ durations: [], easings: [], byContext: {} })),
+      guardExtractor('logo', extractLogo(page, url), { logo: null, instances: [], favicons: [], manifest: null }, extractorErrors),
+      guardExtractor('colors', extractColors(page), { semantic: {}, palette: [], cssVariables: [], _raw: [] }, extractorErrors),
+      guardExtractor('typography', extractTypography(page), { styles: [], sources: {} }, extractorErrors),
+      guardExtractor('spacing', extractSpacing(page), { scaleType: 'unknown', commonValues: [] }, extractorErrors),
+      guardExtractor('borderRadius', extractBorderRadius(page), { values: [] }, extractorErrors),
+      guardExtractor('borders', extractBorders(page), { combinations: [] }, extractorErrors),
+      guardExtractor('shadows', extractShadows(page), [], extractorErrors),
+      guardExtractor('buttons', extractButtonStyles(page), [], extractorErrors),
+      guardExtractor('inputs', extractInputStyles(page), [], extractorErrors),
+      guardExtractor('links', extractLinkStyles(page), [], extractorErrors),
+      guardExtractor('badges', extractBadgeStyles(page), { all: [], byVariant: {} }, extractorErrors),
+      guardExtractor('breakpoints', extractBreakpoints(page), [], extractorErrors),
+      guardExtractor('iconSystem', detectIconSystem(page), [], extractorErrors),
+      guardExtractor('frameworks', detectFrameworks(page), [], extractorErrors),
+      guardExtractor('siteName', extractSiteName(page), null, extractorErrors),
+      guardExtractor('gradients', extractGradients(page), [], extractorErrors),
+      guardExtractor('motion', extractMotion(page), { durations: [], easings: [], byContext: {} }, extractorErrors),
     ]);
 
     const { logo, instances: logoInstances, favicons, manifest } = logoResult;
     let siteName = siteNameRaw;
 
     spinner.stop();
+
+    // Per-extractor failures are fault-isolated above and surface in meta.errors
+    // during result assembly. Print them once now, after the spinner stops, so a
+    // broken extractor is visible during a verbose run without clobbering it.
+    for (const e of extractorErrors) {
+      log(color.warning(`  ! ${e.stage}: extraction failed (continuing) — ${e.reason}`));
+    }
 
     // Inject manifest theme_color / background_color as high-confidence palette entries
     try {
@@ -1240,6 +1249,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: an
     }
 
     if (degraded.length) result.meta.degraded = degraded;
+    if (extractorErrors.length) result.meta.errors = extractorErrors;
 
     return result;
   } catch (error) {
