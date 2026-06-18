@@ -10,6 +10,7 @@ import { extractBreakpoints, detectIconSystem, detectFrameworks, extractGradient
 import { extractTeach } from './teach.js';
 import { extractWcagPairs } from './colors.js';
 import { SCHEMA_VERSION } from '../version.js';
+import { buildContextOptions, parseCookies, parseScreenSize, DEFAULT_LOCALE } from './context-config.js';
 import type { ExtractOptions, BrandingResult, Spinner } from '../types.js';
 
 // Gaussian noise via Box-Muller
@@ -275,50 +276,17 @@ export async function extractBranding(url: string, spinner: Spinner, browser: an
 
   spinner.text = "Creating browser context...";
 
-  const locale = options.locale || "en-US";
-  const timezoneId = options.timezoneId || "America/New_York";
-  const acceptLanguage = options.acceptLanguage || `${locale},${locale.split('-')[0]};q=0.9,en;q=0.8`;
+  // locale, screenW and screenH are still needed below for the stealth init
+  // script; the rest of the context configuration is built purely in
+  // context-config.ts and unit-tested there.
+  const locale = options.locale || DEFAULT_LOCALE;
+  const { width: screenW, height: screenH } = parseScreenSize(options.screenSize);
 
-  const [screenW, screenH] = options.screenSize
-    ? options.screenSize.split('x').map(Number)
-    : [1920, 1080];
-
-  // Parse "Name=value; Name2=value2" cookie string into Playwright format
-  const parsedCookies = options.cookie
-    ? options.cookie.split(";").map((c) => c.trim()).filter(Boolean).map((c) => {
-        const eq = c.indexOf("=");
-        return {
-          name: c.slice(0, eq).trim(),
-          value: c.slice(eq + 1).trim(),
-          url,
-        };
-      })
-    : [];
-
-  const extraHeaders = { "Accept-Language": acceptLanguage };
-  if (options.header) {
-    const colon = options.header.indexOf(":");
-    if (colon > -1) {
-      extraHeaders[options.header.slice(0, colon).trim()] = options.header.slice(colon + 1).trim();
-    }
-  }
-
-  const contextOptions: any = {
-    viewport: { width: screenW, height: screenH },
-    screen: { width: screenW, height: screenH },
-    userAgent: options.userAgent || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-    locale,
-    timezoneId,
-    extraHTTPHeaders: extraHeaders,
-    colorScheme: "light",
-  };
-
-  if (browser.browserType().name() === 'chromium') {
-    contextOptions.permissions = ["clipboard-read", "clipboard-write"];
-  }
+  const contextOptions = buildContextOptions(options, browser.browserType().name());
 
   const context = await browser.newContext(contextOptions);
 
+  const parsedCookies = parseCookies(options.cookie, url);
   if (parsedCookies.length > 0) {
     await context.addCookies(parsedCookies);
   }
