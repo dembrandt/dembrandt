@@ -13,9 +13,12 @@ export default tseslint.config(
       // no-undef double-checks against a globals list it doesn't have and only
       // produces false positives (process, console, document, ...). Off for TS.
       'no-undef': 'off',
-      // `any` is used deliberately at the page.evaluate / DOM boundary and in the
-      // ported validator's JSON traversal; tsc + noUnusedLocals already gate the rest.
-      '@typescript-eslint/no-explicit-any': 'off',
+      // `any` is legitimate at the page.evaluate / DOM boundary and the ingest
+      // canonicalization layer (normalize.ts), but data-model and helper any is
+      // slop. 'warn' (not 'off') so every new explicit any is visible in the
+      // editor/CI and the count ratchets down, without failing the build on the
+      // remaining browser-context/boundary uses.
+      '@typescript-eslint/no-explicit-any': 'warn',
       // tsc's noUnusedLocals/noUnusedParameters already covers this with `_` opt-out.
       '@typescript-eslint/no-unused-vars': 'off',
       // try{}catch{} that intentionally swallow (best-effort extraction) are idiomatic here.

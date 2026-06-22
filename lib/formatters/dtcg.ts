@@ -186,7 +186,7 @@ function exportColors(colors) {
     for (const [key, value] of Object.entries(colors.semantic)) {
       if (value) {
         // Handle both direct color values and objects with color property
-        const colorValue = typeof value === 'string' ? value : (value as any).color;
+        const colorValue = typeof value === 'string' ? value : (value as { color?: string }).color;
         if (colorValue) {
           semantic[sanitizeTokenName(key)] = {
             $type: 'color',

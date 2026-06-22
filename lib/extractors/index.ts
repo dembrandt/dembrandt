@@ -10,7 +10,10 @@ import { extractBreakpoints, detectIconSystem, detectFrameworks, extractGradient
 import { extractTeach } from './teach.js';
 import { extractWcagPairs } from './colors.js';
 import { SCHEMA_VERSION } from '../version.js';
-import type { ExtractOptions, BrandingResult, Spinner } from '../types.js';
+import { buildContextOptions, parseCookies, parseScreenSize, DEFAULT_LOCALE } from './context-config.js';
+import { guardExtractor } from './guard.js';
+import type { Browser, Page } from 'playwright';
+import type { ExtractOptions, BrandingResult, Spinner, ExtractorError, WcagPair } from '../types.js';
 
 // Gaussian noise via Box-Muller
 function gaussian(mean = 0, std = 1) {
@@ -21,19 +24,19 @@ function gaussian(mean = 0, std = 1) {
 }
 
 // Cubic Bézier interpolation
-function bezier(t, p0, p1, p2, p3) {
+function bezier(t: number, p0: number, p1: number, p2: number, p3: number): number {
   const mt = 1 - t;
   return mt * mt * mt * p0 + 3 * mt * mt * t * p1 + 3 * mt * t * t * p2 + t * t * t * p3;
 }
 
 // Physiological tremor: ~8-12Hz oscillation, amplitude varies with fatigue
-function tremor(t, freq, amp) {
+function tremor(t: number, freq: number, amp: number): number {
   return amp * Math.sin(2 * Math.PI * freq * t) + gaussian(0, amp * 0.3);
 }
 
 // Velocity profile: ballistic phase + corrective phase (two-phase Fitts model)
 // Humans move fast toward target then make fine corrections — not smooth decel
-function velocityProfile(t, overshootProb = 0.3) {
+function velocityProfile(t: number, overshootProb = 0.3): number {
   const hasOvershoot = Math.random() < overshootProb;
   if (t < 0.05) return t / 0.05 * 0.2; // startup latency
   if (t < 0.55) return 0.2 + (t - 0.05) / 0.5; // ballistic acceleration
@@ -43,7 +46,7 @@ function velocityProfile(t, overshootProb = 0.3) {
 }
 
 // Sleep helper
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 /**
  * Adaptive readiness: resolve as soon as the page is actually settled — network
@@ -52,7 +55,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
  * fixed wait while typical pages finish in a fraction of the time. Every error
  * is swallowed: readiness is best-effort and must never abort extraction.
  */
-async function waitForSettled(page, capMs, quietMs = 500) {
+async function waitForSettled(page: Page, capMs: number, quietMs = 500) {
   const start = Date.now();
   try { await page.waitForLoadState("networkidle", { timeout: capMs }); } catch {}
   try { await page.evaluate(() => document.fonts?.ready ?? null); } catch {}
@@ -72,7 +75,7 @@ async function waitForSettled(page, capMs, quietMs = 500) {
   return Date.now() - start;
 }
 
-async function simulateHumanMouse(page) {
+async function simulateHumanMouse(page: Page) {
   const vw = 1920, vh = 1080;
 
   // Per-session behavioral fingerprint — each "user" has consistent quirks
@@ -263,62 +266,30 @@ async function simulateHumanMouse(page) {
  * @param {{ slow?: boolean, darkMode?: boolean, mobile?: boolean, wcag?: boolean, screenshotPath?: string, discoverLinks?: number|null, navigationTimeout?: number, stealth?: boolean, userAgent?: string, locale?: string, timezoneId?: string, acceptLanguage?: string, screenSize?: string }} [options]
  * @returns {Promise<BrandingResult>}
  */
-export async function extractBranding(url: string, spinner: Spinner, browser: any, options: ExtractOptions = {}): Promise<BrandingResult> {
+export async function extractBranding(url: string, spinner: Spinner, browser: Browser, options: ExtractOptions = {}): Promise<BrandingResult> {
   const timeoutMultiplier = options.slow ? 3 : 1;
   const timeouts = [];
-  const degraded = []; // post-extraction stages that failed but did not abort the run
+  const degraded: string[] = []; // post-extraction stages that failed but did not abort the run
+  const extractorErrors: ExtractorError[] = []; // scoped failures of the parallel extractors
 
   // Progress lines print only in verbose mode (the main `dembrandt <url>`
   // command). Report commands (drift/init/conformance) pass no verbose flag and
   // stay clean. Warnings are NOT routed through this — they always print.
-  const log = (...args) => { if (options.verbose) console.log(...args); };
+  const log = (...args: unknown[]) => { if (options.verbose) console.log(...args); };
 
   spinner.text = "Creating browser context...";
 
-  const locale = options.locale || "en-US";
-  const timezoneId = options.timezoneId || "America/New_York";
-  const acceptLanguage = options.acceptLanguage || `${locale},${locale.split('-')[0]};q=0.9,en;q=0.8`;
+  // locale, screenW and screenH are still needed below for the stealth init
+  // script; the rest of the context configuration is built purely in
+  // context-config.ts and unit-tested there.
+  const locale = options.locale || DEFAULT_LOCALE;
+  const { width: screenW, height: screenH } = parseScreenSize(options.screenSize);
 
-  const [screenW, screenH] = options.screenSize
-    ? options.screenSize.split('x').map(Number)
-    : [1920, 1080];
-
-  // Parse "Name=value; Name2=value2" cookie string into Playwright format
-  const parsedCookies = options.cookie
-    ? options.cookie.split(";").map((c) => c.trim()).filter(Boolean).map((c) => {
-        const eq = c.indexOf("=");
-        return {
-          name: c.slice(0, eq).trim(),
-          value: c.slice(eq + 1).trim(),
-          url,
-        };
-      })
-    : [];
-
-  const extraHeaders = { "Accept-Language": acceptLanguage };
-  if (options.header) {
-    const colon = options.header.indexOf(":");
-    if (colon > -1) {
-      extraHeaders[options.header.slice(0, colon).trim()] = options.header.slice(colon + 1).trim();
-    }
-  }
-
-  const contextOptions: any = {
-    viewport: { width: screenW, height: screenH },
-    screen: { width: screenW, height: screenH },
-    userAgent: options.userAgent || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-    locale,
-    timezoneId,
-    extraHTTPHeaders: extraHeaders,
-    colorScheme: "light",
-  };
-
-  if (browser.browserType().name() === 'chromium') {
-    contextOptions.permissions = ["clipboard-read", "clipboard-write"];
-  }
+  const contextOptions = buildContextOptions(options, browser.browserType().name());
 
   const context = await browser.newContext(contextOptions);
 
+  const parsedCookies = parseCookies(options.cookie, url);
   if (parsedCookies.length > 0) {
     await context.addCookies(parsedCookies);
   }
@@ -749,29 +720,36 @@ export async function extractBranding(url: string, spinner: Spinner, browser: an
       gradients,
       motion,
     ] = await Promise.all([
-      extractLogo(page, url).catch(() => ({ logo: null, instances: [], favicons: [], manifest: null })),
-      extractColors(page).catch(() => ({ semantic: {}, palette: [], cssVariables: [], _raw: [] })),
-      extractTypography(page).catch(() => ({ styles: [], sources: {} })),
-      extractSpacing(page).catch(() => ({ scaleType: 'unknown', commonValues: [] })),
-      extractBorderRadius(page).catch(() => ({ values: [] })),
-      extractBorders(page).catch(() => ({ combinations: [] })),
-      extractShadows(page).catch(() => []),
-      extractButtonStyles(page).catch(() => []),
-      extractInputStyles(page).catch(() => []),
-      extractLinkStyles(page).catch(() => []),
-      extractBadgeStyles(page).catch(() => ({ all: [], byVariant: {} })),
-      extractBreakpoints(page).catch(() => []),
-      detectIconSystem(page).catch(() => []),
-      detectFrameworks(page).catch(() => []),
-      extractSiteName(page).catch(() => null),
-      extractGradients(page).catch(() => []),
-      extractMotion(page).catch(() => ({ durations: [], easings: [], byContext: {} })),
+      guardExtractor('logo', extractLogo(page, url), { logo: null, instances: [], favicons: [], manifest: null }, extractorErrors),
+      guardExtractor('colors', extractColors(page), { semantic: {}, palette: [], cssVariables: [], _raw: [] }, extractorErrors),
+      guardExtractor('typography', extractTypography(page), { styles: [], sources: {} }, extractorErrors),
+      guardExtractor('spacing', extractSpacing(page), { scaleType: 'unknown', commonValues: [] }, extractorErrors),
+      guardExtractor('borderRadius', extractBorderRadius(page), { values: [] }, extractorErrors),
+      guardExtractor('borders', extractBorders(page), { combinations: [] }, extractorErrors),
+      guardExtractor('shadows', extractShadows(page), [], extractorErrors),
+      guardExtractor('buttons', extractButtonStyles(page), [], extractorErrors),
+      guardExtractor('inputs', extractInputStyles(page), [], extractorErrors),
+      guardExtractor('links', extractLinkStyles(page), [], extractorErrors),
+      guardExtractor('badges', extractBadgeStyles(page), { all: [], byVariant: {} }, extractorErrors),
+      guardExtractor('breakpoints', extractBreakpoints(page), [], extractorErrors),
+      guardExtractor('iconSystem', detectIconSystem(page), [], extractorErrors),
+      guardExtractor('frameworks', detectFrameworks(page), [], extractorErrors),
+      guardExtractor('siteName', extractSiteName(page), null, extractorErrors),
+      guardExtractor('gradients', extractGradients(page), [], extractorErrors),
+      guardExtractor('motion', extractMotion(page), { durations: [], easings: [], byContext: {} }, extractorErrors),
     ]);
 
     const { logo, instances: logoInstances, favicons, manifest } = logoResult;
     let siteName = siteNameRaw;
 
     spinner.stop();
+
+    // Per-extractor failures are fault-isolated above and surface in meta.errors
+    // during result assembly. Print them once now, after the spinner stops, so a
+    // broken extractor is visible during a verbose run without clobbering it.
+    for (const e of extractorErrors) {
+      log(color.warning(`  ! ${e.stage}: extraction failed (continuing) — ${e.reason}`));
+    }
 
     // Inject manifest theme_color / background_color as high-confidence palette entries
     try {
@@ -944,7 +922,8 @@ export async function extractBranding(url: string, spinner: Spinner, browser: an
 
         if (['input', 'textarea', 'select', 'button', 'a'].includes(beforeState.tag)) {
           try {
-            await element.focus({ timeout: 500 * timeoutMultiplier });
+            // ElementHandle.focus() takes no options; the focus is synchronous.
+            await element.focus();
             await page.waitForTimeout(100 * timeoutMultiplier);
             const afterFocus = await element.evaluate(el => {
               function findBg(node) {
@@ -1125,14 +1104,14 @@ export async function extractBranding(url: string, spinner: Spinner, browser: an
       console.log(color.info(`💡 Tip: Try running with ${chalk.bold('--slow')} flag for more reliable results on slow-loading sites`));
     }
 
-    let wcag = [];
+    let wcag: WcagPair[] = [];
     if (options.wcag) {
       spinner.start("Analyzing WCAG contrast pairs...");
       try {
         const { relativeLuminance } = await import('../colors.js');
 
-        function calcPair(fgRaw, bgRaw, extra = {}) {
-          const toHex = (c) => {
+        function calcPair(fgRaw: string, bgRaw: string, extra: Partial<WcagPair> = {}): WcagPair | null {
+          const toHex = (c: string) => {
             const m = c && c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
             if (!m) return null;
             return `#${parseInt(m[1]).toString(16).padStart(2,'0')}${parseInt(m[2]).toString(16).padStart(2,'0')}${parseInt(m[3]).toString(16).padStart(2,'0')}`;
@@ -1272,6 +1251,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: an
     }
 
     if (degraded.length) result.meta.degraded = degraded;
+    if (extractorErrors.length) result.meta.errors = extractorErrors;
 
     return result;
   } catch (error) {

@@ -113,3 +113,23 @@ test('mergeResults records per-page provenance in the pages array', () => {
     ['https://a.test', 'https://a.test/pricing'],
   );
 });
+
+test('mergeResults unions variable-font axes by axis, widening the range', () => {
+  const home = page('https://a.test', {
+    typography: { styles: [], sources: { variableAxes: [{ axis: 'wght', min: 400, max: 600, count: 2 }] } },
+  });
+  const second = page('https://a.test/pricing', {
+    typography: { styles: [], sources: { variableAxes: [
+      { axis: 'wght', min: 300, max: 700, count: 1 },
+      { axis: 'slnt', min: -4, max: 0, count: 1 },
+    ] } },
+  });
+
+  const merged = mergeResults([home, second]);
+  const axes = merged.typography.sources.variableAxes;
+  const wght = axes.find((a) => a.axis === 'wght');
+  assert.equal(wght.min, 300);
+  assert.equal(wght.max, 700);
+  assert.equal(wght.count, 3);
+  assert.ok(axes.find((a) => a.axis === 'slnt'));
+});

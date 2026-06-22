@@ -43,6 +43,14 @@ export interface TypographyStyle {
   isFluid?: boolean;
 }
 
+/** A variable-font axis (e.g. "wght") with the value range seen across the page. */
+export interface VariableFontAxis {
+  axis: string;
+  min: number;
+  max: number;
+  count: number;
+}
+
 export interface Typography {
   styles: TypographyStyle[];
   sources: {
@@ -52,6 +60,10 @@ export interface Typography {
     customFonts?: string[];
     selfHostedFonts?: string[];
     fontDisplay?: string;
+    /** Variable-font axes actually exercised via font-variation-settings. */
+    variableAxes?: VariableFontAxis[];
+    /** OpenType features actively enabled via font-feature-settings (e.g. ss01, calt). */
+    openTypeFeatures?: string[];
   };
 }
 
@@ -206,6 +218,64 @@ export interface Favicon {
   sizes: string | null;
 }
 
+/** PWA web app manifest fields consumed during extraction (theme/name seeding). */
+export interface WebManifest {
+  name?: string;
+  shortName?: string;
+  themeColor?: string;
+  backgroundColor?: string;
+}
+
+/** A same-origin link found during crawl discovery, scored by DOM location. */
+export interface DiscoveredLink {
+  href: string;
+  pathname: string;
+  locationScore: number;
+}
+
+export interface MotionDuration {
+  value: string;
+  ms: number;
+  count?: number;
+}
+
+export interface MotionEasing {
+  value: string;
+  count: number;
+  type?: string;
+}
+
+export interface MotionAnimation {
+  name?: string;
+  value?: string;
+  count?: number;
+  contexts?: string[];
+}
+
+/** Per-semantic-context motion profile (nav, button, hero, ...). */
+export interface MotionContext {
+  count: number;
+  durations: string[];
+  easingType?: string;
+  props: string[];
+}
+
+/** Observed style change between rest and an interactive state. */
+export interface MotionDelta {
+  tag: string;
+  text: string;
+  pattern: string;
+  delta: unknown;
+}
+
+export interface Motion {
+  durations: MotionDuration[];
+  easings: MotionEasing[];
+  animations: MotionAnimation[];
+  contexts?: Record<string, MotionContext>;
+  interactiveDeltas?: MotionDelta[];
+}
+
 export interface WcagPair {
   fg: string;
   bg: string;
@@ -236,6 +306,20 @@ export interface ExtractionMeta {
    * it in the UI instead.
    */
   degraded?: string[];
+  /**
+   * Scoped failures of individual extractors. Each parallel extractor is fault
+   * isolated: when one throws it records { stage, reason } here and falls back to
+   * an empty value, so a single broken extractor never aborts the whole run.
+   */
+  errors?: ExtractorError[];
+}
+
+/** A single fault-isolated extractor failure. */
+export interface ExtractorError {
+  /** Extractor name, e.g. 'colors', 'typography'. */
+  stage: string;
+  /** Failure message (err.message, or the stringified throw value). */
+  reason: string;
 }
 
 export interface BrandingResult {
@@ -245,9 +329,9 @@ export interface BrandingResult {
   meta?: ExtractionMeta;
   siteName?: string | null;
   logo?: Logo | null;
-  logoInstances?: any[];
+  logoInstances?: Logo[];
   favicons?: Favicon[];
-  manifest?: any;
+  manifest?: WebManifest;
   colors: Colors;
   typography: Typography;
   spacing: Spacing;
@@ -255,7 +339,7 @@ export interface BrandingResult {
   borders: Borders;
   shadows: Shadow[];
   gradients?: Gradient[];
-  motion?: any;
+  motion?: Motion;
   components: Components;
   breakpoints: Breakpoint[];
   iconSystem: IconSystem[];
@@ -270,9 +354,9 @@ export interface BrandingResult {
   note?: string;
   isCanvasOnly?: boolean;
   /** Internal/transient fields used during crawl + merge. Never persist; see stripTransient(). */
-  _discoveredLinks?: any[];
-  _extractedUrls?: any[];
-  _pageResults?: any[];
+  _discoveredLinks?: DiscoveredLink[];
+  _extractedUrls?: string[];
+  _pageResults?: BrandingResult[];
 }
 
 /**

@@ -96,11 +96,13 @@ function mergeTypography(results) {
     });
   });
 
-  // Merge sources
+  // Merge sources. variableAxes is an array of objects, so the generic Set
+  // union below would not dedupe it by axis — handle it explicitly afterwards.
   const sources = { ...(base.sources || {}) };
   results.slice(1).forEach(r => {
     const s = r.typography?.sources || {};
     for (const [k, v] of Object.entries(s)) {
+      if (k === 'variableAxes') continue; // merged separately, by axis
       if (Array.isArray(v)) {
         sources[k] = [...new Set([...(sources[k] || []), ...v])];
       } else if (v && !sources[k]) {
@@ -108,6 +110,24 @@ function mergeTypography(results) {
       }
     }
   });
+
+  // Variable-font axes: union by axis across all pages, widening each range.
+  const axisMap = new Map();
+  results.forEach(r => {
+    (r.typography?.sources?.variableAxes || []).forEach(a => {
+      const existing = axisMap.get(a.axis);
+      if (!existing) {
+        axisMap.set(a.axis, { ...a });
+      } else {
+        existing.min = Math.min(existing.min, a.min);
+        existing.max = Math.max(existing.max, a.max);
+        existing.count += a.count;
+      }
+    });
+  });
+  if (axisMap.size > 0) {
+    sources.variableAxes = [...axisMap.values()].sort((a, b) => b.count - a.count);
+  }
 
   const styles = [...styleMap.values()].sort((a, b) => parseFloat(b.size) - parseFloat(a.size));
   return { ...base, styles, sources };
