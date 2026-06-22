@@ -82,12 +82,16 @@ program
   .option("--locale <string>", "Browser locale for fingerprint, e.g. en-GB, fi-FI; affects content only if the site reacts to Accept-Language (default: en-US)")
   .option("--timezone <string>", "Browser timezone for fingerprint, e.g. Europe/Helsinki; affects content only if the site reacts to timezone (default: America/New_York)")
   .option("--accept-language <string>", "Custom Accept-Language header value")
+  .option("--key <string>", "Dembrandt API key for syncing extractions to your account (falls back to DEMBRANDT_KEY env var)")
   .option("--screen-size <WxH>", "Physical screen resolution to report, e.g. 1920x1080 (default: 1920x1080)")
   .action(async (input, paths, opts) => {
     let url = input;
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
       url = "https://" + url;
     }
+
+    // Resolve API key: --key flag takes precedence over env var
+    const apiKey: string | undefined = opts.key ?? process.env.DEMBRANDT_KEY;
 
     if (opts.approve && !opts.compare) {
       console.error(color.warning("! --approve has no effect without --compare <file>."));
@@ -487,6 +491,35 @@ program
           );
         } catch (err) {
           console.log(color.warning(`! Could not write HTML report: ${err.message}`));
+        }
+      }
+
+      // Sync to cloud if --key / DEMBRANDT_KEY is set
+      if (apiKey) {
+        try {
+          const payload = JSON.stringify(result);
+          const byteSize = Buffer.byteLength(payload, "utf8");
+          const MAX_BYTES = 150_000;
+          if (byteSize > MAX_BYTES) {
+            console.error(color.warning(`! Extraction too large to sync (${byteSize} bytes > ${MAX_BYTES}). Skipping cloud upload.`));
+          } else {
+            const syncRes = await fetch("https://dembrandt.com/api/extractions", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: payload,
+            });
+            if (syncRes.ok) {
+              savedNotices.push(chalk.dim(`☁  Synced to your account (--key)`));
+            } else {
+              const err = await syncRes.json().catch(() => ({ error: syncRes.statusText }));
+              console.error(color.warning(`! Cloud sync failed: ${err.error ?? syncRes.statusText}`));
+            }
+          }
+        } catch (syncErr) {
+          console.error(color.warning(`! Cloud sync error: ${syncErr.message}`));
         }
       }
 
