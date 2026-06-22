@@ -1,3 +1,5 @@
+import { DOM_COLOR_SNAPSHOT_SCRIPT, extractPlatformColors, resolvePlatformColors } from './platform-colors.js';
+
 export async function extractSiteName(page) {
   return await page.evaluate(() => {
     const ogSiteName = document.querySelector('meta[property="og:site_name"]') as any;
@@ -73,6 +75,17 @@ export async function extractLogo(page, url) {
       }
     } catch {}
   }
+
+  // Platform-specific color hints (meta/link tags) — fills gaps not covered by manifest
+  const domSnap = await page.evaluate(new Function(`return ${DOM_COLOR_SNAPSHOT_SCRIPT}`) as () => any);
+  const platformHints = extractPlatformColors(domSnap);
+  const resolved = resolvePlatformColors(platformHints, {
+    themeColor: manifestMeta.themeColor,
+    backgroundColor: manifestMeta.backgroundColor,
+  });
+  if (resolved.themeColor) manifestMeta.themeColor = resolved.themeColor;
+  if (resolved.darkThemeColor) manifestMeta.darkThemeColor = resolved.darkThemeColor;
+  if (resolved.backgroundColor) manifestMeta.backgroundColor = resolved.backgroundColor;
 
   const result = await page.evaluate((baseUrl) => {
     const siteDomain = new URL(baseUrl).hostname.replace('www.', '').split('.')[0].toLowerCase();
