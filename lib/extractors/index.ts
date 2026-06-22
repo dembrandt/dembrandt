@@ -354,6 +354,33 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       delete (window as any).cdc_adoQpoasnfa76pfcZLmcfl_Array;
       delete (window as any).cdc_adoQpoasnfa76pfcZLmcfl_Promise;
       delete (window as any).cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
+
+      // WebGL: headless reports SwiftShader — spoof a plausible GPU string
+      const getParam = WebGLRenderingContext.prototype.getParameter;
+      WebGLRenderingContext.prototype.getParameter = function(param: number) {
+        if (param === 37445) return 'Intel Inc.';           // UNMASKED_VENDOR_WEBGL
+        if (param === 37446) return 'Intel Iris OpenGL Engine'; // UNMASKED_RENDERER_WEBGL
+        return getParam.call(this, param);
+      };
+      const getParam2 = WebGL2RenderingContext.prototype.getParameter;
+      WebGL2RenderingContext.prototype.getParameter = function(param: number) {
+        if (param === 37445) return 'Intel Inc.';
+        if (param === 37446) return 'Intel Iris OpenGL Engine';
+        return getParam2.call(this, param);
+      };
+
+      // Audio fingerprint: OfflineAudioContext hash differs in headless — add tiny noise
+      const origCreateOscillator = OfflineAudioContext.prototype.createOscillator ?? null;
+      if (origCreateOscillator) {
+        const origGetChannelData = AudioBuffer.prototype.getChannelData;
+        AudioBuffer.prototype.getChannelData = function(channel: number) {
+          const data = origGetChannelData.call(this, channel);
+          for (let i = 0; i < Math.min(data.length, 20); i++) {
+            data[i] += Math.random() * 1e-7;
+          }
+          return data;
+        };
+      }
     }, { loc: stealthLocale, sw: screenW, sh: screenH });
   }
 
