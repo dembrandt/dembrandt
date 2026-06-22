@@ -208,6 +208,7 @@ export interface Logo {
   ariaLabel?: string | null;
   markup?: string | null;
   dataUri?: string | null;
+  svgColors?: string[];
   safeZone?: { top: number; right: number; bottom: number; left: number };
   background?: string | null;
 }

@@ -813,6 +813,27 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       log(color.success(`  ✓ Manifest: ${parts.join(', ')}`));
     }
     } catch (e) { degraded.push('manifest'); console.log(color.warning('  ! Manifest injection: failed (continuing)')); }
+
+    // Inject SVG logo fill/stroke colors as high-confidence palette entries
+    try {
+      if (logoResult.logoColors?.length > 0) {
+        const { convertColor } = await import('../colors.js');
+        for (const hex of logoResult.logoColors) {
+          const existing = colors.palette.find(c => c.normalized === hex);
+          if (existing) {
+            existing.confidence = 'high';
+            if (!existing.sources.includes('logo')) existing.sources.unshift('logo');
+          } else {
+            const converted = convertColor(hex);
+            const entry: any = { color: hex, normalized: hex, count: 10, confidence: 'high', sources: ['logo'] };
+            if (converted) { entry.lch = converted.lch; entry.oklch = converted.oklch; }
+            colors.palette.push(entry);
+          }
+        }
+        log(color.success(`  ✓ SVG logo colors: ${logoResult.logoColors.length} injected`));
+      }
+    } catch (e) { degraded.push('svg-logo-colors'); console.log(color.warning('  ! SVG logo color injection: failed (continuing)')); }
+
     console.log(colors.palette.length > 0 ? color.success(`  ✓ Colors: ${colors.palette.length} found`) : color.warning(`  ! Colors: 0 found`));
     console.log(typography.styles.length > 0 ? color.success(`  ✓ Typography: ${typography.styles.length} styles`) : color.warning(`  ! Typography: 0 styles`));
     console.log(spacing.commonValues.length > 0 ? color.success(`  ✓ Spacing: ${spacing.commonValues.length} values`) : color.warning(`  ! Spacing: 0 values`));

@@ -295,6 +295,20 @@ export async function extractLogo(page, url) {
           }
         } catch {}
 
+        // Collect fill/stroke attribute colors from all child elements
+        const svgColors: string[] = [];
+        el.querySelectorAll('*').forEach(child => {
+          (['fill', 'stroke'] as const).forEach(attr => {
+            const val = child.getAttribute(attr);
+            if (val && val !== 'none' && val !== 'currentColor' && val !== 'inherit') {
+              const hex = toHex(val);
+              if (hex && /^#[0-9a-f]{6}$/i.test(hex)) svgColors.push(hex);
+            }
+          });
+        });
+        // Deduplicate
+        const uniqueSvgColors = [...new Set(svgColors)];
+
         return {
           source: 'svg',
           context,
@@ -305,6 +319,7 @@ export async function extractLogo(page, url) {
           ariaLabel,
           markup,
           dataUri,
+          svgColors: uniqueSvgColors,
           width: el.width?.baseVal?.value || rect.width,
           height: el.height?.baseVal?.value || rect.height,
           type: logoType,
@@ -608,6 +623,75 @@ export async function extractLogo(page, url) {
   // Merge PWA icons into favicons
   result.favicons = [...result.favicons, ...pwaIcons];
   result.manifest = Object.keys(manifestMeta).length > 0 ? manifestMeta : null;
+
+  // Collect logo colors: inline SVG fill/stroke (already extracted above) + fetched img SVG
+  const inlineSvgColors: string[] = [
+    ...(result.logo?.svgColors ?? []),
+    ...result.instances.flatMap(i => i?.svgColors ?? []),
+  ];
+
+  // For <img src="*.svg"> logos, fetch the SVG and parse fill/stroke attributes
+  const svgImgColors: string[] = [];
+  const svgSrcUrls = new Set<string>();
+  for (const inst of [result.logo, ...result.instances]) {
+    if (inst?.source === 'img' && /\.svg(\?|$)/i.test(inst?.url ?? '')) {
+      svgSrcUrls.add(inst.url);
+    }
+  }
+  if (svgSrcUrls.size > 0) {
+    try {
+      const fetched = await page.evaluate(async (urls: string[]) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 1;
+        const ctx = canvas.getContext('2d');
+
+        function toHex(val: string): string | null {
+          if (!val) return null;
+          if (/^#[0-9a-f]{6}$/i.test(val)) return val.toLowerCase();
+          if (/^#[0-9a-f]{3}$/i.test(val)) return `#${val[1]}${val[1]}${val[2]}${val[2]}${val[3]}${val[3]}`.toLowerCase();
+          if (/^#[0-9a-f]{8}$/i.test(val)) return val.toLowerCase().slice(0, 7);
+          const m = val.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+          if (m) return `#${parseInt(m[1]).toString(16).padStart(2,'0')}${parseInt(m[2]).toString(16).padStart(2,'0')}${parseInt(m[3]).toString(16).padStart(2,'0')}`;
+          if (ctx) {
+            try {
+              ctx.clearRect(0, 0, 1, 1);
+              ctx.fillStyle = 'rgba(0,0,0,0)';
+              ctx.fillStyle = val;
+              ctx.fillRect(0, 0, 1, 1);
+              const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+              if (a > 0) return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+            } catch {}
+          }
+          return null;
+        }
+
+        const colors: string[] = [];
+        for (const u of urls) {
+          try {
+            const resp = await fetch(u, { credentials: 'omit' });
+            if (!resp.ok) continue;
+            const text = await resp.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, 'image/svg+xml');
+            doc.querySelectorAll('*').forEach(el => {
+              (['fill', 'stroke'] as const).forEach(attr => {
+                const val = el.getAttribute(attr);
+                if (val && val !== 'none' && val !== 'currentColor' && val !== 'inherit') {
+                  const hex = toHex(val);
+                  if (hex) colors.push(hex);
+                }
+              });
+            });
+          } catch {}
+        }
+        return [...new Set(colors)].filter(c => /^#[0-9a-f]{6}$/i.test(c));
+      }, [...svgSrcUrls]);
+      svgImgColors.push(...fetched);
+    } catch {}
+  }
+
+  const allLogoColors = [...new Set([...inlineSvgColors, ...svgImgColors])].filter(c => /^#[0-9a-f]{6}$/i.test(c));
+  result.logoColors = allLogoColors;
 
   return result;
 }
