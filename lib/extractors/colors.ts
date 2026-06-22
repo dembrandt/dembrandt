@@ -51,6 +51,14 @@ export async function extractColors(page) {
       return m ? parseFloat(m[1]) : 1;
     }
 
+    function colorLightness(color) {
+      if (!color) return 0;
+      const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (!m) return 0;
+      const r = parseInt(m[1]) / 255, g = parseInt(m[2]) / 255, b = parseInt(m[3]) / 255;
+      return (Math.max(r, g, b) + Math.min(r, g, b)) / 2;
+    }
+
     function isValidColorValue(value) {
       if (!value) return false;
       if (value.includes("calc(") || value.includes("clamp(") || value.includes("var(")) {
@@ -223,9 +231,12 @@ export async function extractColors(page) {
 
       if (context.includes("primary") || el.matches('[class*="primary"]')) {
         const candidate = bgColor !== "rgba(0, 0, 0, 0)" && bgColor !== "transparent" ? bgColor : textColor;
-        if (colorAlpha(candidate) >= 0.7) semanticColors.primary = candidate;
+        if (colorAlpha(candidate) >= 0.7 && colorLightness(candidate) <= 0.95) semanticColors.primary = candidate;
       }
-      if (context.includes("secondary")) semanticColors.secondary = bgColor;
+      if (context.includes("secondary")) {
+        const a = colorAlpha(bgColor);
+        if (a >= 0.1) semanticColors.secondary = bgColor;
+      }
     });
 
     // Use most-common CTA background as primary if class-based detection missed it
