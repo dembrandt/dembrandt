@@ -77,7 +77,7 @@ export async function extractLogo(page, url) {
   }
 
   // Platform-specific color hints (meta/link tags) — fills gaps not covered by manifest
-  const domSnap = await page.evaluate(new Function(`return ${DOM_COLOR_SNAPSHOT_SCRIPT}`) as () => any);
+  const domSnap = await page.evaluate(DOM_COLOR_SNAPSHOT_SCRIPT);
   const platformHints = extractPlatformColors(domSnap);
   const resolved = resolvePlatformColors(platformHints, {
     themeColor: manifestMeta.themeColor,
