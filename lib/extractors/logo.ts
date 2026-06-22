@@ -634,7 +634,7 @@ export async function extractLogo(page, url) {
   const svgImgColors: string[] = [];
   const svgSrcUrls = new Set<string>();
   for (const inst of [result.logo, ...result.instances]) {
-    if (inst?.source === 'img' && /\.svg(\?|$)/i.test(inst?.url ?? '')) {
+    if (inst && inst.source === 'img' && inst.url && /\.svg(\?|$)/i.test(inst.url)) {
       svgSrcUrls.add(inst.url);
     }
   }
