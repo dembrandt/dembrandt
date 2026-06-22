@@ -1,0 +1,38 @@
+{
+  "task": "brand_color",
+  "featureVersion": 1,
+  "featureNames": [
+    "usage_frac",
+    "log_count",
+    "confidence",
+    "lightness",
+    "chroma",
+    "hue_sin",
+    "hue_cos",
+    "is_grayish",
+    "is_near_black",
+    "is_near_white",
+    "n_sources",
+    "src_button",
+    "src_link",
+    "src_nav",
+    "src_logo",
+    "src_hero",
+    "src_cta",
+    "src_brand",
+    "src_header",
+    "src_primary",
+    "src_text",
+    "src_bg",
+    "is_root_token",
+    "is_brand_token",
+    "rank"
+  ],
+  "trainedAt": "2026-06-22T17:13:59.596569+00:00",
+  "nSites": 60,
+  "nCandidates": 410,
+  "metrics": {
+    "leave_one_site_out_top1": 0.6833,
+    "sites_evaluated": 60
+  }
+}

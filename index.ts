@@ -66,6 +66,7 @@ program
   .option("--screenshot <path>", "Save a viewport screenshot of the page (not full-page)")
   // Internal, undocumented flag. Hidden from --help; not part of the product surface.
   .addOption(new Option("--teach").hideHelp())
+  .option("--ai", "Use ML model to predict brand primary color (experimental)")
   .option("--wcag", "Analyze WCAG contrast ratios between palette colors")
   .option("--crawl [n]", "Auto-discover and extract up to N pages via DOM links (default: 5); combine with --sitemap to use sitemap discovery instead", (v: any) => {
     if (v === undefined || v === true) return 5;
@@ -279,6 +280,26 @@ program
       }
 
       console.log();
+
+      // ML primary prediction (--ai flag, experimental)
+      if (opts.ai && result.colors?.palette?.length) {
+        try {
+          const { predictPrimary, modelMeta } = await import('./lib/ml/runtime.js');
+          const meta = modelMeta();
+          const prediction = await predictPrimary(result as any);
+          if (prediction) {
+            result.colors.semantic = result.colors.semantic ?? {};
+            result.colors.semantic.primary = prediction.hex;
+            if (!opts.jsonOnly) {
+              const acc = meta?.metrics?.leave_one_site_out_top1;
+              const accStr = acc != null ? ` · ${(acc * 100).toFixed(0)}% acc` : '';
+              console.error(chalk.dim(`  ⚡ ML primary → ${prediction.hex} (score ${prediction.score.toFixed(2)}${accStr})`));
+            }
+          }
+        } catch (e: any) {
+          if (!opts.jsonOnly) console.error(chalk.dim(`  ⚡ ML skipped: ${e.message}`));
+        }
+      }
 
       // Strip raw colors unless --raw-colors flag is set
       if (!opts.rawColors && result.colors && result.colors.rawColors) {

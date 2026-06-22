@@ -1,6 +1,6 @@
 {
   "name": "dembrandt",
-  "version": "0.19.8",
+  "version": "0.19.9",
   "description": "Extract design tokens and publicly visible CSS information from any website",
   "mcpName": "io.github.dembrandt/dembrandt",
   "main": "dist/index.js",
@@ -43,7 +43,7 @@
     "gold:tune": "node tools/gold-tune.mjs",
     "gold:cluster": "node tools/gold-cluster.mjs",
     "gold:analyze": "node tools/gold-analyze.mjs",
-    "build": "tsc && cp package.json dist/package.json",
+    "build": "tsc && cp package.json dist/package.json && mkdir -p dist/lib/ml && cp lib/ml/model.onnx lib/ml/meta.json dist/lib/ml/",
     "lint": "eslint ."
   },
   "keywords": [
@@ -69,6 +69,9 @@
     "commander": "^11.1.0",
     "ora": "^7.0.1",
     "playwright-core": "^1.60.0"
+  },
+  "optionalDependencies": {
+    "onnxruntime-node": "1.27.0"
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",

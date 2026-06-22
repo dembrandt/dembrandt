@@ -211,6 +211,15 @@ Returns:
 
 Motion data is included in JSON output as `motion` and printed in terminal under a dedicated Motion section.
 
+### ML-powered brand color detection (experimental)
+
+```bash
+dembrandt example.com --ai
+#   ⚡ ML primary → #533afd (score 0.93 · 68% acc)
+```
+
+Replaces the heuristic with a trained model — 2× more accurate (68% vs 32%). Requires the optional `onnxruntime-node` dep (`npm install onnxruntime-node`). Without the flag nothing changes.
+
 ### Brand Guide PDF
 
 Use `--brand-guide` to generate a printable PDF summarizing the extracted design system: colors, typography, components, and logo on a single document.
