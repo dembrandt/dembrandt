@@ -6,6 +6,8 @@ import {
   statusContextRegex,
   saturationFromHex,
   classifyStructural,
+  ancestorLiftScore,
+  ANCESTOR_LIFT_MAX,
 } from '../lib/extractors/color-heuristics.js';
 
 // These guard the recall-vs-precision tuning for card / section / input / badge
@@ -17,10 +19,26 @@ test('CONTEXT_SCORES keeps brand tiers above content surfaces', () => {
   assert.equal(CONTEXT_SCORES.logo, 5);
   assert.equal(CONTEXT_SCORES.brand, 5);
   // content surfaces added, but below the brand/cta tiers
-  for (const k of ['card', 'section', 'feature', 'panel', 'input', 'badge', 'chip']) {
+  for (const k of ['card', 'section', 'feature', 'panel', 'input', 'badge', 'chip', 'footer']) {
     assert.equal(CONTEXT_SCORES[k], 2, `${k} should be weight 2`);
     assert.ok(CONTEXT_SCORES[k] < CONTEXT_SCORES.cta);
   }
+});
+
+test('ancestorLiftScore lifts content-surface context but never brand tiers', () => {
+  // a colour buried in a card/section wrapper -> lifted to the cap
+  assert.equal(ancestorLiftScore(['outer', 'benefit-card', 'row']), ANCESTOR_LIFT_MAX);
+  assert.equal(ancestorLiftScore(['site-footer']), 2);
+  assert.equal(ancestorLiftScore(['nav-wrapper']), 1);
+  // brand-tier keywords on an ancestor must NOT lift (they belong on the element)
+  assert.equal(ancestorLiftScore(['hero-banner']), 0);
+  assert.equal(ancestorLiftScore(['logo-row']), 0);
+  assert.equal(ancestorLiftScore(['cta-block']), 0);
+  // no context, empty, and malformed input are all 0 and never throw
+  assert.equal(ancestorLiftScore(['container flex relative']), 0);
+  assert.equal(ancestorLiftScore([]), 0);
+  assert.equal(ancestorLiftScore(null as unknown as string[]), 0);
+  assert.equal(ancestorLiftScore([undefined as unknown as string, '']), 0);
 });
 
 test('badge is no longer a status context; real status words still match', () => {

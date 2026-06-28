@@ -14,6 +14,19 @@ export const MENU_TRIGGER_SELECTOR =
   '[class*="has-submenu"] > button, nav button';
 
 /**
+ * "Next" controls of common carousel/slider libraries. Clicking these advances
+ * the carousel so lazily-rendered or off-screen slides mount and their colours
+ * become visible to a re-scan. Labelled brand colours were observed inside
+ * `swiper-slide` elements, so carousel internals carry real brand identity.
+ * Covers Swiper, Slick, Bootstrap, Splide, Glide, Flickity and ARIA carousels.
+ */
+export const CAROUSEL_NEXT_SELECTOR =
+  '.swiper-button-next, .slick-next, .carousel-control-next, .splide__arrow--next, ' +
+  '.flickity-button.next, [data-glide-dir=">"], ' +
+  '[aria-roledescription="carousel"] button[aria-label*="next" i], ' +
+  'button[class*="carousel"][class*="next"], button[class*="slider"][class*="next"]';
+
+/**
  * True when clicking the element is safe — it will not navigate away and
  * destroy the page execution context. Anchors with a real href navigate; a
  * missing href, "#", or an in-page fragment ("#section") does not.

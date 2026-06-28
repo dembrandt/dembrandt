@@ -167,8 +167,11 @@ export async function extractColors(page) {
     const contextScores = {
       logo: 5, brand: 5, primary: 4, cta: 4, hero: 3, button: 3,
       card: 2, section: 2, feature: 2, panel: 2, input: 2, badge: 2, chip: 2,
-      link: 2, header: 2, nav: 1,
+      footer: 2, link: 2, header: 2, nav: 1,
     };
+    // Mirror of ANCESTOR_LIFT_MAX (color-heuristics.ts): only keywords at or
+    // below this weight may lift a colour via an ANCESTOR's context.
+    const ancestorLiftMax = 2;
 
     // Colours that appear only via status/feedback or warm-utility classes are
     // not brand identity unless declared as a token or used as a CTA background.
@@ -208,6 +211,28 @@ export async function extractColors(page) {
       // <a> link colour the heuristic would otherwise drop).
       if (el.tagName === 'A') score = Math.max(score, contextScores.link);
       if (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button') score = Math.max(score, contextScores.button);
+
+      // Deep-nested brand colours: lift via ANCESTOR context (card/section/
+      // footer/nav/...) at a capped weight when the element's own context is
+      // silent. Median labelled brand-colour xpath depth is ~10, so own-class
+      // scoring alone misses content buried inside a labelled wrapper. Mirror of
+      // ancestorLiftScore (color-heuristics.ts): bounded to 4 hops, only weights
+      // <= ancestorLiftMax, and only when own score is still baseline — so cost
+      // stays low and already-branded elements are never altered.
+      if (score <= ancestorLiftMax) {
+        let lift = 0;
+        let node = el.parentElement;
+        for (let hop = 0; hop < 4 && node && lift < ancestorLiftMax; hop++) {
+          const actx = (String(node.className || "") + " " + (node.id || "")).toLowerCase();
+          for (const [keyword, weight] of Object.entries(contextScores)) {
+            if (weight > ancestorLiftMax) continue;
+            if (actx.includes(keyword)) lift = Math.max(lift, Math.min(weight, ancestorLiftMax));
+          }
+          node = node.parentElement;
+        }
+        if (lift > score) score = lift;
+      }
+
       const isStatus = statusContext.test(context);
 
       const isCta = (context.includes('button') || context.includes('btn') || context.includes('cta')) &&

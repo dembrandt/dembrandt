@@ -19,8 +19,43 @@
 export const CONTEXT_SCORES: Record<string, number> = {
   logo: 5, brand: 5, primary: 4, cta: 4, hero: 3, button: 3,
   card: 2, section: 2, feature: 2, panel: 2, input: 2, badge: 2, chip: 2,
-  link: 2, header: 2, nav: 1,
+  footer: 2, link: 2, header: 2, nav: 1,
 };
+
+/** Keywords whose weight is at most this are eligible to lift a colour via an
+ *  ANCESTOR's context (card/section/footer/etc). Brand-tier keywords (logo,
+ *  brand, primary, cta, hero, button) are excluded: those must sit on the
+ *  coloured element itself, not be inherited from a wrapper. */
+export const ANCESTOR_LIFT_MAX = 2;
+
+/**
+ * Brand colours often sit on deeply-nested elements (median labelled xpath depth
+ * ~10) whose own className carries no context, while an ancestor is the card /
+ * section / footer wrapper. This folds that ancestor context in at a capped
+ * weight so the colour clears the structural-noise threshold without ever
+ * reaching the brand tier.
+ *
+ * @param {string[]} ancestorContexts className+id strings of ancestor elements
+ * @param {number} [maxLift]
+ * @returns {number} 0..maxLift
+ */
+export function ancestorLiftScore(ancestorContexts: string[], maxLift: number = ANCESTOR_LIFT_MAX): number {
+  if (!Array.isArray(ancestorContexts)) return 0;
+  let best = 0;
+  for (const raw of ancestorContexts) {
+    if (typeof raw !== 'string' || !raw) continue;
+    const ctx = raw.toLowerCase();
+    for (const kw in CONTEXT_SCORES) {
+      const w = CONTEXT_SCORES[kw];
+      if (w > maxLift) continue; // brand-tier keywords don't lift via ancestors
+      if (ctx.includes(kw)) {
+        const lift = Math.min(w, maxLift);
+        if (lift > best) best = lift;
+      }
+    }
+  }
+  return best;
+}
 
 /**
  * Status / feedback context. Colours that appear ONLY via these contexts are

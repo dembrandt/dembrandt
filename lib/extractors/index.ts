@@ -3,7 +3,7 @@ import { color } from '../formatters/theme.js';
 import { discoverLinks } from '../discovery.js';
 import { extractLogo, extractSiteName } from './logo.js';
 import { extractColors } from './colors.js';
-import { MENU_TRIGGER_SELECTOR } from './menu-triggers.js';
+import { MENU_TRIGGER_SELECTOR, CAROUSEL_NEXT_SELECTOR } from './menu-triggers.js';
 import { extractTypography } from './typography.js';
 import { extractSpacing, extractBorderRadius, extractBorders, extractShadows } from './spacing.js';
 import { extractButtonStyles, extractInputStyles, extractLinkStyles, extractBadgeStyles } from './components.js';
@@ -1273,7 +1273,33 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         return count;
       }, MENU_TRIGGER_SELECTOR).catch(() => 0);
 
-      // Let panels render / animate in before scanning.
+      // Advance carousels so lazily-rendered / off-screen slides mount, then the
+      // single re-scan below captures their colours. Node-side loop with a short
+      // wait per round handles transition locks (Swiper ignores clicks mid-slide)
+      // and lazy rendering. Fully guarded: never throws, stops as soon as a round
+      // advances nothing.
+      let carouselAdvances = 0;
+      try {
+        for (let round = 0; round < 3; round++) {
+          const advanced = await page.evaluate((sel) => {
+            let n = 0;
+            try {
+              const ctrls = Array.from(document.querySelectorAll(sel)).slice(0, 12);
+              for (const c of ctrls) {
+                const el = c as HTMLElement;
+                const r = el.getBoundingClientRect();
+                if (r.width > 0 && r.height > 0 && typeof el.click === "function") { el.click(); n++; }
+              }
+            } catch { return 0; }
+            return n;
+          }, CAROUSEL_NEXT_SELECTOR).catch(() => 0);
+          carouselAdvances += advanced;
+          if (!advanced) break;
+          await page.waitForTimeout(250 * timeoutMultiplier);
+        }
+      } catch {}
+
+      // Let panels / slides render / animate in before scanning.
       await page.waitForTimeout(400 * timeoutMultiplier);
 
       const menuColors = await extractColors(page);
@@ -1288,9 +1314,9 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       colors.palette = mergedPalette;
 
       spinner.stop();
-      log(opened > 0
-        ? color.success(`  ✓ Menus: ${opened} opened, +${added} colors`)
-        : color.info(`  i Menus: no click-toggle triggers found`));
+      log(opened > 0 || carouselAdvances > 0
+        ? color.success(`  ✓ Menus: ${opened} opened, ${carouselAdvances} carousel advances, +${added} colors`)
+        : color.info(`  i Menus: no click-toggle triggers or carousels found`));
       } catch (e) { spinner.stop(); degraded.push('menus'); log(color.warning('  ! Menus: failed (continuing)')); }
     }
 
