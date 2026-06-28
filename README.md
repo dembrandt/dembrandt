@@ -14,16 +14,16 @@ Extract a website's design system into design tokens in a few seconds: logo, col
 Install globally: `npm install -g dembrandt`
 
 ```bash
-dembrandt example.com
+dembrandt dembrandt.com
 ```
 
-Or use npx without installing: `npx dembrandt example.com`
+Or use npx without installing: `npx dembrandt dembrandt.com`
 
 Requires Node.js 18+
 
 ## AI Agent Integration (MCP)
 
-Use Dembrandt as a tool in Claude Code, Cursor, Windsurf, or any MCP-compatible client. Ask your agent to "extract the color palette from example.com" and it calls Dembrandt automatically.
+Use Dembrandt as a tool in Claude Code, Cursor, Windsurf, or any MCP-compatible client. Ask your agent to "extract the color palette from dembrandt.com" and it calls Dembrandt automatically.
 
 ```bash
 claude mcp add --transport stdio dembrandt -- npx -y --package dembrandt dembrandt-mcp
@@ -82,28 +82,28 @@ Load extractions, track token drift, and compare snapshots. **[dembrandt.com/app
 
 ```bash
 dembrandt <url>                        # Basic extraction (terminal display only)
-dembrandt example.com --json-only      # Output raw JSON to terminal (no formatted display, no file save)
-dembrandt example.com --save-output    # Save JSON to output/example.com/YYYY-MM-DDTHH-MM-SS.json
-dembrandt example.com --dtcg           # Export in W3C Design Tokens (DTCG) format (auto-saves as .tokens.json)
-dembrandt example.com --dark-mode      # Extract colors from dark mode variant
-dembrandt example.com --mobile         # Use mobile viewport (390x844) for responsive analysis
-dembrandt example.com --slow           # 3x longer timeouts (24s hydration) for JavaScript-heavy sites
-dembrandt example.com --brand-guide    # Generate a brand guide PDF
-dembrandt example.com --design-md      # Generate a DESIGN.md file for AI agents
-dembrandt example.com /pricing /docs   # Extract specific paths and merge results into one output
-dembrandt example.com --crawl 5        # Analyze 5 pages (homepage + 4 discovered pages), merges results
-dembrandt example.com --sitemap        # Discover pages from sitemap.xml instead of DOM links
-dembrandt example.com --crawl 10 --sitemap # Combine: up to 10 pages discovered via sitemap
-dembrandt example.com --no-sandbox     # Disable Chromium sandbox (required for Docker/CI)
-dembrandt example.com --key dmb_···   # Push snapshot to your Dembrandt account; auto-scored against the previous snapshot for that domain
+dembrandt dembrandt.com --json-only     # Output raw JSON to terminal (no formatted display, no file save)
+dembrandt dembrandt.com --save-output   # Save JSON to output/dembrandt.com/YYYY-MM-DDTHH-MM-SS.json
+dembrandt dembrandt.com --dtcg          # Export in W3C Design Tokens (DTCG) format (auto-saves as .tokens.json)
+dembrandt dembrandt.com --dark-mode     # Extract colors from dark mode variant
+dembrandt dembrandt.com --mobile        # Use mobile viewport (390x844) for responsive analysis
+dembrandt dembrandt.com --slow          # 3x longer timeouts (24s hydration) for JavaScript-heavy sites
+dembrandt dembrandt.com --brand-guide   # Generate a brand guide PDF
+dembrandt dembrandt.com --design-md     # Generate a DESIGN.md file for AI agents
+dembrandt dembrandt.com /pricing /docs  # Extract specific paths and merge results into one output
+dembrandt dembrandt.com --crawl 5       # Analyze 5 pages (homepage + 4 discovered pages), merges results
+dembrandt dembrandt.com --sitemap       # Discover pages from sitemap.xml instead of DOM links
+dembrandt dembrandt.com --crawl 10 --sitemap # Combine: up to 10 pages discovered via sitemap
+dembrandt dembrandt.com --no-sandbox    # Disable Chromium sandbox (required for Docker/CI)
+dembrandt dembrandt.com --key dmb_···  # Push snapshot to your Dembrandt account; auto-scored against the previous snapshot for that domain
                                        # DEMBRANDT_API_URL env var overrides the upload endpoint (default: https://www.dembrandt.com)
-dembrandt example.com --browser=firefox # Use Firefox instead of Chromium (better for Cloudflare bypass)
-dembrandt example.com --wcag           # WCAG 2.1 contrast analysis — real DOM pairs, AA/AAA grades
-dembrandt example.com --stealth        # Opt-in anti-detection: navigator spoofing + human mouse simulation (use only when authorized)
-dembrandt example.com --locale fi-FI --timezone Europe/Helsinki  # Browser fingerprint: locale and timezone
-dembrandt example.com --user-agent "Mozilla/5.0 ..."            # Custom user agent string
-dembrandt example.com --accept-language "fi,en;q=0.9"           # Custom Accept-Language header
-dembrandt example.com --screen-size 2560x1440                   # Physical screen resolution to report
+dembrandt dembrandt.com --browser=firefox # Use Firefox instead of Chromium (better for Cloudflare bypass)
+dembrandt dembrandt.com --wcag          # WCAG 2.1 contrast analysis — real DOM pairs, AA/AAA grades
+dembrandt dembrandt.com --stealth       # Opt-in anti-detection: navigator spoofing + human mouse simulation (use only when authorized)
+dembrandt dembrandt.com --locale fi-FI --timezone Europe/Helsinki # Browser fingerprint: locale and timezone
+dembrandt dembrandt.com --user-agent "Mozilla/5.0 ..."           # Custom user agent string
+dembrandt dembrandt.com --accept-language "fi,en;q=0.9"          # Custom Accept-Language header
+dembrandt dembrandt.com --screen-size 2560x1440                  # Physical screen resolution to report
 ```
 
 Default: formatted terminal display only. Use `--save-output` to persist results as JSON files. Browser automatically retries in visible mode if headless extraction fails.
@@ -114,13 +114,13 @@ Analyze multiple pages to get a more complete picture of a site's design system.
 
 ```bash
 # Analyze homepage + 4 auto-discovered pages (default: 5 total)
-dembrandt example.com --crawl 5
+dembrandt dembrandt.com --crawl 5
 
 # Use sitemap.xml for page discovery instead of DOM link scraping
-dembrandt example.com --sitemap
+dembrandt dembrandt.com --sitemap
 
 # Combine both: up to 10 pages from sitemap
-dembrandt example.com --crawl 10 --sitemap
+dembrandt dembrandt.com --crawl 10 --sitemap
 ```
 
 **Page discovery** works two ways:
@@ -135,10 +135,10 @@ By default, dembrandt uses Chromium. If you encounter bot detection or timeouts 
 
 ```bash
 # Use Firefox instead of Chromium
-dembrandt example.com --browser=firefox
+dembrandt dembrandt.com --browser=firefox
 
 # Combine with other flags
-dembrandt example.com --browser=firefox --save-output --dtcg
+dembrandt dembrandt.com --browser=firefox --save-output --dtcg
 ```
 
 **When to use Firefox:**
@@ -168,7 +168,7 @@ Run this from your home directory (outside any Node.js project) so `require` res
 Skip the bundled browser entirely and drive an already-running Chromium over the DevTools Protocol. Useful in CI or containers where a browser is already up, and it needs no local browser download at all:
 
 ```bash
-BROWSER_CDP_ENDPOINT=http://localhost:9222 dembrandt example.com --browser chromium
+BROWSER_CDP_ENDPOINT=http://localhost:9222 dembrandt dembrandt.com --browser chromium
 ```
 
 CDP is supported only with `--browser chromium`.
@@ -178,8 +178,8 @@ CDP is supported only with `--browser chromium`.
 Use `--dtcg` to export in the standardized [W3C Design Tokens Community Group](https://www.designtokens.org/) format:
 
 ```bash
-dembrandt example.com --dtcg
-# Saves to: output/example.com/TIMESTAMP.tokens.json
+dembrandt dembrandt.com --dtcg
+# Saves to: output/dembrandt.com/TIMESTAMP.tokens.json
 ```
 
 The DTCG format is an industry-standard JSON schema that can be consumed by design tools and token transformation libraries like [Style Dictionary](https://styledictionary.com).
@@ -189,8 +189,8 @@ The DTCG format is an industry-standard JSON schema that can be consumed by desi
 Use `--design-md` to generate a [DESIGN.md](https://stitch.withgoogle.com/docs/design-md) file, a plain-text design system document readable by AI agents. The export follows Google's DESIGN.md draft format: YAML design tokens in front matter plus ordered Markdown guidance sections.
 
 ```bash
-dembrandt example.com --design-md
-# Saves to: output/example.com/DESIGN.md
+dembrandt dembrandt.com --design-md
+# Saves to: output/dembrandt.com/DESIGN.md
 ```
 
 DESIGN.md reports only what Dembrandt observed on the source site. Exact values (colors, typography, spacing, radii, shadows) live in the YAML front matter when available, and the Markdown body adds human-readable context. Sections with no extracted evidence are omitted rather than filled with invented defaults. For example, the elevation section is dropped when the site uses no box-shadow tokens.
@@ -226,7 +226,7 @@ Motion data is included in JSON output as `motion` and printed in terminal under
 ### ML-powered brand color detection (experimental)
 
 ```bash
-dembrandt example.com --ai
+dembrandt dembrandt.com --ai
 #   ⚡ ML primary → #533afd (score 0.93 · 68% acc)
 ```
 
@@ -237,8 +237,8 @@ Replaces the heuristic with a trained model — 2× more accurate (68% vs 32%). 
 Use `--brand-guide` to generate a printable PDF summarizing the extracted design system: colors, typography, components, and logo on a single document.
 
 ```bash
-dembrandt example.com --brand-guide
-# Saves to: output/example.com/TIMESTAMP.brand-guide.pdf
+dembrandt dembrandt.com --brand-guide
+# Saves to: output/dembrandt.com/TIMESTAMP.brand-guide.pdf
 ```
 
 ## Continuous integration
