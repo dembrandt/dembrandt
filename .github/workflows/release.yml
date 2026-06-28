@@ -22,6 +22,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm test
+
       - name: Publish to npm (skip if already published manually)
         run: |
           PKG=$(node -p "require('./package.json').name + '@' + require('./package.json').version")
