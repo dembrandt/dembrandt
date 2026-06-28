@@ -434,7 +434,28 @@ export async function extractColors(page) {
       }
     }
 
-    return { semantic: semanticColors, palette: perceptuallyDeduped, cssVariables: filteredCssVariables, _raw: rawColors };
+    // Full detected set — every colour that passed the alpha>=0.3 gate, with NO
+    // frequency threshold and NO perceptual merge, so near-identical shades survive
+    // as the design signal they are (six reds stay six reds). This is the high-recall
+    // candidate set the ML pipeline consumes; the curated `palette` above remains the
+    // product default. `usageFrac` is an element-count proxy (true pixel area TBD).
+    const detectedTotal = Array.from(colorMap.values()).reduce((s, d) => s + (d.count || 0), 0) || 1;
+    const detected = Array.from(colorMap.entries())
+      .filter(([norm]) => typeof norm === 'string' && /^#[0-9a-f]{6}$/i.test(norm))
+      .map(([normalized, data]) => ({
+        color: data.original,
+        normalized,
+        count: data.count,
+        usageFrac: data.count / detectedTotal,
+        confidence: data.isToken
+          ? (data.score > 5 ? 'high' : 'medium')
+          : data.score > 20 ? 'high' : data.score > 5 ? 'medium' : 'low',
+        sources: Array.from(data.sources).slice(0, 5),
+        isToken: !!data.isToken,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    return { semantic: semanticColors, palette: perceptuallyDeduped, cssVariables: filteredCssVariables, detected, _raw: rawColors };
   });
 
   if (result && result.palette) {
