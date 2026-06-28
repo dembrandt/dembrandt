@@ -58,6 +58,9 @@ function extractSite(domain) {
         encoding: "utf8",
         timeout: EXTRACTION_TIMEOUT,
         stdio: ["pipe", "pipe", "pipe"],
+        // Disable the reveal pass so baselines stay deterministic: clicking menus
+        // / advancing carousels mutates the page and varies run-to-run.
+        env: { ...process.env, DEMBRANDT_DISABLE_REVEAL: "1" },
       }
     );
 
@@ -102,6 +105,9 @@ function extractToTemp(domain) {
         encoding: "utf8",
         timeout: EXTRACTION_TIMEOUT,
         stdio: ["pipe", "pipe", "pipe"],
+        // Disable the reveal pass so baselines stay deterministic: clicking menus
+        // / advancing carousels mutates the page and varies run-to-run.
+        env: { ...process.env, DEMBRANDT_DISABLE_REVEAL: "1" },
       }
     );
 

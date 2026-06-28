@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { MENU_TRIGGER_SELECTOR, isSafeMenuTrigger } from '../lib/extractors/menu-triggers.js';
 
-// The navigation guard is the safety-critical part of the --menus pass: an
+// The navigation guard is the safety-critical part of the reveal pass: an
 // anchor with a real href would navigate on click and destroy the page
 // execution context mid-extraction. These cover the predicate that gates it.
 

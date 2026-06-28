@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- Hidden-content reveal (open click-toggle menus/dropdowns, advance carousels, then re-scan) is now standard and on by default. Closed panels and off-screen slides hold brand colours that the static scan never sees, so this materially improves colour recall. Set `DEMBRANDT_DISABLE_REVEAL=1` to skip it, which QA baselines do to stay deterministic
+- Colour extraction recovers card/section/input/badge colours previously lost to structural filtering, and lifts colours from ancestor context, footers, and carousel-revealed panels (DEM-68)
+
+### Added
+- `./findings` subpath export exposes the high-recall detected colour set for the ML pipeline, separate from the scored brand palette
+
+### Removed
+- `--menus` opt-in flag. The reveal pass it gated is now the default, so the flag is redundant
+
 ## [0.19.5] - 2026-06-14
 
 ### Fixed

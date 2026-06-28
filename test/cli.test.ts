@@ -27,8 +27,9 @@ test('--help exits 0 and shows the extraction usage', () => {
   assert.match(r.stdout, /--dtcg/);
 });
 
-test('--menus is a documented flag', () => {
+test('reveal is standard (no enable flag exposed)', () => {
   const r = run(['--help']);
   assert.equal(r.status, 0);
-  assert.match(r.stdout, /--menus/);
+  // Reveal runs by default; there must be no --menus/--reveal opt-in flag.
+  assert.doesNotMatch(r.stdout, /--menus|--reveal\b/);
 });

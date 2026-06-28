@@ -1,4 +1,4 @@
-// Pure helpers for the --menus reveal pass. Kept browser-free so the
+// Pure helpers for the reveal pass. Kept browser-free so the
 // navigation-guard contract can be unit-tested without spinning up a browser.
 // The selector and predicate below are the single source of truth; the inline
 // page.evaluate in index.ts mirrors isSafeMenuTrigger exactly.

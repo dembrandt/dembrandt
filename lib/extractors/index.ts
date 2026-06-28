@@ -264,7 +264,7 @@ async function simulateHumanMouse(page: Page) {
  * @param {string} url
  * @param {import('ora').Ora} spinner
  * @param {import('playwright-core').Browser} browser
- * @param {{ slow?: boolean, darkMode?: boolean, mobile?: boolean, menus?: boolean, wcag?: boolean, screenshotPath?: string, discoverLinks?: number|null, navigationTimeout?: number, stealth?: boolean, userAgent?: string, locale?: string, timezoneId?: string, acceptLanguage?: string, screenSize?: string }} [options]
+ * @param {{ slow?: boolean, darkMode?: boolean, mobile?: boolean, reveal?: boolean, wcag?: boolean, screenshotPath?: string, discoverLinks?: number|null, navigationTimeout?: number, stealth?: boolean, userAgent?: string, locale?: string, timezoneId?: string, acceptLanguage?: string, screenSize?: string }} [options]
  * @returns {Promise<BrandingResult>}
  */
 export async function extractBranding(url: string, spinner: Spinner, browser: Browser, options: ExtractOptions = {}): Promise<BrandingResult> {
@@ -1225,15 +1225,17 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       } catch (e) { spinner.stop(); degraded.push('mobile'); log(color.warning('  ! Mobile: failed (continuing)')); }
     }
 
-    // Menu / overlay reveal: open click-toggle menus (megamenus, dropdowns) so
-    // their hidden panels become visible, then re-scan. extractColors skips
-    // display:none/hidden/zero-size elements, so the colours of closed panels
-    // are invisible to the static scan. Click-toggle menus stay open without a
-    // pointer, so a single re-scan captures the whole batch. Pure CSS :hover
-    // megamenus close when the pointer leaves and are out of scope here.
-    if (options.menus) {
+    // Reveal pass (standard, on by default): open click-toggle menus (megamenus,
+    // dropdowns) and advance carousels so their hidden content becomes visible,
+    // then re-scan. extractColors skips display:none/hidden/zero-size elements, so
+    // the colours of closed panels and off-screen slides are invisible to the
+    // static scan. Click-toggle menus stay open without a pointer, so a single
+    // re-scan captures the whole batch. Pure CSS :hover megamenus close when the
+    // pointer leaves and are out of scope here. Set options.reveal=false (CLI:
+    // DEMBRANDT_DISABLE_REVEAL) to skip, e.g. for deterministic QA baselines.
+    if (options.reveal !== false) {
       try {
-      spinner.start("Opening menus / overlays...");
+      spinner.start("Revealing hidden content (menus, carousels)...");
       // Defensive: runs on hostile third-party DOM. A click can navigate and
       // destroy the execution context, so the whole evaluate is Node-side
       // guarded and we never click real navigation anchors.
@@ -1315,9 +1317,9 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
 
       spinner.stop();
       log(opened > 0 || carouselAdvances > 0
-        ? color.success(`  ✓ Menus: ${opened} opened, ${carouselAdvances} carousel advances, +${added} colors`)
-        : color.info(`  i Menus: no click-toggle triggers or carousels found`));
-      } catch (e) { spinner.stop(); degraded.push('menus'); log(color.warning('  ! Menus: failed (continuing)')); }
+        ? color.success(`  ✓ Reveal: ${opened} menus opened, ${carouselAdvances} carousel advances, +${added} colors`)
+        : color.info(`  i Reveal: no click-toggle menus or carousels found`));
+      } catch (e) { spinner.stop(); degraded.push('reveal'); log(color.warning('  ! Reveal: failed (continuing)')); }
     }
 
     spinner.stop();
