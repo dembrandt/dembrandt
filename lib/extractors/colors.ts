@@ -160,8 +160,14 @@ export async function extractColors(page) {
     const totalElements = elements.length;
     const ctaPrimaryMap = new Map(); // normalized hex → original color for CTA backgrounds
 
+    // Mirror of CONTEXT_SCORES (lib/extractors/color-heuristics.ts) — kept inline
+    // because page.evaluate runs in an isolated realm and cannot import. Card /
+    // section / input / badge families lift colours on repeated content surfaces
+    // above the structural-noise threshold.
     const contextScores = {
-      logo: 5, brand: 5, primary: 4, cta: 4, hero: 3, button: 3, link: 2, header: 2, nav: 1,
+      logo: 5, brand: 5, primary: 4, cta: 4, hero: 3, button: 3,
+      card: 2, section: 2, feature: 2, panel: 2, input: 2, badge: 2, chip: 2,
+      link: 2, header: 2, nav: 1,
     };
 
     // Colours that appear only via status/feedback or warm-utility classes are
@@ -169,7 +175,10 @@ export async function extractColors(page) {
     // The semantic words cover Bootstrap (text-danger), MUI (Mui-error),
     // Bulma (is-danger) and similar conventions; the second branch covers
     // Tailwind's numbered warm utilities (text-red-600) that carry no word.
-    const statusContext = /\b(error|danger|destructive|invalid|warning|success|alert|notice|sale|discount|badge|toast|notification)\b|(?:text|bg|border|ring|fill|stroke|from|to|via|divide|outline|decoration|accent|caret)-(?:red|rose|orange|amber|yellow)-\d/;
+    // Mirror of STATUS_CONTEXT_SOURCE (lib/extractors/color-heuristics.ts).
+    // "badge" intentionally removed: brand badges/pills are real brand colour;
+    // genuine status badges are warm-hued and caught by the numbered branch.
+    const statusContext = /\b(error|danger|destructive|invalid|warning|success|alert|notice|sale|discount|toast|notification)\b|(?:text|bg|border|ring|fill|stroke|from|to|via|divide|outline|decoration|accent|caret)-(?:red|rose|orange|amber|yellow)-\d/;
 
     elements.forEach((el) => {
       const computed = getComputedStyle(el);
@@ -276,22 +285,28 @@ export async function extractColors(page) {
 
     const threshold = Math.max(3, Math.floor(totalElements * 0.01));
 
+    // Mirror of classifyStructural (lib/extractors/color-heuristics.ts). Saturation
+    // is computed once and reused. The high-usage branch now only fires for
+    // near-neutral colours: a saturated colour at high coverage is a deliberate
+    // brand fill (coloured section/card), not chrome noise. NaN-safe throughout.
     function isStructuralColor(data, totalElements) {
       if (data.isToken) return false;
-      const usagePercent = (data.count / totalElements) * 100;
-      const normalized = normalizeColor(data.original);
       if (data.original === "rgba(0, 0, 0, 0)" || data.original === "transparent") return true;
-      if (usagePercent > 40 && data.score < data.count * 1.2) return true;
-      if (data.bgCount === 0 && data.score < data.count * 1.5) {
-        const hex = normalized.replace('#', '');
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-        const max = Math.max(r, g, b);
-        const min = Math.min(r, g, b);
-        const saturation = max === 0 ? 0 : (max - min) / max;
-        if (saturation > 0.3) return true;
-      }
+      const total = totalElements > 0 ? totalElements : 1;
+      const usagePercent = (data.count / total) * 100;
+      const normalized = normalizeColor(data.original);
+      const hex = normalized.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const saturation = Number.isFinite(max) && max > 0 ? (max - min) / max : 0;
+      // Near-neutral, high-usage, low-intent => layout fill / page background.
+      if (usagePercent > 40 && data.score < data.count * 1.2 && saturation <= 0.2) return true;
+      // Saturated, never a background, low-intent => incidental decoration.
+      // Background colours (bgCount > 0) are exempt so card/section fills survive.
+      if (data.bgCount === 0 && data.score < data.count * 1.5 && saturation > 0.3) return true;
       return false;
     }
 
