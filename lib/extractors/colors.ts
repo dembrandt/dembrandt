@@ -59,6 +59,21 @@ export async function extractColors(page) {
       return (Math.max(r, g, b) + Math.min(r, g, b)) / 2;
     }
 
+    // HSL saturation of an opaque hex, with near-black/near-white forced to 0.
+    // Used both for the primary fallback and the near-neutral primary override.
+    function chroma(hex) {
+      if (!hex || !hex.startsWith('#')) return 0;
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      const l = (max + min) / 2;
+      if (max === min) return 0;
+      const s = l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
+      if (l < 0.08 || l > 0.92) return 0;
+      return s;
+    }
+
     function isValidColorValue(value) {
       if (!value) return false;
       if (value.includes("calc(") || value.includes("clamp(") || value.includes("var(")) {
@@ -178,6 +193,12 @@ export async function extractColors(page) {
       for (const [keyword, weight] of Object.entries(contextScores)) {
         if (context.includes(keyword)) score = Math.max(score, weight);
       }
+      // Real anchors and buttons carry brand intent even when their class names
+      // don't contain "link"/"button". Score by tag so chromatic link/CTA text
+      // colours aren't later discarded as structural noise (e.g. a plain styled
+      // <a> link colour the heuristic would otherwise drop).
+      if (el.tagName === 'A') score = Math.max(score, contextScores.link);
+      if (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button') score = Math.max(score, contextScores.button);
       const isStatus = statusContext.test(context);
 
       const isCta = (context.includes('button') || context.includes('btn') || context.includes('cta')) &&
@@ -349,7 +370,14 @@ export async function extractColors(page) {
           merged.add(i);
         }
       }
-      perceptuallyDeduped.push(similar.sort((a, b) => b.count - a.count)[0]);
+      // Prefer a declared brand token as the canonical representative of a merged
+      // cluster, then highest usage. Keeps the author's exact brand hex rather
+      // than an incidental computed value 1-2 levels off (quantization drift).
+      perceptuallyDeduped.push(
+        similar.sort((a, b) =>
+          ((tokenHexes.has(b.normalized) ? 1 : 0) - (tokenHexes.has(a.normalized) ? 1 : 0))
+          || (b.count - a.count))[0]
+      );
     });
 
     const paletteNormalizedColors = new Set(perceptuallyDeduped.map((c) => c.normalized));
@@ -371,19 +399,6 @@ export async function extractColors(page) {
 
     // Fallback: pick most chromatic non-gray palette color as primary
     if (!semanticColors.primary && perceptuallyDeduped.length > 0) {
-      function chroma(hex) {
-        if (!hex || !hex.startsWith('#')) return 0;
-        const r = parseInt(hex.slice(1, 3), 16) / 255;
-        const g = parseInt(hex.slice(3, 5), 16) / 255;
-        const b = parseInt(hex.slice(5, 7), 16) / 255;
-        const max = Math.max(r, g, b), min = Math.min(r, g, b);
-        const l = (max + min) / 2;
-        if (max === min) return 0;
-        const s = l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
-        // Penalize near-black and near-white
-        if (l < 0.08 || l > 0.92) return 0;
-        return s;
-      }
       const best = perceptuallyDeduped
         .filter(c => c.confidence !== 'low')
         .map(c => ({ c, chroma: chroma(c.normalized), isToken: tokenHexes.has(c.normalized) }))
@@ -395,6 +410,28 @@ export async function extractColors(page) {
           ((b.c.count + (b.isToken ? 20 : 0)) - (a.c.count + (a.isToken ? 20 : 0)))
           || (b.chroma - a.chroma))[0];
       if (best) semanticColors.primary = best.c.color;
+    }
+
+    // Near-neutral primaries are the dominant mis-pick: a dark text/background
+    // colour out-scores the real brand hue. If the chosen primary is near-neutral
+    // but a strong chromatic candidate exists (a declared brand token or a
+    // recurring CTA background), prefer the chromatic one. Genuinely monochrome
+    // brands have no such candidate, so they are left untouched.
+    if (semanticColors.primary) {
+      const primaryNorm = normalizeColor(semanticColors.primary);
+      if (typeof primaryNorm === 'string' && chroma(primaryNorm) < 0.12) {
+        // Only the strongest brand signals override a near-neutral primary: a
+        // declared brand token or a recurring CTA background. A merely
+        // high-confidence chromatic accent is not enough; that would demote a
+        // deliberately neutral brand identity for an incidental accent.
+        const chromatic = perceptuallyDeduped
+          .map((c) => ({ c, ch: chroma(c.normalized), isToken: tokenHexes.has(c.normalized), isCta: ctaPrimaryMap.has(c.normalized) }))
+          .filter((x) => x.ch > 0.25 && (x.isToken || x.isCta))
+          .sort((a, b) =>
+            ((b.c.count + (b.isToken ? 20 : 0) + (b.isCta ? 20 : 0)) - (a.c.count + (a.isToken ? 20 : 0) + (a.isCta ? 20 : 0)))
+            || (b.ch - a.ch))[0];
+        if (chromatic) semanticColors.primary = chromatic.c.color;
+      }
     }
 
     return { semantic: semanticColors, palette: perceptuallyDeduped, cssVariables: filteredCssVariables, _raw: rawColors };

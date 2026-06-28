@@ -875,6 +875,76 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       }
     } catch (e) { degraded.push('svg-logo-colors'); console.log(color.warning('  ! SVG logo color injection: failed (continuing)')); }
 
+    // Inject chromatic gradient stop colours as low-confidence palette entries.
+    // Brand gradients (CTA / hero fills) hide real brand colours that never
+    // surface as a flat backgroundColor, so the flat-colour palette misses them
+    // entirely (the recall gap). Conservative: only reused gradients (count >= 2),
+    // only chromatic stops, low confidence, which is enough for downstream ranking
+    // to find them without polluting the high-confidence brand palette.
+    try {
+      const stopColorSet = new Set<string>();
+      for (const g of (gradients || [])) {
+        if ((g.count || 0) < 2) continue;
+        for (const sc of (g.stopColors || [])) stopColorSet.add(sc);
+      }
+      const stopColors = Array.from(stopColorSet);
+      if (stopColors.length) {
+        const normMap = await page.evaluate((cols) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = 1;
+          const ctx = canvas.getContext('2d');
+          const out = {};
+          for (const c of cols) {
+            if (/^#[0-9a-f]{6}$/i.test(c)) { out[c] = c.toLowerCase(); continue; }
+            if (/^#[0-9a-f]{3}$/i.test(c)) { out[c] = `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}`.toLowerCase(); continue; }
+            if (/^#[0-9a-f]{8}$/i.test(c)) { out[c] = c.toLowerCase().slice(0, 7); continue; }
+            const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+            if (m) {
+              if (m[4] !== undefined && parseFloat(m[4]) < 0.3) { out[c] = null; continue; }
+              out[c] = `#${parseInt(m[1]).toString(16).padStart(2,'0')}${parseInt(m[2]).toString(16).padStart(2,'0')}${parseInt(m[3]).toString(16).padStart(2,'0')}`;
+              continue;
+            }
+            if (ctx) {
+              try {
+                ctx.clearRect(0, 0, 1, 1);
+                ctx.fillStyle = 'rgba(0,0,0,0)';
+                ctx.fillStyle = c;
+                ctx.fillRect(0, 0, 1, 1);
+                const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+                if (a > 76) { out[c] = `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`; continue; }
+              } catch {}
+            }
+            out[c] = null;
+          }
+          return out;
+        }, stopColors);
+
+        const { convertColor } = await import('../colors.js');
+        const chromaOf = (hex) => {
+          const m = /^#([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          if (!m) return 0;
+          const r = parseInt(m[1], 16) / 255, g = parseInt(m[2], 16) / 255, b = parseInt(m[3], 16) / 255;
+          const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
+          if (max === min || l < 0.08 || l > 0.92) return 0;
+          return l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
+        };
+
+        let injected = 0;
+        for (const raw of stopColors) {
+          const normalized = normMap[raw];
+          if (!normalized || !/^#[0-9a-f]{6}$/.test(normalized)) continue;
+          if (chromaOf(normalized) < 0.2) continue;                          // skip neutral/decorative stops
+          if (colors.palette.some(c => c.normalized === normalized)) continue;
+          const entry: any = { color: raw, normalized, count: 2, confidence: 'low', sources: ['gradient'] };
+          const converted = convertColor(normalized);
+          if (converted) { entry.lch = converted.lch; entry.oklch = converted.oklch; }
+          colors.palette.push(entry);
+          injected++;
+        }
+        if (injected) log(color.success(`  ✓ Gradient colors: ${injected} injected`));
+      }
+    } catch (e) { degraded.push('gradient-colors'); console.log(color.warning('  ! Gradient color injection: failed (continuing)')); }
+
     console.log(colors.palette.length > 0 ? color.success(`  ✓ Colors: ${colors.palette.length} found`) : color.warning(`  ! Colors: 0 found`));
     console.log(typography.styles.length > 0 ? color.success(`  ✓ Typography: ${typography.styles.length} styles`) : color.warning(`  ! Typography: 0 styles`));
     console.log(spacing.commonValues.length > 0 ? color.success(`  ✓ Spacing: ${spacing.commonValues.length} values`) : color.warning(`  ! Spacing: 0 values`));
