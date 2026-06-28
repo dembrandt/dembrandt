@@ -14,15 +14,27 @@
     "./dtcg": "./dist/lib/dtcg/validate.js",
     "./drift": {
       "types": "./dist/lib/drift.d.ts",
+      "require": "./dist/lib/drift.js",
+      "import": "./dist/lib/drift.js",
       "default": "./dist/lib/drift.js"
     },
     "./report": {
       "types": "./dist/lib/formatters/html.d.ts",
+      "require": "./dist/lib/formatters/html.js",
+      "import": "./dist/lib/formatters/html.js",
       "default": "./dist/lib/formatters/html.js"
+    },
+    "./findings": {
+      "types": "./dist/lib/findings.d.ts",
+      "require": "./dist/lib/findings.js",
+      "import": "./dist/lib/findings.js",
+      "default": "./dist/lib/findings.js"
     },
     "./normalize": "./dist/lib/normalize.js",
     "./types": {
       "types": "./dist/lib/types.d.ts",
+      "require": "./dist/lib/types.js",
+      "import": "./dist/lib/types.js",
       "default": "./dist/lib/types.js"
     }
   },
