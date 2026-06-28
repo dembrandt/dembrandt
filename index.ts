@@ -55,7 +55,7 @@ program
   .option("--dtcg", "Export in W3C Design Tokens (DTCG) format")
   .option("--dark-mode", "Extract colors from dark mode")
   .option("--mobile", "Extract from mobile viewport")
-  .option("--menus", "Open click-toggle menus/dropdowns and re-scan their revealed panels for colors")
+  .option("--menus", "Reveal hidden content (open click-toggle menus/dropdowns, advance carousels) and re-scan for colors")
   .option("--slow", "3x longer timeouts for slow-loading sites")
   .option("--brand-guide", "Export a brand guide PDF")
   .option("--design-md", "Export a DESIGN.md file")
