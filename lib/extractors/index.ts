@@ -3,6 +3,7 @@ import { color } from '../formatters/theme.js';
 import { discoverLinks } from '../discovery.js';
 import { extractLogo, extractSiteName } from './logo.js';
 import { extractColors } from './colors.js';
+import { MENU_TRIGGER_SELECTOR } from './menu-triggers.js';
 import { extractTypography } from './typography.js';
 import { extractSpacing, extractBorderRadius, extractBorders, extractShadows } from './spacing.js';
 import { extractButtonStyles, extractInputStyles, extractLinkStyles, extractBadgeStyles } from './components.js';
@@ -263,7 +264,7 @@ async function simulateHumanMouse(page: Page) {
  * @param {string} url
  * @param {import('ora').Ora} spinner
  * @param {import('playwright-core').Browser} browser
- * @param {{ slow?: boolean, darkMode?: boolean, mobile?: boolean, wcag?: boolean, screenshotPath?: string, discoverLinks?: number|null, navigationTimeout?: number, stealth?: boolean, userAgent?: string, locale?: string, timezoneId?: string, acceptLanguage?: string, screenSize?: string }} [options]
+ * @param {{ slow?: boolean, darkMode?: boolean, mobile?: boolean, menus?: boolean, wcag?: boolean, screenshotPath?: string, discoverLinks?: number|null, navigationTimeout?: number, stealth?: boolean, userAgent?: string, locale?: string, timezoneId?: string, acceptLanguage?: string, screenSize?: string }} [options]
  * @returns {Promise<BrandingResult>}
  */
 export async function extractBranding(url: string, spinner: Spinner, browser: Browser, options: ExtractOptions = {}): Promise<BrandingResult> {
@@ -1222,6 +1223,75 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       spinner.stop();
       log(color.success(`  ✓ Mobile: +${mobileColors.palette.length} colors`));
       } catch (e) { spinner.stop(); degraded.push('mobile'); log(color.warning('  ! Mobile: failed (continuing)')); }
+    }
+
+    // Menu / overlay reveal: open click-toggle menus (megamenus, dropdowns) so
+    // their hidden panels become visible, then re-scan. extractColors skips
+    // display:none/hidden/zero-size elements, so the colours of closed panels
+    // are invisible to the static scan. Click-toggle menus stay open without a
+    // pointer, so a single re-scan captures the whole batch. Pure CSS :hover
+    // megamenus close when the pointer leaves and are out of scope here.
+    if (options.menus) {
+      try {
+      spinner.start("Opening menus / overlays...");
+      // Defensive: runs on hostile third-party DOM. A click can navigate and
+      // destroy the execution context, so the whole evaluate is Node-side
+      // guarded and we never click real navigation anchors.
+      const opened = await page.evaluate(async (selector) => {
+        const isVisible = (el: Element): boolean => {
+          const h = el as HTMLElement;
+          const r = h.getBoundingClientRect();
+          const s = getComputedStyle(h);
+          return r.width > 0 && r.height > 0 && s.display !== "none" && s.visibility !== "hidden";
+        };
+        // Mirror of isSafeMenuTrigger (lib/extractors/menu-triggers.ts) — kept
+        // inline because page.evaluate runs in an isolated browser realm and
+        // cannot import. Any element with a real (non-fragment) href navigates
+        // on click and would destroy this execution context.
+        const isSafe = (el: Element): boolean => {
+          const href = el.getAttribute("href");
+          const isFragment = !href || href === "#" || href.startsWith("#");
+          if (!isFragment) return false;
+          if (el.tagName.toLowerCase() === "a" && href && href !== "#" && !href.startsWith("#")) return false;
+          return true;
+        };
+        let triggers: Element[];
+        try {
+          triggers = Array.from(document.querySelectorAll(selector)).filter((el) => isVisible(el) && isSafe(el));
+        } catch {
+          return 0; // malformed selector or hostile DOM — never throw out of evaluate
+        }
+        let count = 0;
+        for (const el of triggers.slice(0, 30)) {
+          try {
+            const before = location.href;
+            (el as HTMLElement).click();
+            if (location.href !== before) break; // navigated — stop, context may die
+            count++;
+          } catch {}
+        }
+        return count;
+      }, MENU_TRIGGER_SELECTOR).catch(() => 0);
+
+      // Let panels render / animate in before scanning.
+      await page.waitForTimeout(400 * timeoutMultiplier);
+
+      const menuColors = await extractColors(page);
+      const mergedPalette = [...colors.palette];
+      menuColors.palette.forEach((menuColor) => {
+        const isDuplicate = mergedPalette.some((c) => c.normalized === menuColor.normalized);
+        // Demote to medium — revealed-panel colours are weaker brand signal than
+        // the static above-the-fold scan, but stronger than hover state colours.
+        if (!isDuplicate) mergedPalette.push({ ...menuColor, confidence: "medium", source: "menu" });
+      });
+      const added = mergedPalette.length - colors.palette.length;
+      colors.palette = mergedPalette;
+
+      spinner.stop();
+      log(opened > 0
+        ? color.success(`  ✓ Menus: ${opened} opened, +${added} colors`)
+        : color.info(`  i Menus: no click-toggle triggers found`));
+      } catch (e) { spinner.stop(); degraded.push('menus'); log(color.warning('  ! Menus: failed (continuing)')); }
     }
 
     spinner.stop();

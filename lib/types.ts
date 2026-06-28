@@ -404,6 +404,8 @@ export interface ExtractOptions {
   slow?: boolean;
   darkMode?: boolean;
   mobile?: boolean;
+  /** Open click-toggle menus/dropdowns and re-scan their revealed panels for colors. */
+  menus?: boolean;
   stealth?: boolean;
   wcag?: boolean;
   keepAnimations?: boolean;

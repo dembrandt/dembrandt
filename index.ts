@@ -55,6 +55,7 @@ program
   .option("--dtcg", "Export in W3C Design Tokens (DTCG) format")
   .option("--dark-mode", "Extract colors from dark mode")
   .option("--mobile", "Extract from mobile viewport")
+  .option("--menus", "Open click-toggle menus/dropdowns and re-scan their revealed panels for colors")
   .option("--slow", "3x longer timeouts for slow-loading sites")
   .option("--brand-guide", "Export a brand guide PDF")
   .option("--design-md", "Export a DESIGN.md file")
@@ -174,6 +175,7 @@ program
             verbose: !opts.jsonOnly,
             darkMode: opts.darkMode,
             mobile: opts.mobile,
+            menus: opts.menus,
             slow: opts.slow,
             screenshotPath: opts.screenshot,
             discoverLinks: isAutoCrawl ? crawlN - 1 : null,
@@ -237,6 +239,7 @@ program
                   verbose: !opts.jsonOnly,
                   darkMode: opts.darkMode,
                   mobile: opts.mobile,
+                  menus: opts.menus,
                   slow: opts.slow,
                   stealth: opts.stealth,
                   userAgent: opts.userAgent,
@@ -582,7 +585,7 @@ program
 // Grouped --help for the root command. Commander 11 has no native option groups,
 // so render them via a custom formatHelp. Subcommands keep a single flat list.
 const OPTION_GROUPS = [
-  ["Extraction", ["--dark-mode", "--mobile", "--slow", "--crawl", "--sitemap", "--browser"]],
+  ["Extraction", ["--dark-mode", "--mobile", "--menus", "--slow", "--crawl", "--sitemap", "--browser"]],
   ["Output & export", ["--json-only", "--save-output", "--dtcg", "--brand-guide", "--design-md", "--html", "--screenshot", "--raw-colors"]],
   ["Analysis", ["--wcag", "--compare", "--approve"]],
   ["Network & auth", ["--cookie", "--header", "--user-agent", "--locale", "--timezone", "--accept-language", "--screen-size"]],

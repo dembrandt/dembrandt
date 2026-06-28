@@ -26,3 +26,9 @@ test('--help exits 0 and shows the extraction usage', () => {
   assert.match(r.stdout, /Extract design tokens/);
   assert.match(r.stdout, /--dtcg/);
 });
+
+test('--menus is a documented flag', () => {
+  const r = run(['--help']);
+  assert.equal(r.status, 0);
+  assert.match(r.stdout, /--menus/);
+});
