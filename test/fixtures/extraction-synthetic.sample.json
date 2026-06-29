@@ -2,13 +2,15 @@
   "url": "https://synthetic.example.com",
   "extractedAt": "2026-06-11T00:00:00.000Z",
   "meta": {
-    "schemaVersion": "1.1.0",
+    "schemaVersion": "1.2.0",
     "dembrandtVersion": "0.17.0"
   },
   "colors": {
     "semantic": {
       "primary": "#1a73e8",
-      "background": { "color": "#ffffff" }
+      "background": { "color": "#ffffff" },
+      "text": "#202124",
+      "accent": "#e8590c"
     },
     "palette": [
       { "color": "#1a73e8", "count": 120, "confidence": "high" },

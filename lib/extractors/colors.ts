@@ -74,6 +74,28 @@ export async function extractColors(page) {
       return s;
     }
 
+    // HSL hue in degrees [0,360) from an opaque hex; -1 for achromatic colours.
+    // Used to keep the accent token on a genuinely different hue from primary.
+    function hueOf(hex) {
+      if (!hex || !hex.startsWith('#')) return -1;
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      const d = max - min;
+      if (d === 0) return -1;
+      let h;
+      if (max === r) h = (((g - b) / d) % 6 + 6) % 6;
+      else if (max === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h *= 60;
+      return h < 0 ? h + 360 : h;
+    }
+    function hueDistance(a, b) {
+      const diff = Math.abs(a - b) % 360;
+      return diff > 180 ? 360 - diff : diff;
+    }
+
     function isValidColorValue(value) {
       if (!value) return false;
       if (value.includes("calc(") || value.includes("clamp(") || value.includes("var(")) {
@@ -294,6 +316,23 @@ export async function extractColors(page) {
       }
     });
 
+    // Canonical page surface + body text. Read the real computed values off the
+    // document body rather than inferring from the palette: these are the actual
+    // background the content sits on and the dominant body text colour, which is
+    // exactly what a design system means by background/text tokens. The role
+    // data already exists on palette entries; this promotes it to a named token.
+    const surfaceEl = document.body || document.documentElement;
+    if (surfaceEl) {
+      let bgNode: Element | null = surfaceEl;
+      for (let hop = 0; hop < 5 && bgNode; hop++) {
+        const bg = getComputedStyle(bgNode).backgroundColor;
+        if (bg && colorAlpha(bg) >= 0.9) { semanticColors.background = bg; break; }
+        bgNode = bgNode.parentElement;
+      }
+      const txt = getComputedStyle(surfaceEl).color;
+      if (txt && colorAlpha(txt) >= 0.5) semanticColors.text = txt;
+    }
+
     // Use most-common CTA background as primary if class-based detection missed it
     // Require at least 2 CTA occurrences to avoid single "Sign up" buttons dominating
     if (!semanticColors.primary && ctaPrimaryMap.size > 0) {
@@ -472,6 +511,24 @@ export async function extractColors(page) {
             || (b.ch - a.ch))[0];
         if (chromatic) semanticColors.primary = chromatic.c.color;
       }
+    }
+
+    // Accent vs primary. A brand often runs a primary alongside a distinct, more
+    // saturated accent (e.g. a cyan brand mark beside a navy primary). Surface
+    // the accent as its own token so the two are not collapsed: the most
+    // chromatic high-/medium-confidence palette colour whose hue is clearly
+    // different from primary. Additive only — never alters the primary pick,
+    // which already resolves most brands correctly.
+    if (semanticColors.primary) {
+      const primaryNorm = normalizeColor(semanticColors.primary);
+      const primaryHue = typeof primaryNorm === 'string' ? hueOf(primaryNorm) : -1;
+      const accent = perceptuallyDeduped
+        .filter(c => c.confidence !== 'low')
+        .map(c => ({ c, ch: chroma(c.normalized), hue: hueOf(c.normalized) }))
+        .filter(x => x.ch > 0.25 && x.c.normalized !== primaryNorm &&
+          (primaryHue < 0 || hueDistance(x.hue, primaryHue) > 30))
+        .sort((a, b) => b.ch - a.ch)[0];
+      if (accent) semanticColors.accent = accent.c.color;
     }
 
     // Full detected set — every colour that passed the alpha>=0.3 gate, with NO

@@ -36,13 +36,19 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.2.0 — added colors.semantic.background, colors.semantic.text and
+ *          colors.semantic.accent (canonical page surface, body text, and a
+ *          hue-distinct brand accent). Typography gains a "text" context value
+ *          for body-eligible text whose family is not the dominant body font.
+ *          Additive: 1.1.x consumers ignore the new keys and treat "text" as
+ *          body-like.
  *  1.1.0 — added SpacingValue.display, a guaranteed "Npx" string for rendering.
  *          Additive: 1.0.x consumers ignore it. Read `display` instead of
  *          formatting `px`, whose type narrows from "16px" to a number through
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.1.0';
+export const SCHEMA_VERSION = '1.2.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';

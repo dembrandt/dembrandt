@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseVariableAxes, parseOpenTypeFeatures } from '../lib/extractors/typography.js';
+import { parseVariableAxes, parseOpenTypeFeatures, pickBodyFamily } from '../lib/extractors/typography.js';
 
 /**
  * The typography extractor reads computed styles in the browser, but the
@@ -37,4 +37,18 @@ test('parseOpenTypeFeatures dedupes and sorts enabled tags', () => {
 test('parseOpenTypeFeatures excludes features explicitly switched off', () => {
   const f = parseOpenTypeFeatures(['"ss01" on, "tnum" off', '"kern" 0']);
   assert.deepEqual(f, ['ss01']);
+});
+
+test('pickBodyFamily picks the family carrying the most body text', () => {
+  // A decorative face used once must not beat the dominant reading-text family.
+  assert.equal(pickBodyFamily({ 'SF Pro Text': 5000, 'SF Pro Display': 400, fontIvoryLl: 120 }), 'SF Pro Text');
+});
+
+test('pickBodyFamily breaks ties on first-seen for determinism', () => {
+  assert.equal(pickBodyFamily({ Inter: 100, Roboto: 100 }), 'Inter');
+});
+
+test('pickBodyFamily returns null when no family carried body text', () => {
+  assert.equal(pickBodyFamily({}), null);
+  assert.equal(pickBodyFamily({ Inter: 0 }), null);
 });

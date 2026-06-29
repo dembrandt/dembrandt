@@ -1,6 +1,22 @@
 import type { VariableFontAxis } from '../types.js';
 
 /**
+ * Pick the dominant body font family from a map of family -> total body text
+ * length. Highest text coverage wins; ties keep the first-seen family for a
+ * deterministic result. Returns null when no family carried any body text. Pure
+ * and exported so the body-font disambiguation is unit-testable without a
+ * browser.
+ */
+export function pickBodyFamily(weights: Record<string, number>): string | null {
+  let best: string | null = null;
+  let max = 0;
+  for (const [family, weight] of Object.entries(weights || {})) {
+    if (weight > max) { max = weight; best = family; }
+  }
+  return best;
+}
+
+/**
  * Parse `font-variation-settings` strings (e.g. `"wght" 600, "slnt" -4`) into
  * per-axis ranges across the page. Pure and exported so it is unit-testable
  * without a browser. Only explicit variation settings count — we do not infer
@@ -45,6 +61,10 @@ export async function extractTypography(page) {
     const seen = new Map();
     const variationSettings: string[] = [];
     const featureSettings: string[] = [];
+    // family -> total directly-contained visible body text length. Drives the
+    // dominant-body-font pick: among everything the heuristic labels "body", the
+    // family carrying the most reading text is the real body font.
+    const familyBodyWeight: Record<string, number> = {};
     const sources = {
       googleFonts: [],
       adobeFonts: false,
@@ -176,6 +196,14 @@ export async function extractTypography(page) {
         context = "ui";
       }
 
+      if (context === "body") {
+        let directTextLen = 0;
+        el.childNodes.forEach((node: ChildNode) => {
+          if (node.nodeType === 3) directTextLen += (node.textContent || "").trim().length;
+        });
+        if (directTextLen > 0) familyBodyWeight[family] = (familyBodyWeight[family] || 0) + directTextLen;
+      }
+
       const key = `${family}|${size}|${weight}|${context}|${letterSpacing}|${textTransform}`;
       if (seen.has(key)) return;
 
@@ -218,6 +246,7 @@ export async function extractTypography(page) {
       },
       variationSettings,
       featureSettings,
+      familyBodyWeight,
     };
   });
 
@@ -225,6 +254,19 @@ export async function extractTypography(page) {
   // unit-testable. Attach to sources only when present — no empty arrays.
   const variableAxes = parseVariableAxes(data.variationSettings);
   const openTypeFeatures = parseOpenTypeFeatures(data.featureSettings);
+
+  // Disambiguate the body font. The size/tag heuristic labels every non-special
+  // element "body", so a decorative face on one stray element can masquerade as
+  // the body font. Keep the "body" label only on the dominant reading-text
+  // family; demote the rest to the generic "text" role (still text, not the
+  // canonical body font). This makes the body token reflect the dominant
+  // computed font rather than whichever element fell through the heuristic first.
+  const bodyFamily = pickBodyFamily(data.familyBodyWeight);
+  if (bodyFamily) {
+    for (const style of data.styles) {
+      if (style.context === "body" && style.family !== bodyFamily) style.context = "text";
+    }
+  }
 
   return {
     styles: data.styles,
