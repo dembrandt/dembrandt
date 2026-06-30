@@ -251,9 +251,12 @@ function displayColors(colors) {
       try { onSwatch = ' on:' + chalk.bgHex(hex)(chalk.hex(onColor)(' Aa ')); } catch {}
     }
 
+    // Show CSS variable names / roles in full. They are design-token identifiers
+    // (e.g. --pm-radio-color); truncating them to fit a 15-col gutter hid the part
+    // that identifies the token. Short labels still pad for alignment; long ones
+    // extend and push the rgb column right rather than getting clipped.
     const rawLabel = label || (role && role !== 'palette' ? role : '');
-    const truncated = rawLabel.length > 14 ? rawLabel.slice(0, 13) + '…' : rawLabel;
-    const labelText = chalk.dim(truncated.padEnd(15));
+    const labelText = chalk.dim(rawLabel.length > 15 ? rawLabel + ' ' : rawLabel.padEnd(15));
     const rgbText = chalk.dim((rgb || '').padEnd(20));
 
     const hoverText = (hover && role === 'accent') ? chalk.dim(` hover:${hover}`) : '';

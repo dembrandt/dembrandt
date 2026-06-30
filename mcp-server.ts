@@ -275,7 +275,7 @@ async function main() {
 
   (server.tool as any)(
     "get_color_palette",
-    "Extract brand colors from a live website. Returns semantic colors (primary, secondary, accent), full palette ranked by usage frequency and confidence (high/medium/low), CSS custom properties with their design-system names, and hover/focus state colors discovered by simulating real user interactions. Each color in hex, RGB, LCH, and OKLCH. Returns a job_id by default — use get_job_status to poll for the result.",
+    "Extract brand colors from a live website. Returns semantic colors (primary, secondary, accent, plus background and text promoted from the page surface and body text), full palette ranked by usage frequency and confidence (high/medium/low), CSS custom properties with their design-system names, and hover/focus state colors discovered by simulating real user interactions. Each color in hex, RGB, LCH, and OKLCH. Returns a job_id by default — use get_job_status to poll for the result.",
     {
       url, slow, sync,
       darkMode: z.boolean().optional().default(false).describe("Also extract dark mode palette"),
@@ -285,7 +285,7 @@ async function main() {
 
   (server.tool as any)(
     "get_typography",
-    "Extract typography from a live website. Returns every font family with its fallback stack, the complete type scale grouped by context (heading, body, button, link, caption) with pixel and rem sizes, weights, line heights, letter spacing, and text transforms. Also reports font sources: Google Fonts URLs, Adobe Fonts usage, and variable font detection. Returns a job_id by default — use get_job_status to poll for the result.",
+    "Extract typography from a live website. Returns every font family with its fallback stack, the complete type scale grouped by context (heading, body, text, button, link, caption) with pixel and rem sizes, weights, line heights, letter spacing, and text transforms. The body context marks the dominant reading-text font; text marks other body-eligible copy. Also reports font sources: Google Fonts URLs, Adobe Fonts usage, and variable font detection. Returns a job_id by default — use get_job_status to poll for the result.",
     { url, slow, sync },
     toolHandler((d) => ({ url: d.url, typography: d.typography })),
   );
