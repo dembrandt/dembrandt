@@ -19,6 +19,7 @@ import { generatePDF } from "./lib/formatters/pdf.js";
 import { generateDesignMd } from "./lib/formatters/markdown.js";
 import { generateHtmlReport } from "./lib/formatters/html.js";
 import { resolveCompare } from "./lib/compare.js";
+import { emitDriftAnnotations } from "./lib/ci-annotations.js";
 import { parseSitemap } from "./lib/discovery.js";
 import { mergeResults } from "./lib/merger.js";
 import { writeFileSync, mkdirSync, readFileSync } from "fs";
@@ -460,6 +461,11 @@ program
             // CI gate: drift fails the run, but the report still writes first.
             process.exitCode = EXIT.DRIFT;
           }
+          // Under GitHub Actions, surface a failing drift gate inline on the PR
+          // via workflow-command annotations (DEM-83). No-op locally. Gated on
+          // the gate actually failing, so an --approve'd local baseline (which
+          // passes despite a drift report) emits nothing.
+          if (process.exitCode === EXIT.DRIFT) emitDriftAnnotations(report);
         } catch (err) {
           console.log(color.warning(`! Could not compare against baseline: ${err.message}`));
         }
