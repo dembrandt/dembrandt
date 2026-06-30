@@ -1,19 +1,35 @@
 import type { VariableFontAxis } from '../types.js';
 
 /**
- * Pick the dominant body font family from a map of family -> total body text
- * length. Highest text coverage wins; ties keep the first-seen family for a
- * deterministic result. Returns null when no family carried any body text. Pure
- * and exported so the body-font disambiguation is unit-testable without a
+ * Pick the canonical body font family from two signals: the font computed on
+ * `document.body` (the inherited base) and per-family body-text coverage.
+ *
+ * Trust the inherited base only when page text actually renders in it. That
+ * makes apple.com resolve to SF Pro Text even though large lead paragraphs
+ * override to SF Pro Display and out-volume it. But a site that sets no
+ * font-family on <body> inherits the UA default (e.g. "Times"), which no
+ * visible text uses — there the most-used body family is the real answer (e.g.
+ * nyt-franklin on nytimes.com, not the UA "Times"). Coverage ties keep the
+ * first-seen family for determinism. Returns null when neither signal yields a
+ * family. Pure and exported so the disambiguation is unit-testable without a
  * browser.
  */
-export function pickBodyFamily(weights: Record<string, number>): string | null {
+// UA-default serif names a page inherits when <body> sets no font-family. They
+// appear even on sites whose real text is a custom font, so they must never be
+// trusted as the body font over actual coverage.
+const UA_DEFAULT_FAMILIES = new Set(['times', 'times new roman', 'serif']);
+
+export function pickBodyFamily(bodyComputedFamily: string | null, weights: Record<string, number>): string | null {
+  const base = (bodyComputedFamily || '').trim();
+  const w = weights || {};
+  if (base && !UA_DEFAULT_FAMILIES.has(base.toLowerCase()) && (w[base] || 0) > 0) return base;
   let best: string | null = null;
   let max = 0;
-  for (const [family, weight] of Object.entries(weights || {})) {
+  for (const [family, weight] of Object.entries(w)) {
     if (weight > max) { max = weight; best = family; }
   }
-  return best;
+  if (best) return best;
+  return base || null;
 }
 
 /**
@@ -196,7 +212,12 @@ export async function extractTypography(page) {
         context = "ui";
       }
 
-      if (context === "body") {
+      // Vote for the dominant body font only with normal-size running text. Large
+      // non-heading marketing text (hero copy <56px) also lands in "body" via the
+      // size heuristic; counting it lets a display face out-vote the real body
+      // font on heading-heavy pages (e.g. SF Pro Display beating SF Pro Text on
+      // apple.com). Restrict the vote to the typical reading-copy range.
+      if (context === "body" && size >= 11 && size <= 24) {
         let directTextLen = 0;
         el.childNodes.forEach((node: ChildNode) => {
           if (node.nodeType === 3) directTextLen += (node.textContent || "").trim().length;
@@ -237,6 +258,13 @@ export async function extractTypography(page) {
       return bSize - aSize;
     });
 
+    // The font inherited by document.body is the canonical base body font.
+    let bodyComputedFamily: string | null = null;
+    if (document.body) {
+      const fam = getComputedStyle(document.body).fontFamily.split(",")[0].replace(/['"]/g, "").trim();
+      if (fam) bodyComputedFamily = fam;
+    }
+
     return {
       styles: result,
       sources: {
@@ -247,6 +275,7 @@ export async function extractTypography(page) {
       variationSettings,
       featureSettings,
       familyBodyWeight,
+      bodyComputedFamily,
     };
   });
 
@@ -261,7 +290,7 @@ export async function extractTypography(page) {
   // family; demote the rest to the generic "text" role (still text, not the
   // canonical body font). This makes the body token reflect the dominant
   // computed font rather than whichever element fell through the heuristic first.
-  const bodyFamily = pickBodyFamily(data.familyBodyWeight);
+  const bodyFamily = pickBodyFamily(data.bodyComputedFamily, data.familyBodyWeight);
   if (bodyFamily) {
     for (const style of data.styles) {
       if (style.context === "body" && style.family !== bodyFamily) style.context = "text";

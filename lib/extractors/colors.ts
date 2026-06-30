@@ -329,6 +329,10 @@ export async function extractColors(page) {
         if (bg && colorAlpha(bg) >= 0.9) { semanticColors.background = bg; break; }
         bgNode = bgNode.parentElement;
       }
+      // Body and html often paint nothing, leaving the default white canvas the
+      // user actually sees. Dark sites always set an explicit dark background, so
+      // an unset chain means the rendered backdrop is white.
+      if (!semanticColors.background) semanticColors.background = 'rgb(255, 255, 255)';
       const txt = getComputedStyle(surfaceEl).color;
       if (txt && colorAlpha(txt) >= 0.5) semanticColors.text = txt;
     }
