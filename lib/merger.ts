@@ -346,6 +346,36 @@ function mergeMotion(results) {
 }
 
 /**
+ * Union of WCAG pairs across pages. Identical pairs produce identical grades,
+ * so dedupe is by pair identity (order-insensitive fg/bg for static pairs,
+ * plus state/tag for interactive state pairs) with counts summed. Static pairs
+ * keep the single-page contract: sorted by count desc, capped at 50, state
+ * pairs appended after.
+ */
+function mergeWcag(results) {
+  const map = new Map();
+  for (const r of results) {
+    for (const p of r.wcag || []) {
+      const key = p.source === 'state'
+        ? `state|${p.state}|${p.tag}|${p.fg}|${p.bg}`
+        : `static|${[p.fg, p.bg].sort().join('/')}`;
+      const entry = map.get(key);
+      if (entry) {
+        if (p.count != null) entry.count = (entry.count ?? 0) + p.count;
+      } else {
+        map.set(key, { ...p });
+      }
+    }
+  }
+  const all = [...map.values()];
+  const statics = all
+    .filter(p => !p.source)
+    .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+    .slice(0, 50);
+  return [...statics, ...all.filter(p => p.source === 'state')];
+}
+
+/**
  * Merge an array of per-page result objects into a single unified result.
  * @param {Object[]} results - Array of extractBranding() result objects
  * @returns {Object} Merged result with same shape as single-page result
@@ -379,6 +409,14 @@ export function mergeResults(results) {
     ].sort((a: any, b: any) => parseInt(b.px) - parseInt(a.px)),
     iconSystem: mergeByName(results, r => r.iconSystem),
     frameworks: mergeByName(results, r => r.frameworks),
-    pages: results.map(r => ({ url: r.url, extractedAt: r.extractedAt })),
+    ...(results.some(r => r.wcag) ? { wcag: mergeWcag(results) } : {}),
+    // rawColors are per-page filter diagnostics: merging them would destroy the
+    // page provenance they exist for, so each page keeps its own set here.
+    // colors.rawColors stays the first page's (via mergeColors) for back-compat.
+    pages: results.map(r => ({
+      url: r.url,
+      extractedAt: r.extractedAt,
+      ...(r.colors?.rawColors ? { rawColors: r.colors.rawColors } : {}),
+    })),
   };
 }

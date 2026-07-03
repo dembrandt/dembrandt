@@ -346,7 +346,7 @@ export interface BrandingResult {
   iconSystem: IconSystem[];
   frameworks: Framework[];
   wcag?: WcagPair[];
-  pages?: { url: string }[];
+  pages?: { url: string; extractedAt?: string; rawColors?: PaletteColor[] }[];
   /**
    * CLI-emitted note about the extraction itself (e.g. canvas-only sites). This is
    * NOT a user annotation — a user note belongs in the storage envelope around the

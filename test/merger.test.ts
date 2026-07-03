@@ -133,3 +133,51 @@ test('mergeResults unions variable-font axes by axis, widening the range', () =>
   assert.equal(wght.count, 3);
   assert.ok(axes.find((a) => a.axis === 'slnt'));
 });
+
+test('mergeResults unions wcag pairs, deduping order-insensitive static pairs and summing counts', () => {
+  const pair = (fg, bg, count) => ({ fg, bg, ratio: 4.6, aa: true, aaLarge: true, aaa: false, count });
+  const home = page('https://a.test', {
+    wcag: [pair('#000000', '#ffffff', 5), { fg: '#888888', bg: '#999999', ratio: 1.2, aa: false, aaLarge: false, aaa: false, state: 'hover', tag: 'a', source: 'state' }],
+  });
+  const second = page('https://a.test/pricing', {
+    // Same static pair with fg/bg swapped -> same pair, counts sum.
+    wcag: [pair('#ffffff', '#000000', 3), pair('#cc0000', '#ffffff', 2)],
+  });
+
+  const merged = mergeResults([home, second]);
+
+  const statics = merged.wcag.filter((p) => !p.source);
+  assert.equal(statics.length, 2);
+  const bw = statics.find((p) => [p.fg, p.bg].sort().join('/') === '#000000/#ffffff');
+  assert.equal(bw.count, 8);
+
+  // State pairs survive the merge, appended after static pairs.
+  const states = merged.wcag.filter((p) => p.source === 'state');
+  assert.equal(states.length, 1);
+  assert.equal(states[0].state, 'hover');
+});
+
+test('mergeResults omits wcag when no page ran the analysis', () => {
+  const merged = mergeResults([page('https://a.test'), page('https://a.test/pricing')]);
+  assert.equal('wcag' in merged, false);
+});
+
+test('mergeResults keeps rawColors per page in the pages array', () => {
+  const raw = (hex) => [{ normalized: hex, color: hex, count: 1 }];
+  const home = page('https://a.test', {
+    colors: { palette: [], semantic: {}, cssVariables: {}, rawColors: raw('#111111') },
+  });
+  const second = page('https://a.test/pricing', {
+    colors: { palette: [], semantic: {}, cssVariables: {}, rawColors: raw('#222222') },
+  });
+
+  const merged = mergeResults([home, second]);
+
+  assert.equal(merged.pages[0].rawColors[0].normalized, '#111111');
+  assert.equal(merged.pages[1].rawColors[0].normalized, '#222222');
+  // Back-compat: colors.rawColors stays the first page's set.
+  assert.equal(merged.colors.rawColors[0].normalized, '#111111');
+  // No leak when the flag was off: plain pages entries carry no rawColors key.
+  const plain = mergeResults([page('https://a.test'), page('https://a.test/x')]);
+  assert.equal('rawColors' in plain.pages[0], false);
+});

@@ -242,6 +242,11 @@ program
                   reveal: !process.env.DEMBRANDT_DISABLE_REVEAL,
                   slow: opts.slow,
                   stealth: opts.stealth,
+                  cookie: opts.cookie,
+                  header: opts.header,
+                  screenSize: opts.screenSize,
+                  wcag: opts.wcag,
+                  includeRawColors: opts.rawColors,
                   userAgent: opts.userAgent,
                   locale: opts.locale,
                   timezoneId: opts.timezone,
@@ -347,21 +352,22 @@ program
           const outputDir = join(process.cwd(), "output", domain);
           mkdirSync(outputDir, { recursive: true });
 
-          const suffix = opts.dtcg ? '.tokens' : '';
-          const filename = `${timestamp}_v${version}${suffix}.json`;
-          const filepath = join(outputDir, filename);
-          writeFileSync(filepath, JSON.stringify(outputData, null, 2));
-
-          const jsonLabel = opts.dtcg
-            ? 'DTCG tokens saved (--dtcg)'
-            : 'JSON saved (--save-output)';
-          savedNotices.push(
-            chalk.dim(
-              `💾 ${jsonLabel}: ${color.info(
-                `output/${domain}/${filename}`
-              )}`
-            )
-          );
+          // The two flags are orthogonal: --save-output writes the raw
+          // extraction, --dtcg writes the tokens file. Both flags = both files.
+          const saves = [];
+          if (opts.saveOutput) saves.push({ data: result, suffix: '', label: 'JSON saved (--save-output)' });
+          if (opts.dtcg) saves.push({ data: outputData, suffix: '.tokens', label: 'DTCG tokens saved (--dtcg)' });
+          for (const { data, suffix, label } of saves) {
+            const filename = `${timestamp}_v${version}${suffix}.json`;
+            writeFileSync(join(outputDir, filename), JSON.stringify(data, null, 2));
+            savedNotices.push(
+              chalk.dim(
+                `💾 ${label}: ${color.info(
+                  `output/${domain}/${filename}`
+                )}`
+              )
+            );
+          }
         } catch (err) {
           console.log(
             color.warning(`! Could not save JSON file: ${err.message}`)
