@@ -108,6 +108,8 @@ dembrandt dembrandt.com --screen-size 2560x1440                  # Physical scre
 
 Default: formatted terminal display only. Use `--save-output` to persist results as JSON files. Browser automatically retries in visible mode if headless extraction fails.
 
+All flags combine unless noted otherwise: see [docs/FLAGS.md](docs/FLAGS.md) for the flag compatibility tables (interactions, ignored combinations, multi-page propagation).
+
 ### Multi-Page Extraction
 
 Analyze multiple pages to get a more complete picture of a site's design system. Results are merged into a single unified output with cross-page confidence boosting: tokens appearing on multiple pages get higher confidence scores.
