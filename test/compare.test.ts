@@ -57,6 +57,28 @@ test('baseline id path: POSTs candidate to the App and returns its report', asyn
   assert.equal(r.report.score, 7);
 });
 
+test('local file path: unparseable baseline rejects with a clear error, not a bare SyntaxError', async () => {
+  await assert.rejects(
+    () => resolveCompare('DESIGN.md', fixture(), {
+      isFile: () => true,
+      readFile: () => '---\nname: not json\n---',
+    }),
+    /baseline DESIGN\.md is not a dembrandt JSON extraction .*--save-output/,
+  );
+});
+
+test('path-looking argument that is not a file rejects instead of POSTing to the App', async () => {
+  let fetched = false;
+  const fetchFn = (async () => { fetched = true; return { ok: true, json: async () => ({}) }; }) as any;
+  for (const typo of ['output/missing.json', 'baselines\\win.json', 'baseline.JSON', 'DESIGN.md']) {
+    await assert.rejects(
+      () => resolveCompare(typo, fixture(), { isFile: () => false, fetchFn }),
+      /baseline file not found/,
+    );
+  }
+  assert.equal(fetched, false, 'never hits the network for a path-looking typo');
+});
+
 test('baseline id path: surfaces a platform error', async () => {
   const fetchFn = (async () => ({ ok: false, status: 404, statusText: 'Not Found', json: async () => ({ error: 'baseline not found: nope' }) })) as any;
   await assert.rejects(

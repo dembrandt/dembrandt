@@ -43,8 +43,23 @@ export async function resolveCompare(
   const readFile = deps.readFile ?? (readFileSync as (p: string, enc: "utf-8") => string);
 
   if (isFile(arg)) {
-    const baseline = JSON.parse(readFile(arg, "utf-8")) as BrandingResult;
+    let baseline: BrandingResult;
+    try {
+      baseline = JSON.parse(readFile(arg, "utf-8")) as BrandingResult;
+    } catch (err) {
+      throw new Error(
+        `baseline ${arg} is not a dembrandt JSON extraction ` +
+        `(${(err as Error).message}) — create one with --save-output or --json-only`,
+        { cause: err }
+      );
+    }
     return { report: computeDrift(baseline, candidate), source: arg, mode: "local" };
+  }
+
+  // A path-looking argument that is not a file is a typo, not a baseline id —
+  // shipping it to the App would surface a confusing platform error instead.
+  if (arg.includes("/") || arg.includes("\\") || /\.(json|md)$/i.test(arg)) {
+    throw new Error(`baseline file not found: ${arg}`);
   }
 
   // Not a local file → treat as a platform baseline id.

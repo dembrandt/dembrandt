@@ -467,7 +467,11 @@ program
           // passes despite a drift report) emits nothing.
           if (process.exitCode === EXIT.DRIFT) emitDriftAnnotations(report);
         } catch (err) {
+          // A gate that cannot evaluate its baseline must not pass: exit RUNTIME
+          // ("check broke, investigate") so CI distinguishes this from stable (0)
+          // and from real drift (1). See lib/exit-codes.ts.
           console.log(color.warning(`! Could not compare against baseline: ${err.message}`));
+          process.exitCode = EXIT.RUNTIME;
         }
       }
 
