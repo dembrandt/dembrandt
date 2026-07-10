@@ -23,11 +23,12 @@ import { generateDesignMd } from "./lib/formatters/markdown.js";
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
 /**
- * @modelcontextprotocol/sdk and zod are optional peer dependencies: consumers
- * of the pure exports (drift, types, normalize, dtcg) are not forced to install
- * the MCP stack. The server entry defers their import to startup so a missing
- * install surfaces a clear instruction instead of a raw ERR_MODULE_NOT_FOUND at
- * module load, before any guard could run.
+ * @modelcontextprotocol/sdk and zod are regular dependencies since 0.23.1 —
+ * they were optional peers before, which broke the documented npx install
+ * (npx never installs optional peers, and the suggested `npm i` remedy cannot
+ * reach the npx cache tree). The deferred import stays as a backstop so a
+ * broken install surfaces a clear instruction instead of a raw
+ * ERR_MODULE_NOT_FOUND at module load.
  */
 class McpDepsMissingError extends Error {
   constructor() {
