@@ -24,6 +24,12 @@
       "import": "./dist/lib/formatters/html.js",
       "default": "./dist/lib/formatters/html.js"
     },
+    "./brand-guide": {
+      "types": "./dist/lib/formatters/brand-guide.d.ts",
+      "require": "./dist/lib/formatters/brand-guide.js",
+      "import": "./dist/lib/formatters/brand-guide.js",
+      "default": "./dist/lib/formatters/brand-guide.js"
+    },
     "./findings": {
       "types": "./dist/lib/findings.d.ts",
       "require": "./dist/lib/findings.js",
