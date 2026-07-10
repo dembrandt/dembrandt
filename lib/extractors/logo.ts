@@ -1,4 +1,5 @@
 import { DOM_COLOR_SNAPSHOT_SCRIPT, extractPlatformColors, resolvePlatformColors } from './platform-colors.js';
+import { LOGO_HEURISTICS_SOURCE } from './logo-heuristics.js';
 
 export async function extractSiteName(page) {
   return await page.evaluate(() => {
@@ -87,8 +88,51 @@ export async function extractLogo(page, url) {
   if (resolved.darkThemeColor) manifestMeta.darkThemeColor = resolved.darkThemeColor;
   if (resolved.backgroundColor) manifestMeta.backgroundColor = resolved.backgroundColor;
 
-  const result = await page.evaluate((baseUrl) => {
+  const result = await page.evaluate(({ baseUrl, heuristicsSource }) => {
     const siteDomain = new URL(baseUrl).hostname.replace('www.', '').split('.')[0].toLowerCase();
+    // The pure, unit-tested heuristics from logo-heuristics.ts, run here as the exact same
+    // code. guardExtractor wraps this whole evaluate, so even a rehydration failure only
+    // yields an empty logo result for this one site — never a crash.
+    const H = new Function(heuristicsSource +
+      '\nreturn { isHomeHref, classifyContextByPosition, thirdPartyBrandFromAlt, positionFraction, fitPaintedBox, isLogoSized };')() as {
+        isHomeHref: (href: any, origin: any) => boolean;
+        classifyContextByPosition: (top: any, docHeight: any, foldY?: number) => 'header'|'footer'|'hero'|'body';
+        thirdPartyBrandFromAlt: (alt: any, site: any) => string | null;
+        positionFraction: (token: any) => number;
+        fitPaintedBox: (content: any, intrinsic: any, fit: any, px?: number, py?: number) => { x: number; y: number; width: number; height: number };
+        isLogoSized: (w: any, h: any, minLongEdge?: number) => boolean;
+      };
+
+    // A customer / partner logo wall is a STRUCTURAL pattern, not a naming one: three or
+    // more similarly-sized marks grouped in one container ("as used by…", integration
+    // grids, press strips). Detecting the GROUP is safer than guessing each mark's brand
+    // from its file name — the latter dropped real logos whose file wasn't named after the
+    // site (an abbreviation, a hash, a proxy URL). A lone header/footer logo is never in
+    // such a group, so this never touches it.
+    function inLogoWall(el) {
+      const r0 = el.getBoundingClientRect();
+      if (r0.width < 24 || r0.height < 8) return false;
+      // The primary logo lives in the header / nav; brand walls are content sections
+      // ("trusted by", integrations, press). Never treat a header/nav mark as a wall
+      // member — that protected e.g. a header logo sitting beside a couple of UI marks.
+      if (el.closest('header, nav, [role="banner"]')) return false;
+      // Some sites build the top bar from plain divs (no <header>). A mark in the top strip
+      // is chrome, not a content wall, so protect it by position too.
+      if (r0.top + window.scrollY < 180) return false;
+      // Brand-wall logos vary in width (each brand's mark has its own aspect ratio), so
+      // size-similarity is the wrong signal — a carousel/list/grid of >=3 sizable marks in
+      // one local container is the wall. Count sizable img/svg marks (tiny UI icons don't
+      // count); >=3 in a local container (not body/main) means el is part of a wall.
+      let node = el.parentElement;
+      for (let d = 0; d < 3 && node && !/^(BODY|MAIN|HTML)$/.test(node.tagName); d++, node = node.parentElement) {
+        let count = 0;
+        for (const m of node.querySelectorAll('img, svg')) {
+          const r = m.getBoundingClientRect();
+          if (r.width >= 24 && r.height >= 8) { count++; if (count >= 3) return true; }
+        }
+      }
+      return false;
+    }
 
     // Canvas for background color detection
     const canvas = document.createElement('canvas');
@@ -163,7 +207,11 @@ export async function extractLogo(page, url) {
       if (context === 'footer') score += 20;
       if (context === 'hero') score += 15;
 
-      if (imgSrc.toLowerCase().includes(siteDomain) || altText.includes(siteDomain) || className.includes(siteDomain)) score += 40;
+      // Compare against the asset's file name, never the whole URL: every image on
+      // adept.com is served from adept.com, so `Sanofi-Logo.png` scored as adept's own
+      // brand and customer-wall logos outranked the real mark.
+      const imgFile = imgSrc.toLowerCase().split(/[?#]/)[0].split('/').pop() || '';
+      if (imgFile.includes(siteDomain) || altText.includes(siteDomain) || className.includes(siteDomain)) score += 40;
       if (className.includes('logo') || el.id?.toLowerCase().includes('logo')) score += 30;
 
       // SVG with aria-label="Homepage" directly in a home anchor — strong signal
@@ -204,6 +252,58 @@ export async function extractLogo(page, url) {
       if (width > height && width < 400 && width > 40 && height > 10 && height < 120) score += 15;
 
       return score;
+    }
+
+    // The box a logo actually occupies on screen. `width`/`height` below report the
+    // asset's intrinsic size (naturalWidth, or the svg's width attribute) — useful, but
+    // not where the mark is painted. Every layer can resize a logo independently:
+    //
+    //   intrinsic   naturalWidth/Height, or the svg viewBox
+    //   attributes  <img width height>
+    //   CSS         width/height/max-*/aspect-ratio, padding, border, box-sizing
+    //   CSS         object-fit + object-position (an img can letterbox inside its box)
+    //   CSS         transform: scale/rotate (getBoundingClientRect already includes it)
+    //   SVG         preserveAspectRatio (letterboxes the same way object-fit: contain does)
+    //   responsive  srcset/sizes and DPR pick a different asset than the one in `src`
+    //   JS          anything that mutates the above at runtime
+    //
+    // getBoundingClientRect() settles most of it: it is the post-layout, post-transform
+    // border box. What it cannot tell us is that a contained image paints only part of
+    // that box. So: strip border+padding to get the content box, then fit the intrinsic
+    // aspect ratio inside it the way object-fit / preserveAspectRatio would.
+    function paintedRect(el) {
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      const n = (v) => parseFloat(v) || 0;
+      const x = r.left + n(cs.borderLeftWidth) + n(cs.paddingLeft);
+      const y = r.top + n(cs.borderTopWidth) + n(cs.paddingTop);
+      const w = Math.max(0, r.width - n(cs.borderLeftWidth) - n(cs.borderRightWidth) - n(cs.paddingLeft) - n(cs.paddingRight));
+      const h = Math.max(0, r.height - n(cs.borderTopWidth) - n(cs.borderBottomWidth) - n(cs.paddingTop) - n(cs.paddingBottom));
+
+      let iw = 0, ih = 0, fit = 'fill';
+      if (el.tagName === 'IMG') {
+        iw = el.naturalWidth; ih = el.naturalHeight;
+        fit = cs.objectFit || 'fill';
+      } else if (el.tagName.toLowerCase() === 'svg') {
+        const vb = (el.getAttribute('viewBox') || '').split(/[\s,]+/).map(Number).filter((v) => !isNaN(v));
+        if (vb.length === 4 && vb[2] > 0 && vb[3] > 0) { iw = vb[2]; ih = vb[3]; }
+        const par = el.getAttribute('preserveAspectRatio') || 'xMidYMid meet';
+        fit = /\bnone\b/.test(par) ? 'fill' : (/\bslice\b/.test(par) ? 'cover' : 'contain');
+      }
+
+      // object-position (svg letterboxing centres by default, as xMidYMid does)
+      const pos = (el.tagName === 'IMG' ? cs.objectPosition : '50% 50%').split(/\s+/);
+      const fitted = H.fitPaintedBox(
+        { x, y, width: w, height: h },
+        iw > 0 && ih > 0 ? { width: iw, height: ih } : null,
+        fit,
+        H.positionFraction(pos[0]),
+        H.positionFraction(pos[1] || pos[0]),
+      );
+      return {
+        x: Math.round(fitted.x + window.scrollX), y: Math.round(fitted.y + window.scrollY),
+        width: Math.round(fitted.width), height: Math.round(fitted.height),
+      };
     }
 
     function extractLogoFromEl(el, context, baseUrl) {
@@ -264,8 +364,10 @@ export async function extractLogo(page, url) {
           source: 'img',
           context,
           url: new URL(src, baseUrl).href,
-          width: el.naturalWidth || rect.width,
+          width: el.naturalWidth || rect.width,     // intrinsic (asset) size
           height: el.naturalHeight || rect.height,
+          rect: paintedRect(el),                     // where the mark is actually painted
+          natural: { width: el.naturalWidth || null, height: el.naturalHeight || null },
           alt: altText,
           type: logoType,
           reversed,
@@ -320,8 +422,10 @@ export async function extractLogo(page, url) {
           markup,
           dataUri,
           svgColors: uniqueSvgColors,
-          width: el.width?.baseVal?.value || rect.width,
+          width: el.width?.baseVal?.value || rect.width,   // the svg's width attribute
           height: el.height?.baseVal?.value || rect.height,
+          rect: paintedRect(el),                            // where the mark is actually painted
+          natural: (() => { const vb = (el.getAttribute('viewBox') || '').split(/[\s,]+/).map(Number); return vb.length === 4 ? { width: vb[2], height: vb[3] } : { width: null, height: null }; })(),
           type: logoType,
           reversed,
           background: bg,
@@ -348,13 +452,15 @@ export async function extractLogo(page, url) {
           const altText = (el.getAttribute('alt') || '').toLowerCase();
           const attrs = (className + ' ' + (el.id || '') + ' ' + altText).toLowerCase();
 
-          // Disqualify third-party brand logos: alt like "Notion logo" / "Perplexity logo" / "Figma" where the brand isn't our site
+          // Disqualify third-party brand logos: alt naming a brand that isn't our site
           // These appear in customer/integration/testimonial sections on marketing pages.
-          const altBrandMatch = altText.match(/^([a-z][a-z0-9.-]{1,30}?)(?:\s+(?:logo|icon|brand|wordmark))?$/i);
-          if (altBrandMatch) {
-            const altBrand = altBrandMatch[1].replace(/[\s.-]/g, '').toLowerCase();
-            if (altBrand && altBrand !== 'logo' && altBrand !== 'brand' && altBrand !== 'icon' && altBrand !== siteDomain && !altBrand.includes(siteDomain) && !siteDomain.includes(altBrand)) {
-              return; // third-party brand, skip entirely
+          // A mark that links home is ours whatever its alt says; otherwise, if its alt
+          // names a different brand, it is a customer/integration logo — skip it.
+          const homeLinked = H.isHomeHref(el.closest('a')?.getAttribute('href'), location.origin);
+          if (!homeLinked) {
+            // alt naming a different brand, OR membership in a logo wall — either way not ours
+            if (H.thirdPartyBrandFromAlt(altText, siteDomain) || inLogoWall(el)) {
+              return;
             }
           }
 
@@ -426,9 +532,33 @@ export async function extractLogo(page, url) {
     // SPA/PWA apps often render into a root div — treat it as transparent wrapper
     const spaRoot = document.querySelector('#app, #root, #__next, #__nuxt, [data-reactroot]') as any;
 
-    const headerEl = document.querySelector(
-      'header, [role="banner"], [class*="header"], [id*="header"]'
-    ) || (() => {
+    // A comma-separated querySelector returns the first match in DOCUMENT order, not the
+    // first matching selector. Cookie dialogs and modals ship markup like
+    // `div.osano-cm-info__info-dialog-header` and `div.modal-col-header` near the top of
+    // the body, so `[class*="header"]` won the race and the real <header> was never
+    // scanned (seen on sites whose cookie/modal markup sits before the real header). Try
+    // the selectors in order of authority, and only accept a rendered element.
+    const visible = (el: any) => {
+      if (!el) return false;
+      const s = getComputedStyle(el);
+      if (s.display === 'none' || s.visibility === 'hidden') return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    };
+    const pickZone = (selectors: string[], accept: (el: any) => boolean = () => true) => {
+      for (const sel of selectors) {
+        for (const el of Array.from(document.querySelectorAll(sel))) {
+          if (visible(el) && accept(el)) return el as any;
+        }
+      }
+      return null;
+    };
+
+    const headerEl = pickZone(
+      ['header', '[role="banner"]', '[class*="header"]', '[id*="header"]'],
+      // a header sits at the top and spans the page; a modal's header does neither
+      (el) => { const r = el.getBoundingClientRect(); return r.top < 300 && r.width > window.innerWidth * 0.3; },
+    ) || pickZone(['header', '[role="banner"]']) || (() => {
       // Fallback: find first visually top element in SPA root or body that spans full width
       const root = spaRoot || document.body;
       const children = Array.from((root as any).children) as any[];
@@ -441,8 +571,8 @@ export async function extractLogo(page, url) {
       }
       return null;
     })();
-    const navEl = document.querySelector('nav, [role="navigation"]') as any;
-    const footerEl = document.querySelector('footer, [role="contentinfo"], [class*="footer"], [id*="footer"]') as any;
+    const navEl = pickZone(['nav', '[role="navigation"]']) as any;
+    const footerEl = pickZone(['footer', '[role="contentinfo"]', '[class*="footer"]', '[id*="footer"]']) as any;
 
     // Hero: first large section that's not header/footer
     const heroEl = (() => {
@@ -513,30 +643,51 @@ export async function extractLogo(page, url) {
     // Global pre-scan: strong semantic signals that identify a logo anywhere in the document
     const globalLogoCandidates = (() => {
       const results = [];
-      const selectors = [
-        'img[class*="logo"]',
-        'img[id*="logo"]',
-        'a[class*="logo"] img',
-        'a[id*="logo"] img',
-        '[class*="logo-link"] img',
-        '[class*="logo-wrap"] img',
-        '[class*="logo-container"] img',
-        'a[href="/"] img',
-        'a[href="./"] img',
-      ];
+      // Tag-AGNOSTIC: an inline <svg> logo wrapped in a home link is as much the site's
+      // mark as an <img> is, but the old img-only selectors could not see it — that alone
+      // accounted for a large share of the missed home-linked inline-SVG logos.
+      // Gather both img and svg from three unambiguous sources: a logo-named container, a
+      // logo-named ancestor, and a link to the home page.
+      const isHomeHref = (h) => { h = (h || '').toLowerCase(); return h === '/' || h === './'
+        || h === location.origin || h === location.origin + '/'; };
+      const marks = new Set();
+      document.querySelectorAll('[class*="logo" i] img, [class*="logo" i] svg, [id*="logo" i] img, [id*="logo" i] svg')
+        .forEach(el => marks.add(el));
+      document.querySelectorAll('a[href], [role="link"]').forEach(a => {
+        if (!isHomeHref(a.getAttribute('href'))) return;
+        a.querySelectorAll('img, svg').forEach(el => marks.add(el));
+      });
       const seen = new Set();
-      for (const sel of selectors) {
+      for (const el of marks as Set<any>) {
         try {
-          document.querySelectorAll(sel).forEach(el => {
-            if (seen.has(el)) return;
-            seen.add(el);
+          if (seen.has(el)) continue;
+          seen.add(el);
+          {
             const rect = el.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) return;
-            if (rect.top > 500) return; // must be near top
-            if (rect.width > 600 || rect.height > 200) return; // too large
-            const score = scoreLogo(el, 'header') + 20; // bonus for semantic match
-            results.push({ el, score, context: 'header' });
-          });
+            if (rect.width === 0 || rect.height === 0) continue;
+            // Below-fold logos are real — 15 of the 22 marks humans found and this extractor
+            // missed sit under the fold. But letting every semantically-named mark through
+            // tripled the proposal count with customer-wall logos, so only the ones that
+            // link to the home page qualify down there: that link is the site claiming the
+            // mark as its own.
+            if (rect.width > 1500 || rect.height > 500) continue; // an illustration, not a mark
+            if (!H.isLogoSized(rect.width, rect.height)) continue; // a UI icon, not a logo
+            const homeLinked = H.isHomeHref(el.closest('a')?.getAttribute('href'), location.origin);
+            // A customer/partner wall matches [class*=logo] too. If a non-home-linked mark
+            // names a different brand in its alt or file name, it is not ours — skip it.
+            // (A partner strip of "logo-<Brand>.svg" images slipped in here: the pre-scan
+            // never ran the third-party guard that findLogosInZone applies.)
+            if (!homeLinked) {
+              const altText = (el.getAttribute('alt') || '');
+              if (H.thirdPartyBrandFromAlt(altText, siteDomain) || inLogoWall(el)) continue;
+            }
+            const belowFold = rect.top > 500;
+            if (belowFold && !homeLinked) continue; // below the fold, only our own home-linked mark
+            const context = !belowFold ? 'header'
+              : (rect.top > document.documentElement.scrollHeight - 1200 ? 'footer' : 'body');
+            const score = scoreLogo(el, context) + 20; // bonus for semantic match
+            results.push({ el, score, context });
+          }
         } catch {}
       }
       return results;
@@ -573,16 +724,30 @@ export async function extractLogo(page, url) {
       }
     }
 
-    // Collect all unique instances (header, footer, hero)
+    // Collect every distinct mark, best-scoring first. Deduplicating by CONTEXT capped the
+    // output at one logo per header/footer/hero, so a lockup rendered as symbol + wordmark
+    // (two elements) lost half of itself, and a page with logos in both the header and the
+    // body could only ever report one. Deduplicate by element instead.
+    const MAX_INSTANCES = 6;
     const instances = [];
-    const seenContexts = new Set();
+    const seenEls = new Set();
     for (const c of allCandidates) {
-      if (seenContexts.has(c.context)) continue;
-      seenContexts.add(c.context);
+      if (instances.length >= MAX_INSTANCES) break;
+      const key = c.cssBackground
+        ? `bg:${c.cssBackground.url}@${Math.round(c.cssBackground.position.top)}`
+        : c.el;
+      if (!key || seenEls.has(key)) continue;
+      seenEls.add(key);
       let inst = null;
       if (c.cssBackground) inst = c.cssBackground;
       else if (c.el) inst = extractLogoFromEl(c.el, c.context, baseUrl);
-      if (inst) instances.push(inst);
+      // Reject UI icons (search/menu/social glyphs) that scored into the candidate list —
+      // measured floor: no real logo is below 24px on its long edge. Judge by the painted
+      // rect (the on-screen size), not the intrinsic asset size.
+      if (inst) {
+        const box = (inst as any).rect || { width: (inst as any).width, height: (inst as any).height };
+        if (H.isLogoSized(box.width, box.height)) instances.push(inst);
+      }
     }
 
     // Favicons
@@ -618,7 +783,7 @@ export async function extractLogo(page, url) {
     }
 
     return { logo: primaryLogo, instances, favicons };
-  }, url);
+  }, { baseUrl: url, heuristicsSource: LOGO_HEURISTICS_SOURCE });
 
   // Merge PWA icons into favicons
   result.favicons = [...result.favicons, ...pwaIcons];

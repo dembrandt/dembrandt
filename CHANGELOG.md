@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.22.0] - unreleased
+
+### Changed
+- Logo extraction reworked for recall and precision, measured against 103 human-judged sites: recall 0.64 -> 0.67, and known non-logos proposed cut from 11/21 to 4/21 (total proposals 206 -> 178). Concretely: header-zone selection no longer loses to cookie-dialog/modal `[class*=header]` elements; inline-`<svg>` logos wrapped in a home link are found (previously only `<img>` was); below-fold and footer logos that link home now qualify; symbol+wordmark lockups are kept as separate instances instead of collapsing to one; customer/partner-wall logos (detected structurally as a group of >=3 sizable marks in one content container) and 16-20px UI icons are no longer proposed; logos linking to a localized homepage (/en, /de) are recognized as the site's own
+- Each logo instance now reports a `rect` (the painted on-screen box, correct for `object-fit`/`preserveAspectRatio` letterboxing, padding, border and transforms) alongside the existing intrinsic `width`/`height`; a `natural` field carries the asset's intrinsic size
+
+### Added
+- `lib/extractors/logo-heuristics.ts`: the pure, DOM-free logo decisions (home-link, position→context, third-party-brand detection, painted-box geometry, minimum logo size), serialized into the page so the browser runs the exact same code, with 30 unit tests
+
 ## [0.21.0] - 2026-06-29
 
 ### Changed
