@@ -55,9 +55,16 @@ runs:
       # Global install, not npx: when the consuming checkout is itself an npm
       # package (like dembrandt's own repo), npx resolves the spec against the
       # local package.json and never fetches from the registry.
+      #
+      # The browser revision must match the playwright-core version that npm
+      # actually resolved for the CLI (its ranges float), so derive it from the
+      # installed tree instead of hardcoding — same rule as README "Continuous
+      # integration".
       run: |
         npm install -g dembrandt@0.22.0
-        npx --yes playwright@1.60.0 install chromium --with-deps
+        PW_VERSION=$(node -p "require('$(npm root -g)/dembrandt/node_modules/playwright-core/package.json').version")
+        echo "playwright-core resolved to $PW_VERSION"
+        npx --yes "playwright@$PW_VERSION" install chromium --with-deps
 
     - name: Extract and gate
       id: gate
