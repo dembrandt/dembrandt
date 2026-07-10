@@ -1,4 +1,5 @@
 import { DOM_COLOR_SNAPSHOT_SCRIPT, extractPlatformColors, resolvePlatformColors } from './platform-colors.js';
+import { LOGO_HEURISTICS_SOURCE } from './logo-heuristics.js';
 
 export async function extractSiteName(page) {
   return await page.evaluate(() => {
@@ -87,8 +88,19 @@ export async function extractLogo(page, url) {
   if (resolved.darkThemeColor) manifestMeta.darkThemeColor = resolved.darkThemeColor;
   if (resolved.backgroundColor) manifestMeta.backgroundColor = resolved.backgroundColor;
 
-  const result = await page.evaluate((baseUrl) => {
+  const result = await page.evaluate(({ baseUrl, heuristicsSource }) => {
     const siteDomain = new URL(baseUrl).hostname.replace('www.', '').split('.')[0].toLowerCase();
+    // The pure, unit-tested heuristics from logo-heuristics.ts, run here as the exact same
+    // code. guardExtractor wraps this whole evaluate, so even a rehydration failure only
+    // yields an empty logo result for this one site — never a crash.
+    const H = new Function(heuristicsSource +
+      '\nreturn { isHomeHref, classifyContextByPosition, thirdPartyBrandFromAlt, positionFraction, fitPaintedBox };')() as {
+        isHomeHref: (href: any, origin: any) => boolean;
+        classifyContextByPosition: (top: any, docHeight: any, foldY?: number) => 'header'|'footer'|'hero'|'body';
+        thirdPartyBrandFromAlt: (alt: any, site: any) => string | null;
+        positionFraction: (token: any) => number;
+        fitPaintedBox: (content: any, intrinsic: any, fit: any, px?: number, py?: number) => { x: number; y: number; width: number; height: number };
+      };
 
     // Canvas for background color detection
     const canvas = document.createElement('canvas');
@@ -247,19 +259,18 @@ export async function extractLogo(page, url) {
         fit = /\bnone\b/.test(par) ? 'fill' : (/\bslice\b/.test(par) ? 'cover' : 'contain');
       }
 
-      if (iw > 0 && ih > 0 && w > 0 && h > 0 && fit !== 'fill' && fit !== 'cover') {
-        const scale = fit === 'scale-down' ? Math.min(1, Math.min(w / iw, h / ih)) : Math.min(w / iw, h / ih);
-        const pw = iw * scale, ph = ih * scale;
-        // object-position (svg letterboxing centres by default, as xMidYMid does)
-        const pos = (el.tagName === 'IMG' ? cs.objectPosition : '50% 50%').split(/\s+/);
-        const frac = (v) => (v && v.endsWith('%') ? parseFloat(v) / 100 : (v === 'left' || v === 'top' ? 0 : v === 'right' || v === 'bottom' ? 1 : 0.5));
-        x += (w - pw) * frac(pos[0]);
-        y += (h - ph) * frac(pos[1] || pos[0]);
-        w = pw; h = ph;
-      }
+      // object-position (svg letterboxing centres by default, as xMidYMid does)
+      const pos = (el.tagName === 'IMG' ? cs.objectPosition : '50% 50%').split(/\s+/);
+      const fitted = H.fitPaintedBox(
+        { x, y, width: w, height: h },
+        iw > 0 && ih > 0 ? { width: iw, height: ih } : null,
+        fit,
+        H.positionFraction(pos[0]),
+        H.positionFraction(pos[1] || pos[0]),
+      );
       return {
-        x: Math.round(x + window.scrollX), y: Math.round(y + window.scrollY),
-        width: Math.round(w), height: Math.round(h),
+        x: Math.round(fitted.x + window.scrollX), y: Math.round(fitted.y + window.scrollY),
+        width: Math.round(fitted.width), height: Math.round(fitted.height),
       };
     }
 
@@ -411,24 +422,11 @@ export async function extractLogo(page, url) {
 
           // Disqualify third-party brand logos: alt like "Notion logo" / "Perplexity logo" / "Figma" where the brand isn't our site
           // These appear in customer/integration/testimonial sections on marketing pages.
-          // The old pattern only matched a single bare word, so "Abercrombie & Fitch Logo"
-          // and "Commonwealth Bank Logo" slipped through as our own brand. Strip the
-          // generic suffix, squash the rest, and compare. Never disqualify a mark that
-          // links to the home page — that one is ours whatever its alt text says.
-          const homeLinked = (() => {
-            const a = el.closest('a');
-            if (!a) return false;
-            const href = (a.getAttribute('href') || '').toLowerCase();
-            return href === '/' || href === './' || /^https?:\/\/[^/]+\/?$/.test(href);
-          })();
-          const altBrand = altText
-            .replace(/\b(logo|logotype|logomark|wordmark|icon|brand|mark)\b/gi, ' ')
-            .replace(/[^a-z0-9]+/gi, '')
-            .toLowerCase();
-          if (!homeLinked && altBrand.length > 1) {
-            if (altBrand !== siteDomain && !altBrand.includes(siteDomain) && !siteDomain.includes(altBrand)) {
-              return; // a third party's brand, named in its own alt text
-            }
+          // A mark that links home is ours whatever its alt says; otherwise, if its alt
+          // names a different brand, it is a customer/integration logo — skip it.
+          const homeLinked = H.isHomeHref(el.closest('a')?.getAttribute('href'), location.origin);
+          if (!homeLinked && H.thirdPartyBrandFromAlt(altText, siteDomain)) {
+            return; // a third party's brand, named in its own alt text
           }
 
           let qualifies = attrs.includes('logo') || attrs.includes('brand');
@@ -610,43 +608,46 @@ export async function extractLogo(page, url) {
     // Global pre-scan: strong semantic signals that identify a logo anywhere in the document
     const globalLogoCandidates = (() => {
       const results = [];
-      const selectors = [
-        'img[class*="logo"]',
-        'img[id*="logo"]',
-        'a[class*="logo"] img',
-        'a[id*="logo"] img',
-        '[class*="logo-link"] img',
-        '[class*="logo-wrap"] img',
-        '[class*="logo-container"] img',
-        'a[href="/"] img',
-        'a[href="./"] img',
-      ];
+      // Tag-AGNOSTIC: an inline <svg> logo wrapped in a home link is as much the site's
+      // mark as an <img> is, but the old img-only selectors could not see it — that alone
+      // was 11 of the missed home-linked logos (consensys, medable, nytimes, quantummetric).
+      // Gather both img and svg from three unambiguous sources: a logo-named container, a
+      // logo-named ancestor, and a link to the home page.
+      const isHomeHref = (h) => { h = (h || '').toLowerCase(); return h === '/' || h === './'
+        || h === location.origin || h === location.origin + '/'; };
+      const marks = new Set();
+      document.querySelectorAll('[class*="logo" i] img, [class*="logo" i] svg, [id*="logo" i] img, [id*="logo" i] svg')
+        .forEach(el => marks.add(el));
+      document.querySelectorAll('a[href], [role="link"]').forEach(a => {
+        if (!isHomeHref(a.getAttribute('href'))) return;
+        a.querySelectorAll('img, svg').forEach(el => marks.add(el));
+      });
       const seen = new Set();
-      for (const sel of selectors) {
+      for (const el of marks as Set<any>) {
         try {
-          document.querySelectorAll(sel).forEach(el => {
-            if (seen.has(el)) return;
-            seen.add(el);
+          if (seen.has(el)) continue;
+          seen.add(el);
+          {
             const rect = el.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) return;
+            if (rect.width === 0 || rect.height === 0) continue;
             // Below-fold logos are real — 15 of the 22 marks humans found and this extractor
             // missed sit under the fold. But letting every semantically-named mark through
             // tripled the proposal count with customer-wall logos, so only the ones that
             // link to the home page qualify down there: that link is the site claiming the
             // mark as its own.
-            if (rect.width > 1500 || rect.height > 500) return; // an illustration, not a mark
+            if (rect.width > 1500 || rect.height > 500) continue; // an illustration, not a mark
             const belowFold = rect.top > 500;
             if (belowFold) {
               const a = el.closest('a');
               const href = (a?.getAttribute('href') || '').toLowerCase();
               const ownsIt = href === '/' || href === './' || /^https?:\/\/[^/]+\/?$/.test(href);
-              if (!ownsIt) return;
+              if (!ownsIt) continue;
             }
             const context = !belowFold ? 'header'
               : (rect.top > document.documentElement.scrollHeight - 1200 ? 'footer' : 'body');
             const score = scoreLogo(el, context) + 20; // bonus for semantic match
             results.push({ el, score, context });
-          });
+          }
         } catch {}
       }
       return results;
@@ -736,7 +737,7 @@ export async function extractLogo(page, url) {
     }
 
     return { logo: primaryLogo, instances, favicons };
-  }, url);
+  }, { baseUrl: url, heuristicsSource: LOGO_HEURISTICS_SOURCE });
 
   // Merge PWA icons into favicons
   result.favicons = [...result.favicons, ...pwaIcons];
