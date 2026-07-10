@@ -156,7 +156,47 @@ thead th{border-bottom:1px solid var(--line);color:var(--muted);font-weight:600;
 .shadowpanel{background:#f0f0f0;border-radius:8px;padding:18px;display:flex;flex-wrap:wrap;gap:18px;align-items:center}
 .shadowpanel .sb{width:56px;height:56px;border-radius:8px;background:#fff}
 footer{margin-top:48px;color:var(--muted);font-size:var(--t-sm);text-align:center}
+[data-copy]{cursor:pointer}
+[data-copy]:hover{color:var(--accent)}
+.copied,[data-copy].copied:hover{color:var(--good)}
+.copied::after{content:" copied";font-size:var(--t-sm);font-family:var(--sans)}
+button.copyall{margin-left:auto;background:none;border:1px solid var(--line);border-radius:6px;color:var(--muted);font-size:var(--t-sm);font-family:var(--sans);padding:2px 10px;cursor:pointer;text-transform:none;letter-spacing:0}
+button.copyall:hover{color:var(--ink);border-color:var(--muted)}
+details.card>summary:has(button.copyall)::after{margin-left:12px}
+.cov{display:inline-flex;gap:3px;align-items:center;margin-left:6px;vertical-align:middle}
+.cov i{width:14px;height:6px;border-radius:2px;background:var(--line)}
+.cov i.on{background:var(--good)}
+.dgroup{margin-top:18px}
+.dgrouph{display:flex;gap:12px;align-items:baseline;font-size:var(--t-sm);font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.dlist{display:flex;flex-direction:column;gap:7px;font-size:var(--t-sm)}
+.drow{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.dglyph{width:12px;font-weight:700;font-family:var(--mono);flex:none}
+.g-add{color:var(--good)}.g-rem{color:var(--bad)}.g-chg{color:var(--muted)}
+.dsw{width:16px;height:16px;border-radius:5px;box-shadow:inset 0 0 0 1px var(--swring);flex:none}
+.dpill{border:1px solid var(--line);border-radius:999px;padding:1px 9px;font-size:var(--t-sm);color:var(--accent);text-transform:uppercase;letter-spacing:.03em}
+.dold{text-decoration:line-through;color:var(--muted)}
+.dnew{color:var(--good)}
+.ddelta{margin-left:auto;color:var(--muted);font-family:var(--mono)}
+.dlegend{color:var(--muted);font-size:var(--t-sm);margin-top:16px}
+.dempty{color:var(--good);margin-top:12px;font-size:var(--t-sm)}
+tr.tgrouph td{color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:var(--t-sm);border-bottom:1px solid var(--line);padding:14px 12px 6px}
+.sprows{display:grid;gap:7px}
+.sprow{display:grid;grid-template-columns:minmax(96px,auto) 1fr;gap:12px;align-items:center}
+.sprow .bar{height:10px;border-radius:3px;background:var(--accent);opacity:.5;min-width:2px}
+.rads{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end}
+.rad{display:flex;flex-direction:column;align-items:center;gap:6px}
+.rad .radbox{width:44px;height:44px;border:1px solid var(--muted);background:var(--surface)}
+.swpair{display:inline-flex;flex:none}
+.swpair span{width:18px;height:18px;border-radius:5px;box-shadow:inset 0 0 0 1px var(--swring);display:inline-block}
+.swpair span+span{margin-left:-5px}
 `;
+
+/*
+ * The report's only JavaScript: click-to-copy. Progressive enhancement over an
+ * otherwise CSS-only file — without JS everything still renders, values just
+ * don't copy. Buttons inside <summary> must not toggle the card.
+ */
+const SCRIPT = `document.addEventListener('click',function(e){var t=e.target.closest('[data-copy]');if(!t)return;if(t.closest('summary')){e.preventDefault()}navigator.clipboard.writeText(t.getAttribute('data-copy')).then(function(){t.classList.add('copied');setTimeout(function(){t.classList.remove('copied')},1200)}).catch(function(){})});`;
 
 // Dembrandt brand mark (from dembrandt-next/components/AppMarkIcon.tsx). Inlined,
 // fill=currentColor so it inherits the topbar accent. Self-contained — no asset fetch.
@@ -169,11 +209,13 @@ function confBadge(c?: string): string {
   return `<span class="conf ${cls}">${esc(c ?? "low")}</span>`;
 }
 
-// Collapsible section card (Lighthouse-style, native <details> — no JS, stays
-// self-contained). Open by default; the user can collapse any section.
-function section(title: string, body: string, id?: string): string {
+// Collapsible section card (Lighthouse-style, native <details>, self-contained).
+// Open by default; the user can collapse any section. `copyText` adds a
+// "Copy all" button to the header (App parity — every section is exportable).
+function section(title: string, body: string, id?: string, copyText?: string): string {
   if (!body.trim()) return "";
-  return `<details class="card"${id ? ` id="${esc(id)}"` : ""} open><summary>${esc(title)}</summary><div class="cardbody">${body}</div></details>`;
+  const copy = copyText ? `<button class="copyall" data-copy="${esc(copyText)}">Copy all</button>` : "";
+  return `<details class="card"${id ? ` id="${esc(id)}"` : ""} open><summary>${esc(title)}${copy}</summary><div class="cardbody">${body}</div></details>`;
 }
 
 /** Lay two (or more) small cards side by side — related scales read together. */
@@ -242,6 +284,14 @@ function summaryCounts(result: BrandingResult): string {
   return parts.length ? `<p class="counts">${esc(parts.join(" · "))}</p>` : "";
 }
 
+/** Segmented "captured N/M token categories" indicator (App parity). */
+function coverageLine(fr: FindingsReport): string {
+  const cov = fr.coverage;
+  if (!cov || !cov.total) return "";
+  const segs = Array.from({ length: cov.total }, (_, i) => `<i${i < cov.present ? ' class="on"' : ""}></i>`).join("");
+  return `<p class="counts">Captured <span class="cov">${segs}</span> ${esc(cov.present)}/${esc(cov.total)} token categories</p>`;
+}
+
 /** Actionable findings — the audits behind the scores, Lighthouse-style. */
 function findingsSection(fr: FindingsReport): string {
   if (!fr.findings.length) return "";
@@ -278,10 +328,11 @@ function paletteSection(result: BrandingResult): string {
     .map((c: PaletteColor) => {
       const hex = c.normalized || c.color;
       const role = roleByHex.get(String(hex).toLowerCase());
-      return `<div class="color"><div class="sw2" style="background:${safeCss(hex) || "transparent"}"></div><div class="hex">${esc(hex)}</div>${role ? `<div class="role">${esc(role)}</div>` : `<div class="cmeta">${confBadge(c.confidence)}</div>`}</div>`;
+      return `<div class="color"><div class="sw2" style="background:${safeCss(hex) || "transparent"}"></div><div class="hex" data-copy="${esc(hex)}">${esc(hex)}</div>${role ? `<div class="role">${esc(role)}</div>` : `<div class="cmeta">${confBadge(c.confidence)}</div>`}</div>`;
     })
     .join("");
-  return section("Palette", `<div class="colors">${cards}</div>`);
+  const all = palette.map((c: PaletteColor) => c.normalized || c.color).join("\n");
+  return section("Palette", `<div class="colors">${cards}</div>`, undefined, all);
 }
 
 function semanticSection(result: BrandingResult): string {
@@ -290,20 +341,51 @@ function semanticSection(result: BrandingResult): string {
   const chips = sem
     .map(
       ([role, hex]) =>
-        `<div class="color"><div class="sw2" style="background:${safeCss(hex) || "transparent"}"></div><div class="role">${esc(role)}</div><div class="hex">${esc(hex)}</div></div>`
+        `<div class="color"><div class="sw2" style="background:${safeCss(hex) || "transparent"}"></div><div class="role">${esc(role)}</div><div class="hex" data-copy="${esc(hex)}">${esc(hex)}</div></div>`
     )
     .join("");
-  return section("Semantic colors", `<div class="colors">${chips}</div>`);
+  const all = sem.map(([role, hex]) => `${role}: ${hex}`).join("\n");
+  return section("Semantic colors", `<div class="colors">${chips}</div>`, undefined, all);
+}
+
+/**
+ * Bucket a typography context into a display group so the type scale reads
+ * Display → Headings → Body → UI → Caption instead of extraction order
+ * (App parity: ExtractionsPageClient groupOrder).
+ */
+const TYPE_GROUPS = ["Display", "Headings", "Body", "Links", "UI", "Caption", "Other"] as const;
+function typeGroup(context: string): (typeof TYPE_GROUPS)[number] {
+  const c = context.toLowerCase();
+  if (/display|hero/.test(c)) return "Display";
+  if (/^h[1-6]|heading|title/.test(c)) return "Headings";
+  if (/body|text|paragraph/.test(c)) return "Body";
+  if (/link/.test(c)) return "Links";
+  if (/button|input|label|nav|ui/.test(c)) return "UI";
+  if (/caption|small|meta|footnote/.test(c)) return "Caption";
+  return "Other";
 }
 
 function typographySection(result: BrandingResult): string {
   const styles = result.typography?.styles ?? [];
   if (!styles.length) return "";
-  const rows = styles
-    .map(
-      (s: TypographyStyle) =>
-        `<tr><td>${esc(s.context)}</td><td>${esc((s.family ?? "").split(",")[0])}</td><td class="mono">${esc(s.size)}</td><td class="mono">${esc(s.weight)}</td><td class="mono">${esc(s.lineHeight ?? "")}</td></tr>`
-    )
+  const groups = new Map<string, TypographyStyle[]>();
+  for (const s of styles) {
+    const g = typeGroup(String(s.context ?? ""));
+    groups.set(g, [...(groups.get(g) ?? []), s]);
+  }
+  const row = (s: TypographyStyle) => {
+    const family = (s.family ?? "").split(",")[0];
+    // Render the family name in its own font (locally installed fonts only —
+    // the report never fetches web fonts, same caveat as the App shows).
+    const fstyle = [safeCss(family) ? `font-family:${safeCss(family)},var(--sans)` : "", s.weight ? `font-weight:${safeCss(s.weight)}` : ""].filter(Boolean).join(";");
+    return `<tr><td>${esc(s.context)}</td><td${fstyle ? ` style="${esc(fstyle)}"` : ""}>${esc(family)}</td><td class="mono" data-copy="${esc(s.size)}">${esc(s.size)}</td><td class="mono">${esc(s.weight)}</td><td class="mono">${esc(s.lineHeight ?? "")}</td></tr>`;
+  };
+  const rows = TYPE_GROUPS.filter((g) => groups.has(g))
+    .map((g) => {
+      const items = groups.get(g)!;
+      const head = groups.size > 1 ? `<tr class="tgrouph"><td colspan="5">${esc(g)} <span class="muted">${items.length}</span></td></tr>` : "";
+      return head + items.map(row).join("");
+    })
     .join("");
   const srcs = result.typography?.sources ?? {};
   const fams = [
@@ -313,9 +395,12 @@ function typographySection(result: BrandingResult): string {
     ...(srcs.selfHostedFonts ?? []),
   ];
   const srcLine = fams.length ? `<p class="sub">Sources: ${esc(fams.join(", "))}</p>` : "";
+  const all = styles.map((s) => `${s.context}: ${(s.family ?? "").split(",")[0]} ${s.size}/${s.weight}${s.lineHeight ? ` lh ${s.lineHeight}` : ""}`).join("\n");
   return section(
     "Typography",
-    `<table><thead><tr><th>Context</th><th>Family</th><th>Size</th><th>Weight</th><th>Line height</th></tr></thead><tbody>${rows}</tbody></table>${srcLine}`
+    `<table><thead><tr><th>Context</th><th>Family</th><th>Size</th><th>Weight</th><th>Line height</th></tr></thead><tbody>${rows}</tbody></table>${srcLine}`,
+    undefined,
+    all
   );
 }
 
@@ -334,37 +419,57 @@ function sortByPx(values: TokenValue[]): TokenValue[] {
   return [...values].sort((a, b) => tokenPx(a) - tokenPx(b));
 }
 
-function tokenChips(values: TokenValue[]): string {
-  return values
-    .map((v) => {
-      // px may already be a string like "2px" (pre-1.1.0 extractions); don't
-      // re-append the unit.
-      const label = v.display ?? v.value ?? (typeof v.px === "string" ? v.px : v.px != null ? `${v.px}px` : "");
-      if (!label) return "";
-      return `<span class="tok">${esc(label)}${v.count != null ? ` <span class="muted">${esc(v.count)}×</span>` : ""}</span>`;
-    })
-    .join("");
+/** Token label — px may already be a string like "2px" (pre-1.1.0), don't re-append. */
+function tokenLabel(v: TokenValue): string {
+  return v.display ?? v.value ?? (typeof v.px === "string" ? v.px : v.px != null ? `${v.px}px` : "");
 }
 
 function spacingSection(result: BrandingResult): string {
   const vals = result.spacing?.commonValues ?? [];
   if (!vals.length) return "";
+  // Proportional bars turn the scale into a visible ramp (App parity) — the
+  // chip stays as the label, the bar shows relative magnitude.
+  const sorted = sortByPx(vals as TokenValue[]);
+  const finite = sorted.filter((v) => Number.isFinite(tokenPx(v)));
+  const max = Math.max(...finite.map(tokenPx), 1);
+  const rows = sorted
+    .map((v) => {
+      const label = tokenLabel(v);
+      if (!label) return "";
+      const px = tokenPx(v);
+      const bar = Number.isFinite(px) && px >= 1 ? `<span class="bar" style="width:${Math.max(1, Math.round((100 * px) / max))}%"></span>` : "<span></span>";
+      return `<div class="sprow"><span class="tok" data-copy="${esc(label)}">${esc(label)}${v.count != null ? ` <span class="muted">${esc(v.count)}×</span>` : ""}</span>${bar}</div>`;
+    })
+    .join("");
   const scale = result.spacing?.scaleType ? `<p class="sub">Scale: ${esc(result.spacing.scaleType)}</p>` : "";
-  return section("Spacing", `<div class="chips">${tokenChips(sortByPx(vals as TokenValue[]))}</div>${scale}`);
+  const all = sorted.map(tokenLabel).filter(Boolean).join("\n");
+  return section("Spacing", `<div class="sprows">${rows}</div>${scale}`, undefined, all);
 }
 
 function radiusSection(result: BrandingResult): string {
   const vals = result.borderRadius?.values ?? [];
   if (!vals.length) return "";
-  return section("Border radius", `<div class="chips">${tokenChips(sortByPx(vals as TokenValue[]))}</div>`);
+  // Each radius is applied to a real box (App parity) so the shape is visible.
+  const sorted = sortByPx(vals as TokenValue[]);
+  const boxes = sorted
+    .map((v) => {
+      const label = tokenLabel(v);
+      if (!label) return "";
+      const r = safeCss(label);
+      return `<div class="rad"><div class="radbox"${r ? ` style="border-radius:${esc(r)}"` : ""}></div><span class="tok" data-copy="${esc(label)}">${esc(label)}${v.count != null ? ` <span class="muted">${esc(v.count)}×</span>` : ""}</span></div>`;
+    })
+    .join("");
+  const all = sorted.map(tokenLabel).filter(Boolean).join("\n");
+  return section("Border radius", `<div class="rads">${boxes}</div>`, undefined, all);
 }
 
 function shadowsSection(result: BrandingResult): string {
   const shadows = result.shadows ?? [];
   if (!shadows.length) return "";
   const boxes = shadows.map((s) => `<span class="sb" style="box-shadow:${safeCss(s.shadow)}"></span>`).join("");
-  const list = shadows.map((s) => `<div class="mono sub">${esc(s.shadow)}</div>`).join("");
-  return section("Shadows", `<div class="shadowpanel">${boxes}</div><div style="margin-top:12px;display:grid;gap:4px">${list}</div>`);
+  const list = shadows.map((s) => `<div class="mono sub" data-copy="${esc(s.shadow)}">${esc(s.shadow)}</div>`).join("");
+  const all = shadows.map((s) => s.shadow).join("\n");
+  return section("Shadows", `<div class="shadowpanel">${boxes}</div><div style="margin-top:12px;display:grid;gap:4px">${list}</div>`, undefined, all);
 }
 
 function buttonsSection(result: BrandingResult): string {
@@ -416,14 +521,24 @@ function wcagSection(result: BrandingResult): string {
   if (!pairs.length) return "";
   const rows = pairs
     .slice(0, 60)
-    .map((p: WcagPair) => {
-      const verdict = p.aa ? `<span class="badge b-good">AA</span>` : p.aaLarge ? `<span class="badge b-warn">AA Large</span>` : `<span class="badge b-bad">Fail</span>`;
-      return `<tr><td><span class="shadowbox" style="width:22px;height:22px;border-radius:4px;background:${safeCss(p.bg)};border:1px solid var(--line)"></span></td><td class="mono">${esc(p.fg)}</td><td class="mono">${esc(p.bg)}</td><td class="mono">${esc(p.ratio?.toFixed ? p.ratio.toFixed(2) : p.ratio)}</td><td>${verdict}</td></tr>`;
+    .map((p: WcagPair & { aaa?: boolean }) => {
+      // Tiered verdict incl. AAA (App parity); fg AND bg swatches as a pair.
+      const verdict = p.aaa
+        ? `<span class="badge b-good">AAA</span>`
+        : p.aa
+          ? `<span class="badge b-good">AA</span>`
+          : p.aaLarge
+            ? `<span class="badge b-warn">AA Large</span>`
+            : `<span class="badge b-bad">Fail</span>`;
+      const swatches = `<span class="swpair"><span style="background:${safeCss(p.fg) || "transparent"}"></span><span style="background:${safeCss(p.bg) || "transparent"}"></span></span>`;
+      return `<tr><td>${swatches}</td><td class="mono" data-copy="${esc(p.fg)}">${esc(p.fg)}</td><td class="mono" data-copy="${esc(p.bg)}">${esc(p.bg)}</td><td class="mono">${esc(p.ratio?.toFixed ? p.ratio.toFixed(2) : p.ratio)}</td><td>${verdict}</td></tr>`;
     })
     .join("");
+  const failed = pairs.filter((p) => !p.aa && !p.aaLarge).length;
+  const title = failed ? `WCAG contrast (${pairs.length - failed} pass · ${failed} fail)` : `WCAG contrast (${pairs.length} pass)`;
   return section(
-    "WCAG contrast",
-    `<table><thead><tr><th>bg</th><th>Foreground</th><th>Background</th><th>Ratio</th><th>AA</th></tr></thead><tbody>${rows}</tbody></table>`,
+    title,
+    `<table><thead><tr><th>Pair</th><th>Foreground</th><th>Background</th><th>Ratio</th><th>Level</th></tr></thead><tbody>${rows}</tbody></table>`,
     "wcag"
   );
 }
@@ -447,33 +562,76 @@ function metaSection(result: BrandingResult): string {
 
 /* -------------------------------- drift --------------------------------- */
 
-function driftSection(drift: DriftReport, baselineLabel?: string): string {
+const DRIFT_GLYPH = { added: `<span class="dglyph g-add">+</span>`, removed: `<span class="dglyph g-rem">−</span>`, changed: `<span class="dglyph g-chg">~</span>` } as const;
+
+/** Is a token string paintable as a swatch (colors only, not shadows etc.)? */
+function isColorish(v: unknown): boolean {
+  return /^(#|rgb|hsl|lch|oklch|lab|oklab)/i.test(String(v ?? "").trim());
+}
+
+/** One drift change row, rendered per-category (App parity). */
+function driftRow(ch: DriftChange, roleByHex: Map<string, string>): string {
+  const glyph = DRIFT_GLYPH[ch.kind as keyof typeof DRIFT_GLYPH] ?? DRIFT_GLYPH.changed;
+  const delta = ch.delta != null ? `<span class="ddelta">Δ${esc(ch.delta)}</span>` : "";
+  if (ch.category === "color") {
+    const sw = (v: unknown) => (v && isColorish(v) ? `<span class="dsw" style="background:${safeCss(v) || "transparent"}"></span>` : "");
+    const role = roleByHex.get(String(ch.after ?? ch.before ?? "").toLowerCase());
+    const detail =
+      ch.before && ch.after
+        ? `${sw(ch.before)}${sw(ch.after)}<span class="mono">${esc(ch.before)} → ${esc(ch.after)}</span>`
+        : `${sw(ch.before ?? ch.after)}<span class="mono">${esc(ch.before ?? ch.after ?? ch.label)}</span>`;
+    return `<div class="drow">${glyph}${detail}${role ? `<span class="dpill">${esc(role)}</span>` : ""}${delta}</div>`;
+  }
+  if (ch.category === "typography") {
+    const detail =
+      ch.before && ch.after
+        ? `<span class="dold">${esc(ch.before)}</span> <span class="${ch.kind === "removed" ? "dold" : "dnew"}">${esc(ch.after)}</span>`
+        : `<span class="${ch.kind === "removed" ? "dold" : "dnew"}">${esc(ch.before ?? ch.after ?? "")}</span>`;
+    return `<div class="drow">${glyph}<span class="mono muted">${esc(ch.label)}</span>${detail}${delta}</div>`;
+  }
+  const detail = ch.before && ch.after ? `${esc(ch.before)} → ${esc(ch.after)}` : esc(ch.before ?? ch.after ?? "");
+  // Single-value tokens (spacing/radius) often have label === value; don't repeat.
+  const label = ch.label && ch.label !== (ch.before ?? ch.after) ? `<span class="mono muted">${esc(ch.label)}</span>` : "";
+  return `<div class="drow">${glyph}${label}<span class="mono">${detail}</span>${delta}</div>`;
+}
+
+function driftSection(drift: DriftReport, result: BrandingResult, baselineLabel?: string): string {
   const cls = drift.status === "drift" ? "is-drift" : "is-stable";
   const verdict =
     drift.status === "drift"
       ? `<span class="badge b-bad">DRIFT</span>`
       : `<span class="badge b-good">STABLE</span>`;
-  const cats = drift.categories
-    .filter((c) => c.changed + c.added + c.removed > 0)
-    .map(
-      (c) =>
-        `<tr><td>${esc(c.category)}</td><td>${esc(Math.round(c.score * 100))}</td><td>${esc(c.changed)}</td><td>${esc(c.added)}</td><td>${esc(c.removed)}</td></tr>`
-    )
-    .join("");
-  const changes = drift.changes
-    .slice(0, 120)
-    .map((ch: DriftChange) => {
-      const kindCls = ch.kind === "added" ? "b-good" : ch.kind === "removed" ? "b-bad" : "b-warn";
-      const detail = ch.before && ch.after ? `${esc(ch.before)} → ${esc(ch.after)}` : esc(ch.before ?? ch.after ?? "");
-      return `<tr><td>${esc(ch.category)}</td><td><span class="badge ${kindCls}">${esc(ch.kind)}</span></td><td class="mono">${esc(ch.label)}</td><td class="mono">${detail}</td><td class="mono">${ch.delta != null ? esc(ch.delta) : ""}</td></tr>`;
+  const roleByHex = new Map<string, string>();
+  for (const [role, hex] of Object.entries(result.colors?.semantic ?? {})) {
+    if (hex) roleByHex.set(String(hex).toLowerCase(), role);
+  }
+  // Per-category blocks in scoring order; each header carries the sub-counts
+  // so the old separate category table is redundant.
+  const capped = drift.changes.slice(0, 120);
+  const order = drift.categories.map((c) => c.category);
+  const byCat = new Map<DriftChange["category"], DriftChange[]>();
+  for (const ch of capped) byCat.set(ch.category, [...(byCat.get(ch.category) ?? []), ch]);
+  const groups = [...byCat.entries()]
+    .sort(([a], [b]) => (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 99 : order.indexOf(b)))
+    .map(([cat, items]) => {
+      const cnt = (k: DriftChange["kind"]) => items.filter((i) => i.kind === k).length;
+      const parts = [
+        cnt("changed") ? `${cnt("changed")} changed` : "",
+        cnt("added") ? `${cnt("added")} added` : "",
+        cnt("removed") ? `${cnt("removed")} removed` : "",
+      ].filter(Boolean);
+      return `<div class="dgroup"><div class="dgrouph">${esc(cat)}<span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">${esc(parts.join(" · "))}</span></div><div class="dlist">${items.map((ch) => driftRow(ch, roleByHex)).join("")}</div></div>`;
     })
     .join("");
   const more = drift.changes.length > 120 ? `<p class="sub">… ${drift.changes.length - 120} more changes</p>` : "";
-  return `<div class="drift ${cls}" id="drift"><div class="row"><div class="score">${esc(drift.score)}</div><div><div>${verdict} <span class="sub">threshold ${esc(drift.threshold)}</span></div><div class="sub">${esc(drift.summary.changed)} changed · ${esc(drift.summary.added)} added · ${esc(drift.summary.removed)} removed${baselineLabel ? ` · vs ${esc(baselineLabel)}` : ""}</div></div></div>${
-    cats ? `<table style="margin-top:14px"><thead><tr><th>Category</th><th>Score</th><th>Δ</th><th>+</th><th>−</th></tr></thead><tbody>${cats}</tbody></table>` : ""
-  }${
-    changes ? `<table style="margin-top:10px"><thead><tr><th>Category</th><th>Kind</th><th>Token</th><th>Change</th><th>Δ</th></tr></thead><tbody>${changes}</tbody></table>${more}` : ""
-  }</div>`;
+  const legend = capped.length ? `<p class="dlegend"><span class="g-add">+</span> added · <span class="g-rem">−</span> removed · <span class="g-chg">~</span> changed</p>` : "";
+  const empty = capped.length ? "" : `<p class="dempty">✓ No changes detected — tokens match the baseline.</p>`;
+  // Plaintext diff for the clipboard (App's "Copy report").
+  const copyText = capped
+    .map((ch) => `${ch.kind === "added" ? "+" : ch.kind === "removed" ? "-" : "~"} [${ch.category}] ${ch.label}${ch.before && ch.after ? `: ${ch.before} -> ${ch.after}` : ch.before || ch.after ? `: ${ch.before ?? ch.after}` : ""}`)
+    .join("\n");
+  const copyBtn = capped.length ? `<button class="copyall" data-copy="${esc(`Drift ${drift.score} (threshold ${drift.threshold}) — ${drift.status}\n${copyText}`)}" style="margin-left:auto">Copy report</button>` : "";
+  return `<div class="drift ${cls}" id="drift"><div class="row"><div class="score">${esc(drift.score)}</div><div><div>${verdict} <span class="sub">threshold ${esc(drift.threshold)}</span></div><div class="sub">${esc(drift.summary.changed)} changed · ${esc(drift.summary.added)} added · ${esc(drift.summary.removed)} removed${baselineLabel ? ` · vs ${esc(baselineLabel)}` : ""}</div></div>${copyBtn}</div>${groups}${more}${legend}${empty}</div>`;
 }
 
 /* -------------------------------- entry --------------------------------- */
@@ -489,7 +647,7 @@ export function generateHtmlReport(result: BrandingResult, options: HtmlReportOp
   const fr = computeFindings(result);
 
   const body = [
-    options.drift ? driftSection(options.drift, options.baselineLabel) : "",
+    options.drift ? driftSection(options.drift, result, options.baselineLabel) : "",
     findingsSection(fr),
     paletteSection(result),
     semanticSection(result),
@@ -519,9 +677,11 @@ export function generateHtmlReport(result: BrandingResult, options: HtmlReportOp
 <div class="wrap">
 ${gauges}
 ${summaryCounts(result)}
+${coverageLine(fr)}
 ${body}
 <footer>Generated by <a href="https://github.com/dembrandt/dembrandt">Dembrandt</a>${version ? " " + esc(version) : ""} · <a href="https://github.com/dembrandt/dembrandt/issues">File an issue</a></footer>
 </div>
+<script>${SCRIPT}</script>
 </body>
 </html>`;
 }
