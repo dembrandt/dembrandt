@@ -55,7 +55,10 @@ export function classifyContextByPosition(top: unknown, docHeight: unknown, fold
 export function thirdPartyBrandFromAlt(altText: unknown, siteDomain: unknown): string | null {
   if (typeof altText !== 'string') return null;
   const brand = altText
-    .replace(/\b(logos?|logotypes?|logomarks?|wordmarks?|icons?|brands?|marks?)\b/gi, ' ')
+    // generic logo words, then file extensions, then common asset-name variant suffixes
+    .replace(/\b(logos?|logotypes?|logomarks?|brandmarks?|wordmarks?|icons?|brands?|marks?)\b/gi, ' ')
+    .replace(/\.(svg|png|webp|avif|jpe?g|gif)\b/gi, ' ')
+    .replace(/\b(on[-_]?white|on[-_]?black|white|black|dark|light|colou?r|mono|full|small|large|[0-9]+x|2x|3x|v?[0-9]{1,4})\b/gi, ' ')
     .replace(/[^a-z0-9]+/gi, '')
     .toLowerCase();
   if (brand.length < 2) return null;
@@ -128,6 +131,18 @@ export function fitPaintedBox(
   };
 }
 
+/**
+ * Is this mark big enough to be a logo rather than a UI icon? Measured floor: no confirmed
+ * or human-found logo in the labelled set has a longer edge below 24px, while header search
+ * / menu / social glyphs are 16-20px squares. Defensive: non-finite dimensions are not a
+ * logo.
+ */
+export function isLogoSized(width: unknown, height: unknown, minLongEdge = 24): boolean {
+  const w = Number(width), h = Number(height);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return false;
+  return Math.max(w, h) >= minLongEdge;
+}
+
 // Serialized twins, injected into page.evaluate so the browser runs identical code.
 // Order matters only for readability; none reference each other.
 export const LOGO_HEURISTICS_SOURCE: string = [
@@ -136,4 +151,5 @@ export const LOGO_HEURISTICS_SOURCE: string = [
   thirdPartyBrandFromAlt,
   positionFraction,
   fitPaintedBox,
+  isLogoSized,
 ].map((fn) => fn.toString()).join('\n\n');

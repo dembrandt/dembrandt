@@ -94,12 +94,13 @@ export async function extractLogo(page, url) {
     // code. guardExtractor wraps this whole evaluate, so even a rehydration failure only
     // yields an empty logo result for this one site — never a crash.
     const H = new Function(heuristicsSource +
-      '\nreturn { isHomeHref, classifyContextByPosition, thirdPartyBrandFromAlt, positionFraction, fitPaintedBox };')() as {
+      '\nreturn { isHomeHref, classifyContextByPosition, thirdPartyBrandFromAlt, positionFraction, fitPaintedBox, isLogoSized };')() as {
         isHomeHref: (href: any, origin: any) => boolean;
         classifyContextByPosition: (top: any, docHeight: any, foldY?: number) => 'header'|'footer'|'hero'|'body';
         thirdPartyBrandFromAlt: (alt: any, site: any) => string | null;
         positionFraction: (token: any) => number;
         fitPaintedBox: (content: any, intrinsic: any, fit: any, px?: number, py?: number) => { x: number; y: number; width: number; height: number };
+        isLogoSized: (w: any, h: any, minLongEdge?: number) => boolean;
       };
 
     // Canvas for background color detection
@@ -425,8 +426,12 @@ export async function extractLogo(page, url) {
           // A mark that links home is ours whatever its alt says; otherwise, if its alt
           // names a different brand, it is a customer/integration logo — skip it.
           const homeLinked = H.isHomeHref(el.closest('a')?.getAttribute('href'), location.origin);
-          if (!homeLinked && H.thirdPartyBrandFromAlt(altText, siteDomain)) {
-            return; // a third party's brand, named in its own alt text
+          if (!homeLinked) {
+            const srcFile = (el.currentSrc || el.getAttribute('src') || '').split(/[?#]/)[0].split('/').pop() || '';
+            // alt OR the asset file name may name a different brand (customer/partner wall)
+            if (H.thirdPartyBrandFromAlt(altText, siteDomain) || H.thirdPartyBrandFromAlt(srcFile, siteDomain)) {
+              return; // a third party's brand, in its alt text or its file name
+            }
           }
 
           let qualifies = attrs.includes('logo') || attrs.includes('brand');
@@ -636,13 +641,19 @@ export async function extractLogo(page, url) {
             // link to the home page qualify down there: that link is the site claiming the
             // mark as its own.
             if (rect.width > 1500 || rect.height > 500) continue; // an illustration, not a mark
-            const belowFold = rect.top > 500;
-            if (belowFold) {
-              const a = el.closest('a');
-              const href = (a?.getAttribute('href') || '').toLowerCase();
-              const ownsIt = href === '/' || href === './' || /^https?:\/\/[^/]+\/?$/.test(href);
-              if (!ownsIt) continue;
+            if (!H.isLogoSized(rect.width, rect.height)) continue; // a UI icon, not a logo
+            const homeLinked = H.isHomeHref(el.closest('a')?.getAttribute('href'), location.origin);
+            // A customer/partner wall matches [class*=logo] too. If a non-home-linked mark
+            // names a different brand in its alt or file name, it is not ours — skip it.
+            // (This is why the h2o.ai "logo-Leidos.svg" strip slipped in: the pre-scan
+            // never ran the third-party guard that findLogosInZone applies.)
+            if (!homeLinked) {
+              const altText = (el.getAttribute('alt') || '');
+              const srcFile = (el.currentSrc || el.getAttribute('src') || '').split(/[?#]/)[0].split('/').pop() || '';
+              if (H.thirdPartyBrandFromAlt(altText, siteDomain) || H.thirdPartyBrandFromAlt(srcFile, siteDomain)) continue;
             }
+            const belowFold = rect.top > 500;
+            if (belowFold && !homeLinked) continue; // below the fold, only our own home-linked mark
             const context = !belowFold ? 'header'
               : (rect.top > document.documentElement.scrollHeight - 1200 ? 'footer' : 'body');
             const score = scoreLogo(el, context) + 20; // bonus for semantic match
@@ -701,7 +712,13 @@ export async function extractLogo(page, url) {
       let inst = null;
       if (c.cssBackground) inst = c.cssBackground;
       else if (c.el) inst = extractLogoFromEl(c.el, c.context, baseUrl);
-      if (inst) instances.push(inst);
+      // Reject UI icons (search/menu/social glyphs) that scored into the candidate list —
+      // measured floor: no real logo is below 24px on its long edge. Judge by the painted
+      // rect (the on-screen size), not the intrinsic asset size.
+      if (inst) {
+        const box = (inst as any).rect || { width: (inst as any).width, height: (inst as any).height };
+        if (H.isLogoSized(box.width, box.height)) instances.push(inst);
+      }
     }
 
     // Favicons

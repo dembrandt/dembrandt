@@ -6,6 +6,7 @@ import {
   thirdPartyBrandFromAlt,
   positionFraction,
   fitPaintedBox,
+  isLogoSized,
   LOGO_HEURISTICS_SOURCE,
 } from '../lib/extractors/logo-heuristics.js';
 
@@ -165,10 +166,48 @@ test('fitPaintedBox: defensive against missing/zero/NaN intrinsic and degenerate
   assert.ok(Number.isFinite(bad.x) && Number.isFinite(bad.y) && bad.width === 0 && bad.height === 0);
 });
 
+// ---- filename-aware third-party detection ----------------------------------
+test('thirdPartyBrandFromAlt: catches customer logos named by file (the h2o wall bug)', () => {
+  assert.equal(thirdPartyBrandFromAlt('logo-Leidos.svg', 'h2o'), 'leidos');
+  assert.equal(thirdPartyBrandFromAlt('logo-gartner-on-white.svg', 'h2o'), 'gartner');
+  assert.equal(thirdPartyBrandFromAlt('logo-MarketAxess.svg', 'h2o'), 'marketaxess');
+});
+
+test('thirdPartyBrandFromAlt: the site\'s own asset file is kept whatever the suffix', () => {
+  assert.equal(thirdPartyBrandFromAlt('h2o-logo.svg', 'h2o'), null);
+  assert.equal(thirdPartyBrandFromAlt('mambu-logo-2023.svg', 'mambu'), null);
+  assert.equal(thirdPartyBrandFromAlt('stripe-logo-white.png', 'stripe'), null);
+});
+
+test('thirdPartyBrandFromAlt: a generic or variant-only file name is not a brand', () => {
+  assert.equal(thirdPartyBrandFromAlt('logo.svg', 'h2o'), null);
+  assert.equal(thirdPartyBrandFromAlt('logo-white.svg', 'h2o'), null);
+  assert.equal(thirdPartyBrandFromAlt('brandmark.svg', 'h2o'), null);
+});
+
+// ---- isLogoSized -----------------------------------------------------------
+test('isLogoSized: 24px on the long edge is the floor (matches the smallest real logo)', () => {
+  assert.equal(isLogoSized(24, 24), true);
+  assert.equal(isLogoSized(118, 13), true);   // a thin wordmark
+  assert.equal(isLogoSized(50, 50), true);
+});
+
+test('isLogoSized: header UI icons (16-20px squares) are rejected', () => {
+  assert.equal(isLogoSized(16, 16), false);
+  assert.equal(isLogoSized(20, 20), false);
+});
+
+test('isLogoSized: defensive against zero / negative / NaN / non-numeric', () => {
+  assert.equal(isLogoSized(0, 0), false);
+  assert.equal(isLogoSized(-40, 40), false);
+  assert.equal(isLogoSized(NaN, 40), false);
+  assert.equal(isLogoSized('40' as any, undefined as any), false);
+});
+
 // ---- serialization contract ------------------------------------------------
 test('LOGO_HEURISTICS_SOURCE re-hydrates to functions that behave identically', () => {
   const H = new Function(LOGO_HEURISTICS_SOURCE +
-    '\nreturn { isHomeHref, classifyContextByPosition, thirdPartyBrandFromAlt, positionFraction, fitPaintedBox };')();
+    '\nreturn { isHomeHref, classifyContextByPosition, thirdPartyBrandFromAlt, positionFraction, fitPaintedBox, isLogoSized };')();
   assert.equal(typeof H.isHomeHref, 'function');
   assert.equal(H.isHomeHref('/', 'https://x.com'), isHomeHref('/', 'https://x.com'));
   assert.equal(H.classifyContextByPosition(7500, 8000), classifyContextByPosition(7500, 8000));
@@ -177,6 +216,7 @@ test('LOGO_HEURISTICS_SOURCE re-hydrates to functions that behave identically', 
     H.fitPaintedBox(box(0, 0, 200, 200), { width: 400, height: 100 }, 'contain'),
     fitPaintedBox(box(0, 0, 200, 200), { width: 400, height: 100 }, 'contain'),
   );
+  assert.equal(H.isLogoSized(16, 16), isLogoSized(16, 16));
 });
 
 test('LOGO_HEURISTICS_SOURCE is self-contained: no module refs leak in', () => {
