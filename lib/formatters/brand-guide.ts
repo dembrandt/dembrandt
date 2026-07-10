@@ -139,10 +139,17 @@ function weightName(w) {
 }
 
 export function buildHTML(data) {
+  // Public entry point: callers may pass adapted/partial token data (e.g. from a
+  // parsed design.md), so never assume a fully-formed extraction result.
+  if (!data || typeof data !== 'object') data = {};
+
   let domain;
   try { domain = new URL(data.url).hostname.replace('www.', ''); }
   catch { domain = 'unknown'; }
-  const date = new Date(data.extractedAt).toLocaleDateString('en-US', {
+
+  const parsed = data.extractedAt ? new Date(data.extractedAt) : new Date();
+  const dateSource = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  const date = dateSource.toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric'
   });
 
@@ -154,7 +161,9 @@ export function buildHTML(data) {
   const paletteColors = allColors.filter(c => c.source !== 'semantic');
   const colors = sortByHue([...semanticColors, ...paletteColors]);
   const fonts = gatherFonts(data.typography);
-  const googleFonts = data.typography?.sources?.googleFonts || [];
+  const googleFonts = Array.isArray(data.typography?.sources?.googleFonts)
+    ? data.typography.sources.googleFonts
+    : [];
 
   // Build Google Fonts import URL for available fonts
   const googleFontImport = (() => {
@@ -1002,7 +1011,7 @@ function getLogoImageUrl(data) {
 }
 
 function gatherColors(colors) {
-  if (!colors) return [];
+  if (!colors || typeof colors !== 'object') return [];
   const result = [];
   const seen = new Set();
 
@@ -1022,23 +1031,25 @@ function gatherColors(colors) {
   };
 
   // 1. Semantic colors are the most reliable brand signals
-  if (colors.semantic) {
+  if (colors.semantic && typeof colors.semantic === 'object') {
     for (const [role, color] of (Object.entries(colors.semantic) as any[])) {
       if (color) add(color, role, 'high', 'semantic');
     }
   }
 
   // 2. All palette colors
-  if (colors.palette) {
+  if (Array.isArray(colors.palette)) {
     for (const c of colors.palette) {
-      add(c.color, '', c.confidence, 'palette');
+      if (!c) continue;
+      // Accept both { color } entries and bare color strings
+      add(typeof c === 'string' ? c : c.color, '', c && c.confidence, 'palette');
     }
   }
 
   // 3. CSS variable colors
-  if (colors.cssVariables) {
+  if (colors.cssVariables && typeof colors.cssVariables === 'object') {
     for (const [_varName, varData] of (Object.entries(colors.cssVariables) as any[])) {
-      const val = typeof varData === 'string' ? varData : varData.value;
+      const val = typeof varData === 'string' ? varData : varData?.value;
       if (val) add(val, '', 'high', 'css-var');
     }
   }
@@ -1047,7 +1058,7 @@ function gatherColors(colors) {
 }
 
 function gatherFonts(typography) {
-  if (!typography?.styles?.length) return [];
+  if (!Array.isArray(typography?.styles) || !typography.styles.length) return [];
 
   const families = new Map();
 
