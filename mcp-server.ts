@@ -15,7 +15,10 @@ import { createRequire } from "node:module";
 import { loadBrowserEngines, PlaywrightMissingError } from "./lib/browser.js";
 import { extractBranding } from "./lib/extractors/index.js";
 import { computeDrift } from "./lib/drift.js";
+import { computeFindings } from "./lib/findings.js";
 import { generateHtmlReport } from "./lib/formatters/html.js";
+import { toDtcgTokens } from "./lib/formatters/dtcg.js";
+import { generateDesignMd } from "./lib/formatters/markdown.js";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
@@ -99,6 +102,8 @@ async function runExtraction(url: string, options: any = {}) {
       slow: options.slow || false,
       darkMode: options.darkMode || false,
       mobile: options.mobile || false,
+      wcag: options.wcag || false,
+      ...(options.cookie ? { cookie: options.cookie } : {}),
     });
     return { ok: true, data };
   } catch (err) {
@@ -157,6 +162,16 @@ class JobQueue {
 
   get(id) {
     return this.#jobs.get(id) ?? null;
+  }
+
+  list() {
+    return Array.from(this.#jobs, ([id, job]) => ({
+      job_id: id,
+      status: job.status,
+      url: job.url,
+      createdAt: job.createdAt,
+      completedAt: job.completedAt,
+    }));
   }
 
   cancel(id) {
@@ -231,8 +246,8 @@ setInterval(() => jobQueue.cleanup(), 600_000);
  */
 function toolHandler(pick, extraOptions = {}) {
   return async (params) => {
-    const { url, slow, darkMode, sync } = params;
-    const opts = { slow, darkMode, ...extraOptions };
+    const { url, sync, ...rest } = params;
+    const opts = { ...rest, ...extraOptions };
 
     if (sync) {
       const result = await runExtraction(url, opts);
@@ -263,13 +278,19 @@ async function main() {
   const url = z.string().describe("Website URL (e.g. example.com)");
   const slow = z.boolean().optional().default(false).describe("3x timeouts for heavy SPAs");
   const sync = z.boolean().optional().default(false).describe("Wait for result directly instead of returning a job_id (blocks 15-40s)");
+  const mobile = z.boolean().optional().default(false).describe("Extract from a mobile viewport instead of desktop");
+  const cookie = z.string().optional().describe('Cookie string for authenticated pages, e.g. "session=abc; token=xyz"');
 
   // ── Extraction tools ───────────────────────────────────────────────────
 
   (server.tool as any)(
     "get_design_tokens",
     "Extract the full design system from a live website. Launches a real browser, navigates to the site, and returns production-ready design tokens: color palette (hex, RGB, LCH, OKLCH) with semantic roles and CSS custom properties, typography scale (families, fallbacks, sizes, weights, line heights, letter spacing by context), spacing system with grid detection, border radii, border patterns, box shadows for elevation, component styles (buttons with hover/focus states, inputs, links, badges), responsive breakpoints, logo and favicons, site name, detected CSS frameworks, and icon systems. Returns a job_id by default — use get_job_status to poll for the result.",
-    { url, slow, sync },
+    {
+      url, slow, sync, mobile, cookie,
+      darkMode: z.boolean().optional().default(false).describe("Extract with dark mode emulation (prefers-color-scheme: dark)"),
+      wcag: z.boolean().optional().default(false).describe("Include WCAG contrast analysis between palette colors"),
+    },
     toolHandler((d) => d),
   );
 
@@ -277,30 +298,31 @@ async function main() {
     "get_color_palette",
     "Extract brand colors from a live website. Returns semantic colors (primary, secondary, accent, plus background and text promoted from the page surface and body text), full palette ranked by usage frequency and confidence (high/medium/low), CSS custom properties with their design-system names, and hover/focus state colors discovered by simulating real user interactions. Each color in hex, RGB, LCH, and OKLCH. Returns a job_id by default — use get_job_status to poll for the result.",
     {
-      url, slow, sync,
+      url, slow, sync, mobile, cookie,
       darkMode: z.boolean().optional().default(false).describe("Also extract dark mode palette"),
+      wcag: z.boolean().optional().default(false).describe("Include WCAG contrast analysis between palette colors"),
     },
-    toolHandler((d) => ({ url: d.url, colors: d.colors })),
+    toolHandler((d) => ({ url: d.url, colors: d.colors, ...(d.wcag ? { wcag: d.wcag } : {}) })),
   );
 
   (server.tool as any)(
     "get_typography",
     "Extract typography from a live website. Returns every font family with its fallback stack, the complete type scale grouped by context (heading, body, text, button, link, caption) with pixel and rem sizes, weights, line heights, letter spacing, and text transforms. The body context marks the dominant reading-text font; text marks other body-eligible copy. Also reports font sources: Google Fonts URLs, Adobe Fonts usage, and variable font detection. Returns a job_id by default — use get_job_status to poll for the result.",
-    { url, slow, sync },
+    { url, slow, sync, mobile, cookie },
     toolHandler((d) => ({ url: d.url, typography: d.typography })),
   );
 
   (server.tool as any)(
     "get_component_styles",
     "Extract UI component styles from a live website. Returns button variants with default, hover, active, and focus states (background, text color, padding, border radius, border, shadow, outline, opacity), input field styles (border, focus ring, padding, placeholder), link styles (color, text decoration, hover changes), and badge/tag styles. Returns a job_id by default — use get_job_status to poll for the result.",
-    { url, slow, sync },
+    { url, slow, sync, mobile, cookie },
     toolHandler((d) => ({ url: d.url, components: d.components })),
   );
 
   (server.tool as any)(
     "get_surfaces",
     "Extract surface treatment tokens from a live website: border radii with element context (which radii are used on buttons vs cards vs inputs vs modals), border patterns (width + style + color combinations), and box shadow elevation levels. Returns a job_id by default — use get_job_status to poll for the result.",
-    { url, slow, sync },
+    { url, slow, sync, mobile, cookie },
     toolHandler((d) => ({
       url: d.url,
       borderRadius: d.borderRadius,
@@ -312,14 +334,14 @@ async function main() {
   (server.tool as any)(
     "get_spacing",
     "Extract the spacing system from a live website: common margin and padding values sorted by frequency, pixel and rem values, and grid system detection (4px, 8px, or custom scale). Returns a job_id by default — use get_job_status to poll for the result.",
-    { url, slow, sync },
+    { url, slow, sync, mobile, cookie },
     toolHandler((d) => ({ url: d.url, spacing: d.spacing })),
   );
 
   (server.tool as any)(
     "get_brand_identity",
     "Extract brand identity from a live website: site name, logo (source, dimensions, safe zone), all favicon variants (icon, apple-touch-icon, og:image, twitter:image with sizes and URLs), detected CSS frameworks (Tailwind, Bootstrap, MUI, etc.), icon systems (Font Awesome, Material Icons, SVG), and responsive breakpoints. Returns a job_id by default — use get_job_status to poll for the result.",
-    { url, slow, sync },
+    { url, slow, sync, mobile, cookie },
     toolHandler((d) => ({
       url: d.url,
       siteName: d.siteName,
@@ -364,6 +386,27 @@ async function main() {
     },
   );
 
+  (server.tool as any)(
+    "get_findings",
+    "Lint a dembrandt extraction for design-system quality issues: WCAG contrast failures, inconsistency (near-duplicate colors, off-scale spacing values, radius sprawl), and duplication. Returns findings with severity (error/warn), category, and a human-readable message, plus summary counts. Pure and synchronous — no browser. Complements compute_drift: drift asks 'did it change', findings asks 'is it good'.",
+    { result: extract },
+    ({ result }: any) => jsonResult(computeFindings(result)),
+  );
+
+  (server.tool as any)(
+    "export_dtcg",
+    "Convert a dembrandt extraction to W3C Design Tokens (DTCG) format: color, typography, spacing, radius, border, and shadow tokens with $type/$value structure and dembrandt provenance under $extensions. Pure and synchronous — no browser. Use it to hand tokens to Style Dictionary, Figma token plugins, or any DTCG-compatible pipeline.",
+    { result: extract },
+    ({ result }: any) => jsonResult(toDtcgTokens(result)),
+  );
+
+  (server.tool as any)(
+    "generate_design_md",
+    "Render a DESIGN.md brand guide (markdown) from a dembrandt extraction: colors, typography, spacing, surfaces, and components as a human-readable design reference. Pure and synchronous — no browser. Write the output to DESIGN.md in a project so agents and developers build UI against the extracted brand.",
+    { result: extract },
+    ({ result }: any) => ({ content: [{ type: "text", text: generateDesignMd(result) }] }),
+  );
+
   // ── Job management tools ───────────────────────────────────────────────
 
   (server.tool as any)(
@@ -377,6 +420,13 @@ async function main() {
       if (job.status === "failed") return errorResult(`Job failed: ${job.error}`);
       return jsonResult({ job_id, status: job.status });
     },
+  );
+
+  (server.tool as any)(
+    "list_jobs",
+    "List all extraction jobs from this session with their status (queued/running/completed/failed/cancelled), URL, and timestamps. Completed jobs are kept for one hour.",
+    {},
+    () => jsonResult({ jobs: jobQueue.list() }),
   );
 
   (server.tool as any)(
