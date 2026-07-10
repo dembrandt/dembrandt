@@ -46,13 +46,18 @@ runs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/ms-playwright
-        # DEMBRANDT_CLI_VERSION below pins playwright-core transitively; bump
-        # the cache key together with the version pin.
+        # The CLI version pinned in the install step below fixes playwright-core
+        # transitively; bump this key together with that pin on release.
         key: dembrandt-chromium-${{ runner.os }}-0.22.0
 
-    - name: Install Chromium matching playwright-core
+    - name: Install dembrandt CLI and Chromium
       shell: bash
-      run: npx --yes playwright@1.60.0 install chromium --with-deps
+      # Global install, not npx: when the consuming checkout is itself an npm
+      # package (like dembrandt's own repo), npx resolves the spec against the
+      # local package.json and never fetches from the registry.
+      run: |
+        npm install -g dembrandt@0.22.0
+        npx --yes playwright@1.60.0 install chromium --with-deps
 
     - name: Extract and gate
       id: gate
@@ -64,9 +69,6 @@ runs:
         DEMBRANDT_BASELINE: ${{ inputs.baseline }}
         DEMBRANDT_KEY: ${{ inputs.key }}
         DEMBRANDT_EXTRA_ARGS: ${{ inputs.args }}
-        # Pinned so a vX tag of this action always runs the same CLI. Keep in
-        # sync with package.json "version" and the cache key above on release.
-        DEMBRANDT_CLI_VERSION: "0.22.0"
       run: |
         args=("$DEMBRANDT_URL" --json-only)
         if [ -n "$DEMBRANDT_BASELINE" ]; then
@@ -78,7 +80,7 @@ runs:
         fi
         # DEMBRANDT_KEY is picked up by the CLI itself as the --key fallback.
         set +e
-        npx --yes "dembrandt@$DEMBRANDT_CLI_VERSION" "${args[@]}" "${extra[@]}" > dembrandt-report.json
+        dembrandt "${args[@]}" "${extra[@]}" > dembrandt-report.json
         rc=$?
         set -e
         echo "report=dembrandt-report.json" >> "$GITHUB_OUTPUT"
