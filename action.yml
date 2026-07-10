@@ -83,6 +83,12 @@ runs:
         dembrandt "${args[@]}" "${extra[@]}" > dembrandt-report.json
         rc=$?
         set -e
+        if [ "$rc" -ge 2 ]; then
+          # Extraction problem (not drift): surface the machine-readable error
+          # from the report, since --json-only keeps it off the console.
+          msg=$(jq -r '.error | "\(.code): \(.message)"' dembrandt-report.json 2>/dev/null || true)
+          echo "::error title=dembrandt extraction failed (exit $rc)::${msg:-see report output}"
+        fi
         echo "report=dembrandt-report.json" >> "$GITHUB_OUTPUT"
         score=$(jq -r '.drift.score // empty' dembrandt-report.json 2>/dev/null || true)
         echo "score=$score" >> "$GITHUB_OUTPUT"
