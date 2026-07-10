@@ -245,6 +245,47 @@ dembrandt dembrandt.com --brand-guide
 
 ## Continuous integration
 
+### GitHub Action
+
+The official action wraps extract → compare → gate into one step: it installs a matching Chromium, runs a pinned CLI version, fails the job on drift, and renders the drifted tokens as inline annotations on the PR.
+
+```yaml
+- uses: dembrandt/dembrandt@v1
+  with:
+    url: https://preview.example.com
+    baseline: .dembrandt/baseline.json
+```
+
+Gating a Vercel preview needs no extra wiring — trigger on the deployment event and pass its URL:
+
+```yaml
+on:
+  deployment_status:
+
+jobs:
+  drift:
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dembrandt/dembrandt@v1
+        with:
+          url: ${{ github.event.deployment_status.environment_url }}
+          baseline: .dembrandt/baseline.json
+          key: ${{ secrets.DEMBRANDT_KEY }}
+```
+
+| Input | Required | Description |
+|---|---|---|
+| `url` | yes | URL to extract — typically the PR's preview deployment |
+| `baseline` | no | Committed baseline JSON path, or an App baseline id. Omit to extract without gating |
+| `key` | no | API key for cloud snapshot sync ([dembrandt.com/app/api-keys](https://www.dembrandt.com/app/api-keys)) |
+| `args` | no | Extra CLI flags, e.g. `--wcag` or `--pages 3` |
+
+Outputs: `report` (path to the drift/extraction JSON) and `score` (drift score, empty without a baseline). The action pins the CLI version per release, so a `@v1` gate never changes behavior under you. For a fully hand-rolled workflow (per-page PR comment, preview vs production, report artifact), see [`examples/drift-gate.yml`](examples/drift-gate.yml).
+
+### Running the CLI directly
+
 Dembrandt drives a real browser, so the browser revision must match `playwright-core`.
 
 If you are not using the Playwright container image, install the browser revision that matches `playwright-core`:

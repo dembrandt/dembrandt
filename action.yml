@@ -1,0 +1,91 @@
+name: "Dembrandt Drift Gate"
+author: "Dembrandt"
+description: "Extract a site's design system and fail the build on design drift against a baseline — colors, typography, spacing, radii, shadows from the real rendered DOM."
+branding:
+  icon: "eye"
+  color: "purple"
+
+inputs:
+  url:
+    description: "URL to extract — typically the PR's preview deployment."
+    required: true
+  baseline:
+    description: "Drift baseline: path to a committed baseline JSON, or an App baseline id. Omit to extract without gating."
+    required: false
+    default: ""
+  key:
+    description: "Dembrandt API key (dembrandt.com/app/api-keys) — uploads the snapshot to your account for drift history. Pass a secret."
+    required: false
+    default: ""
+  args:
+    description: 'Extra dembrandt CLI flags, e.g. "--wcag" or "--pages 3".'
+    required: false
+    default: ""
+  node-version:
+    description: "Node.js version used to run the CLI."
+    required: false
+    default: "24"
+
+outputs:
+  report:
+    description: "Path to the machine-readable report JSON (drift details under the `drift` key when a baseline was given)."
+    value: ${{ steps.gate.outputs.report }}
+  score:
+    description: "Drift score from the report (empty when no baseline was given)."
+    value: ${{ steps.gate.outputs.score }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Cache Playwright Chromium
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        # DEMBRANDT_CLI_VERSION below pins playwright-core transitively; bump
+        # the cache key together with the version pin.
+        key: dembrandt-chromium-${{ runner.os }}-0.22.0
+
+    - name: Install Chromium matching playwright-core
+      shell: bash
+      run: npx --yes playwright@1.60.0 install chromium --with-deps
+
+    - name: Extract and gate
+      id: gate
+      shell: bash
+      env:
+        # Inputs flow through env, never inline into the script, so a crafted
+        # input value cannot inject shell into this step.
+        DEMBRANDT_URL: ${{ inputs.url }}
+        DEMBRANDT_BASELINE: ${{ inputs.baseline }}
+        DEMBRANDT_KEY: ${{ inputs.key }}
+        DEMBRANDT_EXTRA_ARGS: ${{ inputs.args }}
+        # Pinned so a vX tag of this action always runs the same CLI. Keep in
+        # sync with package.json "version" and the cache key above on release.
+        DEMBRANDT_CLI_VERSION: "0.22.0"
+      run: |
+        args=("$DEMBRANDT_URL" --json-only)
+        if [ -n "$DEMBRANDT_BASELINE" ]; then
+          args+=(--compare "$DEMBRANDT_BASELINE")
+        fi
+        extra=()
+        if [ -n "$DEMBRANDT_EXTRA_ARGS" ]; then
+          read -r -a extra <<< "$DEMBRANDT_EXTRA_ARGS"
+        fi
+        # DEMBRANDT_KEY is picked up by the CLI itself as the --key fallback.
+        set +e
+        npx --yes "dembrandt@$DEMBRANDT_CLI_VERSION" "${args[@]}" "${extra[@]}" > dembrandt-report.json
+        rc=$?
+        set -e
+        echo "report=dembrandt-report.json" >> "$GITHUB_OUTPUT"
+        score=$(jq -r '.drift.score // empty' dembrandt-report.json 2>/dev/null || true)
+        echo "score=$score" >> "$GITHUB_OUTPUT"
+        # Exit code carries the verdict: 0 stable, 1 drift, 2/67 extraction
+        # problems (see README "Exit codes"). Drift annotations render on the
+        # PR automatically — the CLI emits workflow commands under
+        # GITHUB_ACTIONS.
+        exit $rc

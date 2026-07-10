@@ -1,0 +1,31 @@
+# Dogfood for action.yml: run the published composite action against our own
+# site. No baseline — this verifies the action mechanics (browser install,
+# CLI invocation, report output), not the drift verdict, so extraction churn
+# can't make it flaky.
+name: action-smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "action.yml"
+      - ".github/workflows/action-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run the action against dembrandt.com
+        id: gate
+        uses: ./
+        with:
+          url: https://www.dembrandt.com
+
+      - name: Assert report exists and is valid JSON
+        run: |
+          test -s "${{ steps.gate.outputs.report }}"
+          jq -e '.url' "${{ steps.gate.outputs.report }}" > /dev/null
+          echo "report OK: $(wc -c < "${{ steps.gate.outputs.report }}") bytes"
