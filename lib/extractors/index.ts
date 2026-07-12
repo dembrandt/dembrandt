@@ -1394,6 +1394,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       meta: {
         dembrandtVersion: options._version || null,
         schemaVersion: SCHEMA_VERSION,
+        viewport: { width: screenW, height: screenH },
         flags: {
           ...(options.stealth && { stealth: true }),
           ...(options.darkMode && { darkMode: true }),

@@ -64,6 +64,10 @@ export interface DriftReport {
   summary: { changed: number; added: number; removed: number };
   categories: CategoryResult[];
   changes: DriftChange[];
+  /** Comparison-validity caveats (e.g. baseline and candidate extracted at
+   *  different viewport widths). The score stands, but changes may be
+   *  environment-induced rather than design drift. */
+  warnings?: string[];
 }
 
 /* ----------------------------- color math ----------------------------- */
@@ -407,6 +411,20 @@ function notLowConfidence(t: { confidence?: Confidence }): boolean {
   return t.confidence !== "low";
 }
 
+/** Layout-dependent tokens vary by viewport width, so a baseline and candidate
+ * extracted at different widths diff the responsive layout, not the design.
+ * Old snapshots lack meta.viewport; only warn when both sides carry it. */
+function viewportWarning(baseline: ExtractionResult, candidate: ExtractionResult): string | null {
+  const b = baseline.meta?.viewport;
+  const c = candidate.meta?.viewport;
+  if (!b || !c || b.width === c.width) return null;
+  return (
+    `baseline extracted at ${b.width}x${b.height}, candidate at ${c.width}x${c.height} — ` +
+    `layout-dependent changes below may be viewport-induced, not design drift. ` +
+    `Re-extract both at the same width (--screen-size).`
+  );
+}
+
 export function computeDrift(
   baseline: ExtractionResult,
   candidate: ExtractionResult,
@@ -471,6 +489,8 @@ export function computeDrift(
     { changed: 0, added: 0, removed: 0 } as Record<DriftKind, number>
   );
 
+  const vw = viewportWarning(baseline, candidate);
+
   return {
     score,
     status: score > cfg.failThreshold ? "drift" : "stable",
@@ -478,5 +498,6 @@ export function computeDrift(
     summary,
     categories,
     changes,
+    ...(vw ? { warnings: [vw] } : {}),
   };
 }

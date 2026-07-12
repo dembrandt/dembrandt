@@ -302,6 +302,12 @@ export interface ExtractionMeta {
   schemaVersion: string;
   flags?: Record<string, unknown>;
   /**
+   * Viewport the extraction ran at. Layout-dependent tokens (typography,
+   * spacing, visible components) vary by width, so comparing extracts taken at
+   * different widths produces false drift; the drift engine warns on mismatch.
+   */
+  viewport?: { width: number; height: number };
+  /**
    * Categories that extracted incompletely. Engine rule: do NOT flag drift from a
    * degraded category (it failed extraction, the brand did not change) — surface
    * it in the UI instead.

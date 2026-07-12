@@ -47,6 +47,32 @@ test('a low-confidence radius present in one extraction but not the other is not
   assert.equal(report.changes.filter((c) => c.category === 'radius').length, 0);
 });
 
+test('baseline and candidate extracted at different viewport widths produce a warning', () => {
+  const base = fixture({ meta: { schemaVersion: '1', viewport: { width: 1920, height: 1080 } } });
+  const cand = fixture({ meta: { schemaVersion: '1', viewport: { width: 390, height: 844 } } });
+
+  const report = computeDrift(base, cand);
+  assert.equal(report.warnings?.length, 1);
+  assert.match(report.warnings![0], /1920x1080/);
+  assert.match(report.warnings![0], /390x844/);
+});
+
+test('same viewport width produces no warning', () => {
+  const base = fixture({ meta: { schemaVersion: '1', viewport: { width: 1920, height: 1080 } } });
+  const cand = fixture({ meta: { schemaVersion: '1', viewport: { width: 1920, height: 900 } } });
+
+  const report = computeDrift(base, cand);
+  assert.equal(report.warnings, undefined);
+});
+
+test('missing viewport meta on either side produces no warning (pre-viewport snapshots)', () => {
+  const base = fixture(); // no meta at all
+  const cand = fixture({ meta: { schemaVersion: '1', viewport: { width: 390, height: 844 } } });
+
+  const report = computeDrift(base, cand);
+  assert.equal(report.warnings, undefined);
+});
+
 test('a high-confidence radius change is still real drift', () => {
   const base = fixture({
     borderRadius: { values: [{ value: '4px', count: 20, confidence: 'high' }] },

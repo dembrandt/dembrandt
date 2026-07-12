@@ -632,12 +632,17 @@ function driftSection(drift: DriftReport, result: BrandingResult, baselineLabel?
   const more = drift.changes.length > 120 ? `<p class="sub">… ${drift.changes.length - 120} more changes</p>` : "";
   const legend = capped.length ? `<p class="dlegend"><span class="g-add">+</span> added · <span class="g-rem">−</span> removed · <span class="g-chg">~</span> changed</p>` : "";
   const empty = capped.length ? "" : `<p class="dempty">✓ No changes detected — tokens match the baseline.</p>`;
+  // Comparison-validity warnings (viewport/flags/fonts mismatch) render above
+  // the change groups: they qualify everything below.
+  const warnings = (drift.warnings ?? [])
+    .map((w) => `<p class="sub" style="color:var(--bad)">! ${esc(w)}</p>`)
+    .join("");
   // Plaintext diff for the clipboard (App's "Copy report").
   const copyText = capped
     .map((ch) => `${ch.kind === "added" ? "+" : ch.kind === "removed" ? "-" : "~"} [${ch.category}] ${ch.label}${ch.before && ch.after ? `: ${ch.before} -> ${ch.after}` : ch.before || ch.after ? `: ${ch.before ?? ch.after}` : ""}`)
     .join("\n");
   const copyBtn = capped.length ? `<button class="copyall" data-copy="${esc(`Drift ${drift.score} (threshold ${drift.threshold}) — ${drift.status}\n${copyText}`)}" style="margin-left:auto">Copy report</button>` : "";
-  return `<div class="drift ${cls}" id="drift"><div class="row"><div class="score">${esc(drift.score)}</div><div><div>${verdict} <span class="sub">threshold ${esc(drift.threshold)}</span></div><div class="sub">${esc(drift.summary.changed)} changed · ${esc(drift.summary.added)} added · ${esc(drift.summary.removed)} removed${baselineLabel ? ` · vs ${esc(baselineLabel)}` : ""}</div></div>${copyBtn}</div>${groups}${more}${legend}${empty}</div>`;
+  return `<div class="drift ${cls}" id="drift"><div class="row"><div class="score">${esc(drift.score)}</div><div><div>${verdict} <span class="sub">threshold ${esc(drift.threshold)}</span></div><div class="sub">${esc(drift.summary.changed)} changed · ${esc(drift.summary.added)} added · ${esc(drift.summary.removed)} removed${baselineLabel ? ` · vs ${esc(baselineLabel)}` : ""}</div></div>${copyBtn}</div>${warnings}${groups}${more}${legend}${empty}</div>`;
 }
 
 /* -------------------------------- entry --------------------------------- */

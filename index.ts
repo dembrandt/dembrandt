@@ -448,6 +448,9 @@ program
               `${report.summary.changed} changed, ${report.summary.added} added, ${report.summary.removed} removed`
             )
           );
+          for (const w of report.warnings ?? []) {
+            savedNotices.push(color.warning(`! ${w}`));
+          }
           // --approve: accept the current extraction as the new baseline.
           // Only local files can be overwritten; App baseline ids are read-only.
           if (opts.approve) {
