@@ -298,14 +298,26 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
 
   const context = await browser.newContext(contextOptions);
 
+  // Setup between context creation and the main try/finally below runs outside
+  // the finally that closes the context; a throw here (malformed cookie, dead
+  // CDP browser at newPage) must still release it or shared browsers leak.
+  const closingOnError = async <T>(p: Promise<T>): Promise<T> => {
+    try {
+      return await p;
+    } catch (err) {
+      await context.close().catch(() => {});
+      throw err;
+    }
+  };
+
   const parsedCookies = parseCookies(options.cookie, url);
   if (parsedCookies.length > 0) {
-    await context.addCookies(parsedCookies);
+    await closingOnError(context.addCookies(parsedCookies));
   }
 
   if (options.stealth) {
     const stealthLocale = locale;
-    await context.addInitScript(({ loc, sw, sh }) => {
+    await closingOnError(context.addInitScript(({ loc, sw, sh }) => {
       Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
       Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
       Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
@@ -404,10 +416,10 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
           });
         };
       }
-    }, { loc: stealthLocale, sw: screenW, sh: screenH });
+    }, { loc: stealthLocale, sw: screenW, sh: screenH }));
   }
 
-  const page = await context.newPage();
+  const page = await closingOnError(context.newPage());
 
   // Track font requests to identify self-hosted custom fonts
   const fontRequests = new Set<string>();
@@ -1254,6 +1266,9 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       spinner.stop();
       log(color.success(`  ✓ Mobile: +${mobileColors.palette.length} colors`));
       } catch (e) { spinner.stop(); degraded.push('mobile'); log(color.warning('  ! Mobile: failed (continuing)')); }
+      // Restore the configured viewport: every later pass (reveal, screenshot)
+      // and meta.viewport describe the desktop run, not the mobile detour.
+      try { await page.setViewportSize({ width: screenW, height: screenH }); } catch {}
     }
 
     // Reveal pass (standard, on by default): open click-toggle menus (megamenus,

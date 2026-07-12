@@ -69,6 +69,12 @@ export function driftAnnotations(report: DriftReport): string[] {
   const title = `Design drift ${report.score} exceeds threshold ${report.threshold}`;
   const summary = `${report.summary.changed} changed, ${report.summary.added} added, ${report.summary.removed} removed`;
   lines.push(`::error title=${escapeProperty(title)}::${escapeData(summary)}`);
+  // Comparison-validity caveats (viewport/flag/font mismatch, degraded
+  // categories) must render next to the failures they qualify, or reviewers
+  // act on drift that the engine itself has flagged as suspect.
+  for (const w of report.warnings ?? []) {
+    lines.push(`::warning title=${escapeProperty("Drift comparison caveat")}::${escapeData(w)}`);
+  }
   for (const c of report.changes) {
     lines.push(`::${severityForKind(c.kind)}::${escapeData(changeMessage(c))}`);
   }

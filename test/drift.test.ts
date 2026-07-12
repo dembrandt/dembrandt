@@ -68,9 +68,20 @@ test('same viewport width produces no warning', () => {
 });
 
 test('malformed viewport meta produces no warning instead of garbage', () => {
-  const base = fixture({ meta: { schemaVersion: '1', viewport: {} } });
   const cand = fixture({ meta: { schemaVersion: '1', viewport: { width: 390, height: 844 } } });
-  assert.equal(computeDrift(base, cand).warnings, undefined);
+  for (const viewport of [{}, { width: null, height: null }, { width: '', height: 844 }, { width: [], height: 1080 }]) {
+    const base = fixture({ meta: { schemaVersion: '1', viewport } });
+    assert.equal(computeDrift(base, cand).warnings, undefined, JSON.stringify(viewport));
+  }
+});
+
+test('a real width mismatch with a garbage height renders ? instead of NaN', () => {
+  const base = fixture({ meta: { schemaVersion: '1', viewport: { width: 1920, height: null } } });
+  const cand = fixture({ meta: { schemaVersion: '1', viewport: { width: 390, height: 844 } } });
+
+  const w = computeDrift(base, cand).warnings![0];
+  assert.match(w, /1920x\?/);
+  assert.doesNotMatch(w, /NaN/);
 });
 
 test('same width as string vs number is not a mismatch', () => {
@@ -106,7 +117,7 @@ test('one removed typography style among many does not max the category', () => 
   assert.equal(report.status, 'stable');
 });
 
-test('one font-family change among many does not max the category', () => {
+test('one font-family change flags drift without maxing the category', () => {
   const styles = typoStyles(10);
   const changed = styles.map((s, i) => (i === 0 ? { ...s, family: 'Comic Sans MS' } : s));
   const base = fixture({ typography: { styles, sources: {} } });
@@ -114,7 +125,19 @@ test('one font-family change among many does not max the category', () => {
 
   const report = computeDrift(base, cand);
   const typo = report.categories.find((c) => c.category === 'typography')!;
-  assert.ok(typo.score < 0.5, `one family change must not dominate the category, got ${typo.score}`);
+  assert.ok(typo.score <= 0.5, `one family change must not read as full replacement, got ${typo.score}`);
+  assert.equal(report.status, 'drift', 'a confirmed in-place family change is real drift and must flag');
+});
+
+test('mass deletion of typography styles flags drift even though one removal does not', () => {
+  const styles = typoStyles(10);
+  const base = fixture({ typography: { styles, sources: {} } });
+  const cand = fixture({ typography: { styles: styles.slice(0, 4), sources: {} } });
+
+  const report = computeDrift(base, cand);
+  const typo = report.categories.find((c) => c.category === 'typography')!;
+  assert.ok(typo.score >= 0.6, `deleting 6/10 styles must scale, got ${typo.score}`);
+  assert.equal(report.status, 'drift');
 });
 
 test('replacing the font family across all styles still drifts', () => {
@@ -188,6 +211,10 @@ test('a degraded category is excluded from the score instead of read as removals
   const report = computeDrift(base, cand);
   assert.equal(report.status, 'stable', `16 missing styles from a failed extractor must not read as drift, got ${report.score}`);
   assert.ok(report.warnings?.some((w) => w.includes('typography extraction was degraded')), JSON.stringify(report.warnings));
+  // Phantom tokens must not leak into changes/summary either: CI annotations
+  // render report.changes unfiltered.
+  assert.equal(report.changes.filter((c) => c.category === 'typography').length, 0);
+  assert.equal(report.summary.removed, 0);
 });
 
 test('a compare where every comparable category is degraded warns that it is inconclusive', () => {
@@ -223,8 +250,8 @@ test('categories empty on both sides do not dilute the score', () => {
 
   const report = computeDrift(base, cand);
   // Comparable categories: color (w 1) + typography (w 1). A full family swap
-  // (category 0.8) must average against those alone, not the empty three.
-  assert.equal(report.score, 40);
+  // (category 1.0) must average against those alone, not the empty three.
+  assert.equal(report.score, 50);
 });
 
 test('a high-confidence radius change is still real drift', () => {

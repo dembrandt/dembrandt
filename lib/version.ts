@@ -41,7 +41,10 @@
  *          width/height; mismatched widths produce false layout drift),
  *          fontsReady and pendingFonts (false = typography families may be OS
  *          fallbacks). DriftReport gains warnings[] (comparison-validity
- *          caveats). Additive: 1.2.x consumers ignore the new keys.
+ *          caveats) and inconclusive. Additive: 1.2.x consumers ignore the new
+ *          keys. BEHAVIOR: drift scores recalibrated — categories empty on
+ *          both sides no longer dilute the average, and typography severities
+ *          changed; an approved baseline may need re-approval after upgrade.
  *  1.2.0 — added colors.semantic.background, colors.semantic.text and
  *          colors.semantic.accent (canonical page surface, body text, and a
  *          hue-distinct brand accent). Typography gains a "text" context value

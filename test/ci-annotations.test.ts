@@ -35,6 +35,14 @@ test('driftAnnotations leads with an error summary carrying score + threshold', 
   assert.match(lines[0], /1 changed, 1 added, 1 removed/);
 });
 
+test('driftAnnotations surfaces comparison-validity warnings next to the failures', () => {
+  const lines = driftAnnotations(report({ warnings: ['baseline extracted at 1920x1080, candidate at 390x844'] }));
+  const caveat = lines.find((l) => l.includes('Drift comparison caveat'));
+  assert.ok(caveat, lines.join('\n'));
+  assert.ok(caveat!.startsWith('::warning '));
+  assert.ok(caveat!.includes('390x844'));
+});
+
 test('driftAnnotations maps changed/removed to error and added to warning', () => {
   const lines = driftAnnotations(report()).slice(1);
   assert.match(lines[0], /^::error::#2564ea #2564ea -> #1050d0 \(token-drift:color, delta 6.2\)/);
