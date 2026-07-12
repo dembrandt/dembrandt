@@ -15,8 +15,10 @@ function fixture(overrides: any = {}): any {
     extractedAt: 't',
     colors: { palette: [{ normalized: '#133174', count: 40, confidence: 'high' }], semantic: { primary: '#133174' }, cssVariables: {} },
     typography: { styles: [], sources: {} },
-    spacing: { scaleType: 'base-8', commonValues: [] },
-    borderRadius: { values: [] },
+    // Representative extract: spacing and radius present, so overall-score
+    // assertions run against a realistic category denominator.
+    spacing: { scaleType: 'base-8', commonValues: [{ px: 8 }, { px: 16 }, { px: 24 }] },
+    borderRadius: { values: [{ value: '4px', count: 20, confidence: 'high' }] },
     borders: {}, shadows: [],
     components: { buttons: [], inputs: [], links: [], badges: [] },
     breakpoints: [], iconSystem: [], frameworks: [],
@@ -123,6 +125,23 @@ test('a removed style scores below an in-place family change', () => {
   const score = (r: any) => r.categories.find((c: any) => c.category === 'typography').score;
   assert.ok(score(removedReport) < score(changedReport),
     `removal (${score(removedReport)}) must score below family change (${score(changedReport)})`);
+});
+
+test('categories empty on both sides do not dilute the score', () => {
+  const styles = typoStyles(2);
+  const sparse = {
+    typography: { styles, sources: {} },
+    spacing: { scaleType: 'base-8', commonValues: [] },
+    borderRadius: { values: [] },
+    shadows: [],
+  };
+  const base = fixture(sparse);
+  const cand = fixture({ ...sparse, typography: { styles: typoStyles(2, 'Georgia'), sources: {} } });
+
+  const report = computeDrift(base, cand);
+  // Comparable categories: color (w 1) + typography (w 1). A full family swap
+  // (category 0.8) must average against those alone, not the empty three.
+  assert.equal(report.score, 40);
 });
 
 test('a high-confidence radius change is still real drift', () => {

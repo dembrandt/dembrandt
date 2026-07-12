@@ -451,36 +451,42 @@ export function computeDrift(
 ): DriftReport {
   const cfg: DriftConfig = { ...DEFAULT_DRIFT_CONFIG, ...config, weights: { ...DEFAULT_DRIFT_CONFIG.weights, ...config.weights } };
 
+  const basePalette = paletteEntries(baseline);
+  const candPalette = paletteEntries(candidate);
+  const baseTypo = baseline.typography?.styles ?? [];
+  const candTypo = candidate.typography?.styles ?? [];
+  const baseSpacing = (baseline.spacing?.commonValues ?? []).map((s) => String(s.px));
+  const candSpacing = (candidate.spacing?.commonValues ?? []).map((s) => String(s.px));
+  const baseRadius = (baseline.borderRadius?.values ?? []).filter(notLowConfidence).map((r) => r.value).filter(isRealisticDimension);
+  const candRadius = (candidate.borderRadius?.values ?? []).filter(notLowConfidence).map((r) => r.value).filter(isRealisticDimension);
+  const baseShadows = (baseline.shadows ?? []).filter(notLowConfidence).map((s) => s.shadow).filter(isSupportedShadow);
+  const candShadows = (candidate.shadows ?? []).filter(notLowConfidence).map((s) => s.shadow).filter(isSupportedShadow);
+
+  // A category empty on BOTH sides carries no information; letting it enter the
+  // average at score 0 dilutes real drift in the categories that were measured.
+  const comparable = (b: unknown[], c: unknown[]) => b.length + c.length > 0;
+
   const parts = [
-    { ...compareColors(paletteEntries(baseline), paletteEntries(candidate), cfg), w: cfg.weights.color },
+    { ...compareColors(basePalette, candPalette, cfg), w: cfg.weights.color, comparable: comparable(basePalette, candPalette) },
     {
-      ...compareTypography(baseline.typography?.styles ?? [], candidate.typography?.styles ?? [], cfg),
+      ...compareTypography(baseTypo, candTypo, cfg),
       w: cfg.weights.typography,
+      comparable: comparable(baseTypo, candTypo),
     },
     {
-      ...compareDimensions(
-        "spacing",
-        (baseline.spacing?.commonValues ?? []).map((s) => String(s.px)),
-        (candidate.spacing?.commonValues ?? []).map((s) => String(s.px)),
-        cfg
-      ),
+      ...compareDimensions("spacing", baseSpacing, candSpacing, cfg),
       w: cfg.weights.spacing,
+      comparable: comparable(baseSpacing, candSpacing),
     },
     {
-      ...compareDimensions(
-        "radius",
-        (baseline.borderRadius?.values ?? []).filter(notLowConfidence).map((r) => r.value).filter(isRealisticDimension),
-        (candidate.borderRadius?.values ?? []).filter(notLowConfidence).map((r) => r.value).filter(isRealisticDimension),
-        cfg
-      ),
+      ...compareDimensions("radius", baseRadius, candRadius, cfg),
       w: cfg.weights.radius,
+      comparable: comparable(baseRadius, candRadius),
     },
     {
-      ...compareShadows(
-        (baseline.shadows ?? []).filter(notLowConfidence).map((s) => s.shadow).filter(isSupportedShadow),
-        (candidate.shadows ?? []).filter(notLowConfidence).map((s) => s.shadow).filter(isSupportedShadow)
-      ),
+      ...compareShadows(baseShadows, candShadows),
       w: cfg.weights.shadow,
+      comparable: comparable(baseShadows, candShadows),
     },
   ];
 
@@ -492,8 +498,7 @@ export function computeDrift(
   for (const p of parts) {
     categories.push(p.result);
     changes.push(...p.changes);
-    const active = p.result.changed + p.result.added + p.result.removed > 0 || p.result.score > 0;
-    if (active || p.w > 0) {
+    if (p.comparable) {
       weighted += p.result.score * p.w;
       totalW += p.w;
     }
