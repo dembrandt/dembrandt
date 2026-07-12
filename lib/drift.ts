@@ -450,6 +450,82 @@ function viewportWarning(baseline: ExtractionResult, candidate: ExtractionResult
   );
 }
 
+/** Both extracts must come from the same page: result.url is the final URL
+ * after redirects, so a baseline that landed on /fi/ diffed against a candidate
+ * on / compares two different surfaces. */
+function pageMismatchWarning(baseline: ExtractionResult, candidate: ExtractionResult): string | null {
+  let b: URL;
+  let c: URL;
+  try {
+    b = new URL(baseline.url);
+    c = new URL(candidate.url);
+  } catch {
+    return null;
+  }
+  const norm = (u: URL) => u.host.replace(/^www\./, "") + u.pathname.replace(/\/+$/, "");
+  if (norm(b) === norm(c)) return null;
+  return (
+    `baseline was extracted from ${b.href}, candidate from ${c.href} — ` +
+    `different pages after redirects, the diff compares two different surfaces.`
+  );
+}
+
+/** --dark-mode merges a dark-scheme pass into the palette, so extracts with and
+ * without it are not comparable: the whole palette "changes". */
+function darkModeWarning(baseline: ExtractionResult, candidate: ExtractionResult): string | null {
+  const b = Boolean(baseline.meta?.flags?.darkMode);
+  const c = Boolean(candidate.meta?.flags?.darkMode);
+  if (b === c) return null;
+  return (
+    `--dark-mode was on for the ${b ? "baseline" : "candidate"} only — ` +
+    `palette drift may be theme-induced, not design drift. Re-extract with matching flags.`
+  );
+}
+
+/** A snapshot taken before web fonts finished loading carries fallback
+ * families; family drift against it is suspect. */
+function fontsWarning(baseline: ExtractionResult, candidate: ExtractionResult): string | null {
+  const sides: string[] = [];
+  if (baseline.meta?.fontsReady === false) sides.push("baseline");
+  if (candidate.meta?.fontsReady === false) sides.push("candidate");
+  if (sides.length === 0) return null;
+  const pending = [
+    ...(baseline.meta?.pendingFonts ?? []),
+    ...(candidate.meta?.pendingFonts ?? []),
+  ];
+  const detail = pending.length ? ` (pending: ${[...new Set(pending)].join(", ")})` : "";
+  return (
+    `web fonts had not finished loading in the ${sides.join(" and ")} extraction${detail} — ` +
+    `typography family changes may be fallback fonts, not design drift.`
+  );
+}
+
+/** Stage names the extractor records in meta.errors / meta.degraded, mapped to
+ * the drift category they invalidate. The dark-mode and mobile passes merge
+ * extra colors into the palette, so their failure degrades color. */
+const STAGE_CATEGORY: Record<string, DriftCategory> = {
+  colors: "color",
+  typography: "typography",
+  spacing: "spacing",
+  borderRadius: "radius",
+  shadows: "shadow",
+  "dark-mode": "color",
+  mobile: "color",
+};
+
+function degradedDriftCategories(r: ExtractionResult): Set<DriftCategory> {
+  const out = new Set<DriftCategory>();
+  for (const e of r.meta?.errors ?? []) {
+    const cat = STAGE_CATEGORY[e.stage];
+    if (cat) out.add(cat);
+  }
+  for (const stage of r.meta?.degraded ?? []) {
+    const cat = STAGE_CATEGORY[stage];
+    if (cat) out.add(cat);
+  }
+  return out;
+}
+
 export function computeDrift(
   baseline: ExtractionResult,
   candidate: ExtractionResult,
@@ -496,6 +572,19 @@ export function computeDrift(
     },
   ];
 
+  const warnings: string[] = [];
+  for (const w of [
+    viewportWarning(baseline, candidate),
+    pageMismatchWarning(baseline, candidate),
+    darkModeWarning(baseline, candidate),
+    fontsWarning(baseline, candidate),
+  ]) {
+    if (w) warnings.push(w);
+  }
+
+  const baseDegraded = degradedDriftCategories(baseline);
+  const candDegraded = degradedDriftCategories(candidate);
+
   // Weighted average over categories that actually have something to compare.
   let weighted = 0;
   let totalW = 0;
@@ -504,6 +593,21 @@ export function computeDrift(
   for (const p of parts) {
     categories.push(p.result);
     changes.push(...p.changes);
+    const cat = p.result.category;
+    const degradedSides = [
+      baseDegraded.has(cat) ? "baseline" : null,
+      candDegraded.has(cat) ? "candidate" : null,
+    ].filter(Boolean);
+    if (degradedSides.length > 0) {
+      // Engine rule (see ExtractionMeta.degraded): a degraded category failed
+      // extraction, the brand did not change — its missing tokens would read
+      // as removals, so it must not enter the score.
+      warnings.push(
+        `${cat} extraction was degraded in the ${degradedSides.join(" and ")} — ` +
+        `category excluded from the drift score.`
+      );
+      continue;
+    }
     if (p.comparable) {
       weighted += p.result.score * p.w;
       totalW += p.w;
@@ -519,8 +623,6 @@ export function computeDrift(
     { changed: 0, added: 0, removed: 0 } as Record<DriftKind, number>
   );
 
-  const vw = viewportWarning(baseline, candidate);
-
   return {
     score,
     status: score > cfg.failThreshold ? "drift" : "stable",
@@ -528,6 +630,6 @@ export function computeDrift(
     summary,
     categories,
     changes,
-    ...(vw ? { warnings: [vw] } : {}),
+    ...(warnings.length ? { warnings } : {}),
   };
 }

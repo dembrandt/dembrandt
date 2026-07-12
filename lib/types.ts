@@ -292,6 +292,12 @@ export interface WcagPair {
 
 /** Metadata block on the native extraction output. */
 export interface ExtractionMeta {
+  /**
+   * Unique id of this snapshot, stamped at extraction time. The canonical key
+   * for consumers: extractedAt and storage timestamps drift by seconds, so
+   * anything pinning or deduping snapshots must use this, not a time.
+   */
+  snapshotId?: string;
   /** Provenance: the CLI release that produced this. Doubles as source.cliVersion. */
   dembrandtVersion?: string | null;
   /**
@@ -307,6 +313,15 @@ export interface ExtractionMeta {
    * different widths produces false drift; the drift engine warns on mismatch.
    */
   viewport?: { width: number; height: number };
+  /**
+   * False when web fonts had not finished loading when styles were read:
+   * typography families may be OS fallbacks, and family drift against this
+   * snapshot is suspect. Consumers must not have to infer this from generic
+   * family names.
+   */
+  fontsReady?: boolean;
+  /** Font families still pending when fontsReady is false. */
+  pendingFonts?: string[];
   /**
    * Categories that extracted incompletely. Engine rule: do NOT flag drift from a
    * degraded category (it failed extraction, the brand did not change) — surface

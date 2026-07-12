@@ -142,6 +142,54 @@ test('a removed style scores below an in-place family change', () => {
     `removal (${score(removedReport)}) must score below family change (${score(changedReport)})`);
 });
 
+test('extracts from different final URLs produce a page-mismatch warning', () => {
+  const base = fixture({ url: 'https://example.com/' });
+  const cand = fixture({ url: 'https://www.example.com/fi/' });
+
+  const report = computeDrift(base, cand);
+  assert.ok(report.warnings?.some((w) => w.includes('different pages')), JSON.stringify(report.warnings));
+});
+
+test('www and trailing slash are not a page mismatch', () => {
+  const base = fixture({ url: 'https://example.com/pricing' });
+  const cand = fixture({ url: 'https://www.example.com/pricing/' });
+
+  assert.equal(computeDrift(base, cand).warnings, undefined);
+});
+
+test('--dark-mode on one side only produces a warning', () => {
+  const base = fixture({ meta: { schemaVersion: '1', flags: { darkMode: true } } });
+  const cand = fixture({ meta: { schemaVersion: '1', flags: {} } });
+
+  const report = computeDrift(base, cand);
+  assert.ok(report.warnings?.some((w) => w.includes('--dark-mode')), JSON.stringify(report.warnings));
+});
+
+test('unloaded web fonts on either side produce a warning naming the pending families', () => {
+  const base = fixture({ meta: { schemaVersion: '1', fontsReady: true } });
+  const cand = fixture({ meta: { schemaVersion: '1', fontsReady: false, pendingFonts: ['Inter'] } });
+
+  const report = computeDrift(base, cand);
+  const w = report.warnings?.find((x) => x.includes('web fonts'));
+  assert.ok(w, JSON.stringify(report.warnings));
+  assert.match(w!, /candidate/);
+  assert.match(w!, /Inter/);
+});
+
+test('a degraded category is excluded from the score instead of read as removals', () => {
+  const styles = typoStyles(16);
+  const base = fixture({ typography: { styles, sources: {} } });
+  // Candidate's typography extractor failed: empty styles + a scoped error.
+  const cand = fixture({
+    typography: { styles: [], sources: {} },
+    meta: { schemaVersion: '1', errors: [{ stage: 'typography', reason: 'timeout' }] },
+  });
+
+  const report = computeDrift(base, cand);
+  assert.equal(report.status, 'stable', `16 missing styles from a failed extractor must not read as drift, got ${report.score}`);
+  assert.ok(report.warnings?.some((w) => w.includes('typography extraction was degraded')), JSON.stringify(report.warnings));
+});
+
 test('categories empty on both sides do not dilute the score', () => {
   const styles = typoStyles(2);
   const sparse = {

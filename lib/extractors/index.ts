@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { randomUUID } from 'node:crypto';
 import { color } from '../formatters/theme.js';
 import { discoverLinks } from '../discovery.js';
 import { extractLogo, extractSiteName } from './logo.js';
@@ -742,6 +743,29 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
 
     log(color.info("\n  Extracting design tokens...\n"));
 
+    // Font readiness is read here, at the moment styles are about to be read:
+    // a family still loading (or failed) renders as an OS fallback, and
+    // typography from this run must carry that fact (meta.fontsReady) instead
+    // of consumers inferring it from generic family names. 'unloaded' faces are
+    // declared but never requested — no rendered text uses them — so they are
+    // not fallback risks and must not be listed.
+    let fontsReady = true;
+    let pendingFonts: string[] = [];
+    try {
+      const fontState = await page.evaluate(() => ({
+        status: document.fonts ? document.fonts.status : 'loaded',
+        unsettled: document.fonts
+          ? Array.from(document.fonts)
+              .filter((f) => f.status === 'loading' || f.status === 'error')
+              .map((f) => f.family)
+          : [],
+      }));
+      fontsReady = fontState.status === 'loaded' && fontState.unsettled.length === 0;
+      pendingFonts = [...new Set(
+        fontState.unsettled.map((f) => String(f).replace(/^["']|["']$/g, ''))
+      )].sort();
+    } catch { /* best-effort; absence of the stamp must never abort extraction */ }
+
     spinner.start("Analyzing design system (17 parallel tasks)...");
     const [
       logoResult,
@@ -1392,9 +1416,12 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       url: page.url(),
       extractedAt: new Date().toISOString(),
       meta: {
+        snapshotId: randomUUID(),
         dembrandtVersion: options._version || null,
         schemaVersion: SCHEMA_VERSION,
         viewport: { width: screenW, height: screenH },
+        fontsReady,
+        ...(pendingFonts.length ? { pendingFonts } : {}),
         flags: {
           ...(options.stealth && { stealth: true }),
           ...(options.darkMode && { darkMode: true }),
