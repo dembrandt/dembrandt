@@ -211,12 +211,24 @@ function fieldDiffs(b: TypographyStyle, c: TypographyStyle, cfg: DriftConfig): n
   return d;
 }
 
+// Typography severities, tuned so no single style change can max the category
+// on its own. Removals are the noisiest signal live-DOM extraction produces (a
+// style missing from one crawl is usually crawl variance, not a design change),
+// so a removal scores below a confirmed in-place family change.
+const TYPO_FAMILY_PENALTY = 0.8;
+const TYPO_REMOVED_PENALTY = 0.6;
+const TYPO_ADDED_PENALTY = 0.5;
+// The peak floor keeps one large regression visible among many unchanged
+// styles, but damped: severity 1.0 floors the category at 50%, not 100%, so a
+// single style change never reads as the whole type system being replaced.
+const TYPO_PEAK_DAMP = 0.5;
+
 // Severity of one style's change, scaled by magnitude (0..1). A doubled font
 // size weighs far more than a 5% nudge — binary field counting hid that, making
 // a hero-size regression look as mild as a rounding tweak.
 function fieldPenalty(b: TypographyStyle, c: TypographyStyle, cfg: DriftConfig): number {
   let p = 0;
-  if (normFamily(b.family) !== normFamily(c.family)) p += 1;
+  if (normFamily(b.family) !== normFamily(c.family)) p += TYPO_FAMILY_PENALTY;
   if (String(b.weight) !== String(c.weight)) p += 0.5;
   const sizePct = pctChange(parseFloat(b.size), parseFloat(c.size));
   if (sizePct > cfg.dimPct) p += clamp01(sizePct / cfg.dimShiftPct);
@@ -246,8 +258,8 @@ function compareTypography(base: TypographyStyle[], cand: TypographyStyle[], cfg
     const bucket = buckets.get(key(b));
     if (!bucket || bucket.length === 0) {
       changes.push({ category: "typography", kind: "removed", label: b.context, before: fmt(b) });
-      penalty += 1;
-      peak = Math.max(peak, 1);
+      penalty += TYPO_REMOVED_PENALTY;
+      peak = Math.max(peak, TYPO_REMOVED_PENALTY);
       removed++;
       continue;
     }
@@ -276,16 +288,23 @@ function compareTypography(base: TypographyStyle[], cand: TypographyStyle[], cfg
   for (const arr of buckets.values()) {
     for (const c of arr) {
       changes.push({ category: "typography", kind: "added", label: c.context, after: fmt(c) });
-      penalty += 0.5;
-      peak = Math.max(peak, 0.5);
+      penalty += TYPO_ADDED_PENALTY;
+      peak = Math.max(peak, TYPO_ADDED_PENALTY);
       added++;
     }
   }
 
   return {
     changes,
-    // Peak keeps a single large regression from being diluted by many unchanged styles.
-    result: { category: "typography", score: Math.max(categoryScore(penalty, base.length, cand.length), peak), changed, added, removed },
+    // Damped peak keeps a single large regression from being diluted by many
+    // unchanged styles without letting it max the category (see TYPO_PEAK_DAMP).
+    result: {
+      category: "typography",
+      score: Math.max(categoryScore(penalty, base.length, cand.length), peak * TYPO_PEAK_DAMP),
+      changed,
+      added,
+      removed,
+    },
   };
 }
 

@@ -73,6 +73,58 @@ test('missing viewport meta on either side produces no warning (pre-viewport sna
   assert.equal(report.warnings, undefined);
 });
 
+function typoStyles(n: number, family = 'Inter'): any[] {
+  return Array.from({ length: n }, (_, i) => ({
+    context: `style-${i}`, family, size: '16px', weight: '400',
+  }));
+}
+
+test('one removed typography style among many does not max the category', () => {
+  const styles = typoStyles(10);
+  const base = fixture({ typography: { styles, sources: {} } });
+  const cand = fixture({ typography: { styles: styles.slice(0, 9), sources: {} } });
+
+  const report = computeDrift(base, cand);
+  const typo = report.categories.find((c) => c.category === 'typography')!;
+  assert.ok(typo.score < 0.5, `one removal must not dominate the category, got ${typo.score}`);
+  assert.equal(report.status, 'stable');
+});
+
+test('one font-family change among many does not max the category', () => {
+  const styles = typoStyles(10);
+  const changed = styles.map((s, i) => (i === 0 ? { ...s, family: 'Comic Sans MS' } : s));
+  const base = fixture({ typography: { styles, sources: {} } });
+  const cand = fixture({ typography: { styles: changed, sources: {} } });
+
+  const report = computeDrift(base, cand);
+  const typo = report.categories.find((c) => c.category === 'typography')!;
+  assert.ok(typo.score < 0.5, `one family change must not dominate the category, got ${typo.score}`);
+});
+
+test('replacing the font family across all styles still drifts', () => {
+  const base = fixture({ typography: { styles: typoStyles(10, 'Inter'), sources: {} } });
+  const cand = fixture({ typography: { styles: typoStyles(10, 'Georgia'), sources: {} } });
+
+  const report = computeDrift(base, cand);
+  const typo = report.categories.find((c) => c.category === 'typography')!;
+  assert.ok(typo.score >= 0.7, `full family swap must score high, got ${typo.score}`);
+  assert.equal(report.status, 'drift');
+});
+
+test('a removed style scores below an in-place family change', () => {
+  const styles = typoStyles(10);
+  const base = fixture({ typography: { styles, sources: {} } });
+
+  const removedReport = computeDrift(base, fixture({ typography: { styles: styles.slice(0, 9), sources: {} } }));
+  const changedReport = computeDrift(base, fixture({
+    typography: { styles: styles.map((s, i) => (i === 0 ? { ...s, family: 'Georgia' } : s)), sources: {} },
+  }));
+
+  const score = (r: any) => r.categories.find((c: any) => c.category === 'typography').score;
+  assert.ok(score(removedReport) < score(changedReport),
+    `removal (${score(removedReport)}) must score below family change (${score(changedReport)})`);
+});
+
 test('a high-confidence radius change is still real drift', () => {
   const base = fixture({
     borderRadius: { values: [{ value: '4px', count: 20, confidence: 'high' }] },
