@@ -436,9 +436,15 @@ function notLowConfidence(t: { confidence?: Confidence }): boolean {
 function viewportWarning(baseline: ExtractionResult, candidate: ExtractionResult): string | null {
   const b = baseline.meta?.viewport;
   const c = candidate.meta?.viewport;
-  if (!b || !c || b.width === c.width) return null;
+  if (!b || !c) return null;
+  // Persisted blobs are untrusted: widths may be strings or absent. Coerce, and
+  // stay silent on anything non-numeric rather than warn on garbage.
+  const bw = Number(b.width);
+  const cw = Number(c.width);
+  if (!Number.isFinite(bw) || !Number.isFinite(cw) || bw === cw) return null;
+  const dim = (v: { width: unknown; height: unknown }) => `${Number(v.width)}x${Number(v.height)}`;
   return (
-    `baseline extracted at ${b.width}x${b.height}, candidate at ${c.width}x${c.height} — ` +
+    `baseline extracted at ${dim(b)}, candidate at ${dim(c)} — ` +
     `layout-dependent changes below may be viewport-induced, not design drift. ` +
     `Re-extract both at the same width (--screen-size).`
   );

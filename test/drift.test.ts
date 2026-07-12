@@ -67,6 +67,18 @@ test('same viewport width produces no warning', () => {
   assert.equal(report.warnings, undefined);
 });
 
+test('malformed viewport meta produces no warning instead of garbage', () => {
+  const base = fixture({ meta: { schemaVersion: '1', viewport: {} } });
+  const cand = fixture({ meta: { schemaVersion: '1', viewport: { width: 390, height: 844 } } });
+  assert.equal(computeDrift(base, cand).warnings, undefined);
+});
+
+test('same width as string vs number is not a mismatch', () => {
+  const base = fixture({ meta: { schemaVersion: '1', viewport: { width: '1920', height: '1080' } } });
+  const cand = fixture({ meta: { schemaVersion: '1', viewport: { width: 1920, height: 1080 } } });
+  assert.equal(computeDrift(base, cand).warnings, undefined);
+});
+
 test('missing viewport meta on either side produces no warning (pre-viewport snapshots)', () => {
   const base = fixture(); // no meta at all
   const cand = fixture({ meta: { schemaVersion: '1', viewport: { width: 390, height: 844 } } });
@@ -75,7 +87,9 @@ test('missing viewport meta on either side produces no warning (pre-viewport sna
   assert.equal(report.warnings, undefined);
 });
 
-function typoStyles(n: number, family = 'Inter'): any[] {
+interface TestStyle { context: string; family: string; size: string; weight: string }
+
+function typoStyles(n: number, family = 'Inter'): TestStyle[] {
   return Array.from({ length: n }, (_, i) => ({
     context: `style-${i}`, family, size: '16px', weight: '400',
   }));
@@ -122,7 +136,8 @@ test('a removed style scores below an in-place family change', () => {
     typography: { styles: styles.map((s, i) => (i === 0 ? { ...s, family: 'Georgia' } : s)), sources: {} },
   }));
 
-  const score = (r: any) => r.categories.find((c: any) => c.category === 'typography').score;
+  const score = (r: ReturnType<typeof computeDrift>) =>
+    r.categories.find((c) => c.category === 'typography')!.score;
   assert.ok(score(removedReport) < score(changedReport),
     `removal (${score(removedReport)}) must score below family change (${score(changedReport)})`);
 });
