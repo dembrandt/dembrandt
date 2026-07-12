@@ -1491,5 +1491,10 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
     console.error(`  ↳ URL: ${url}`);
     console.error(`  ↳ Stage: ${spinner.text || "unknown"}`);
     throw error;
+  } finally {
+    // We opened the context, we close it. Otherwise crawls accumulate one
+    // context per page, and on CDP-connected shared browsers (browser.close()
+    // only disconnects) every extraction leaks a context permanently.
+    await context.close().catch(() => {});
   }
 }
