@@ -2,8 +2,11 @@
   "url": "https://synthetic.example.com",
   "extractedAt": "2026-06-11T00:00:00.000Z",
   "meta": {
-    "schemaVersion": "1.2.0",
-    "dembrandtVersion": "0.17.0"
+    "snapshotId": "00000000-0000-4000-8000-000000000001",
+    "schemaVersion": "1.3.0",
+    "dembrandtVersion": "0.17.0",
+    "viewport": { "width": 1920, "height": 1080 },
+    "fontsReady": true
   },
   "colors": {
     "semantic": {

@@ -60,7 +60,14 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 async function waitForSettled(page: Page, capMs: number, quietMs = 500) {
   const start = Date.now();
   try { await page.waitForLoadState("networkidle", { timeout: capMs }); } catch {}
-  try { await page.evaluate(() => document.fonts?.ready ?? null); } catch {}
+  // fonts.ready resolves only when no face is loading; a hung font request
+  // would stall it past every cap, so race it against the remaining budget.
+  try {
+    await Promise.race([
+      page.evaluate(() => document.fonts?.ready ?? null),
+      new Promise((r) => setTimeout(r, Math.max(250, capMs - (Date.now() - start)))),
+    ]);
+  } catch {}
   const remaining = Math.max(250, capMs - (Date.now() - start));
   try {
     await page.evaluate(({ quietMs, remaining }) => new Promise<void>((resolve) => {

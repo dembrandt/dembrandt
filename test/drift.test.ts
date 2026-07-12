@@ -190,6 +190,26 @@ test('a degraded category is excluded from the score instead of read as removals
   assert.ok(report.warnings?.some((w) => w.includes('typography extraction was degraded')), JSON.stringify(report.warnings));
 });
 
+test('a compare where every comparable category is degraded warns that it is inconclusive', () => {
+  const sparse = {
+    typography: { styles: typoStyles(3), sources: {} },
+    colors: { palette: [], semantic: {}, cssVariables: {} },
+    spacing: { scaleType: 'base-8', commonValues: [] },
+    borderRadius: { values: [] },
+    shadows: [],
+  };
+  const base = fixture(sparse);
+  const cand = fixture({
+    ...sparse,
+    typography: { styles: [], sources: {} },
+    meta: { schemaVersion: '1', errors: [{ stage: 'typography', reason: 'timeout' }] },
+  });
+
+  const report = computeDrift(base, cand);
+  assert.equal(report.score, 0);
+  assert.ok(report.warnings?.some((w) => w.includes('inconclusive')), JSON.stringify(report.warnings));
+});
+
 test('categories empty on both sides do not dilute the score', () => {
   const styles = typoStyles(2);
   const sparse = {

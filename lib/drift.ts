@@ -614,6 +614,15 @@ export function computeDrift(
     }
   }
 
+  // Degradation can exclude every comparable category. The score is then 0 by
+  // construction, not by evidence — a gate must not treat that as a clean pass.
+  if (totalW === 0 && (baseDegraded.size > 0 || candDegraded.size > 0)) {
+    warnings.push(
+      "no category could be scored: every comparable category was degraded — " +
+      "this compare is inconclusive, not stable. Re-extract and retry."
+    );
+  }
+
   const score = totalW > 0 ? Math.round((weighted / totalW) * 100) : 0;
   const summary = changes.reduce(
     (acc, c) => {

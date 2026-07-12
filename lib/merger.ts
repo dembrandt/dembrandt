@@ -7,7 +7,33 @@
  * pageCount on palette entries) added.
  */
 
+import { randomUUID } from 'node:crypto';
 import { deltaE } from './colors.js';
+
+/**
+ * Meta for a merged snapshot. The merged artifact is a distinct snapshot, so it
+ * gets its own snapshotId; readiness aggregates across pages (one page that
+ * rendered fallback fonts taints the merged typography).
+ */
+function mergeMeta(results) {
+  const home = results[0];
+  if (!home.meta) return {};
+  const metas = results.map((r) => r.meta).filter(Boolean);
+  const fontsReady = metas.every((m) => m.fontsReady !== false);
+  const pendingFonts = [...new Set(metas.flatMap((m) => m.pendingFonts ?? []))].sort();
+  const degraded = [...new Set(metas.flatMap((m) => m.degraded ?? []))];
+  const errors = metas.flatMap((m) => m.errors ?? []);
+  return {
+    meta: {
+      ...home.meta,
+      snapshotId: randomUUID(),
+      fontsReady,
+      ...(pendingFonts.length ? { pendingFonts } : {}),
+      ...(degraded.length ? { degraded } : {}),
+      ...(errors.length ? { errors } : {}),
+    },
+  };
+}
 
 const DELTA_E_THRESHOLD = 15;
 
@@ -389,7 +415,7 @@ export function mergeResults(results) {
   return {
     url: home.url,
     extractedAt: home.extractedAt,
-    ...(home.meta ? { meta: home.meta } : {}),
+    ...mergeMeta(results),
     siteName: home.siteName,
     logo: home.logo,
     favicons: home.favicons,

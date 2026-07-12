@@ -36,6 +36,12 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.3.0 — meta gains snapshotId (canonical snapshot key: pin/dedupe on this,
+ *          not on extractedAt or storage timestamps), viewport (extraction
+ *          width/height; mismatched widths produce false layout drift),
+ *          fontsReady and pendingFonts (false = typography families may be OS
+ *          fallbacks). DriftReport gains warnings[] (comparison-validity
+ *          caveats). Additive: 1.2.x consumers ignore the new keys.
  *  1.2.0 — added colors.semantic.background, colors.semantic.text and
  *          colors.semantic.accent (canonical page surface, body text, and a
  *          hue-distinct brand accent). Typography gains a "text" context value
@@ -48,7 +54,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.2.0';
+export const SCHEMA_VERSION = '1.3.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';

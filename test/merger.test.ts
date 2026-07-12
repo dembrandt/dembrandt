@@ -35,6 +35,23 @@ function page(url, overrides: any = {}) {
 
 const color = (hex, count, confidence) => ({ normalized: hex, color: hex, count, confidence });
 
+test('merged meta gets a fresh snapshotId and aggregates readiness across pages', () => {
+  const a = page('https://a.com/', {
+    meta: { schemaVersion: '1.3.0', snapshotId: 'id-a', viewport: { width: 1920, height: 1080 }, fontsReady: true },
+  });
+  const b = page('https://a.com/pricing', {
+    meta: { schemaVersion: '1.3.0', snapshotId: 'id-b', fontsReady: false, pendingFonts: ['Inter'], degraded: ['hover-focus'] },
+  });
+
+  const merged = mergeResults([a, b]);
+  assert.ok(merged.meta.snapshotId, 'merged snapshot must have an id');
+  assert.notEqual(merged.meta.snapshotId, 'id-a', 'merged artifact is a distinct snapshot');
+  assert.equal(merged.meta.fontsReady, false, 'one fallback-rendered page taints the merged snapshot');
+  assert.deepEqual(merged.meta.pendingFonts, ['Inter']);
+  assert.deepEqual(merged.meta.degraded, ['hover-focus']);
+  assert.deepEqual(merged.meta.viewport, { width: 1920, height: 1080 }, 'home meta fields survive');
+});
+
 test('mergeResults throws on empty input', () => {
   assert.throws(() => mergeResults([]), /No results to merge/);
 });
