@@ -534,8 +534,14 @@ function wcagSection(result: BrandingResult): string {
       return `<tr><td>${swatches}</td><td class="mono" data-copy="${esc(p.fg)}">${esc(p.fg)}</td><td class="mono" data-copy="${esc(p.bg)}">${esc(p.bg)}</td><td class="mono">${esc(p.ratio?.toFixed ? p.ratio.toFixed(2) : p.ratio)}</td><td>${verdict}</td></tr>`;
     })
     .join("");
+  // Tiers must agree with the header gauge, which counts strict AA: AA-Large-only
+  // pairs are the middle tier, not passes.
   const failed = pairs.filter((p) => !p.aa && !p.aaLarge).length;
-  const title = failed ? `WCAG contrast (${pairs.length - failed} pass · ${failed} fail)` : `WCAG contrast (${pairs.length} pass)`;
+  const aaLargeOnly = pairs.filter((p) => !p.aa && p.aaLarge).length;
+  const passed = pairs.length - failed - aaLargeOnly;
+  const title = failed || aaLargeOnly
+    ? `WCAG contrast (${passed} pass${aaLargeOnly ? ` · ${aaLargeOnly} AA Large` : ""}${failed ? ` · ${failed} fail` : ""})`
+    : `WCAG contrast (${pairs.length} pass)`;
   return section(
     title,
     `<table><thead><tr><th>Pair</th><th>Foreground</th><th>Background</th><th>Ratio</th><th>Level</th></tr></thead><tbody>${rows}</tbody></table>`,
