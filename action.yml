@@ -61,7 +61,7 @@ runs:
       # installed tree instead of hardcoding — same rule as README "Continuous
       # integration".
       run: |
-        npm install -g dembrandt@0.23.1
+        npm install -g dembrandt@0.24.0
         PW_VERSION=$(node -p "require('$(npm root -g)/dembrandt/node_modules/playwright-core/package.json').version")
         echo "playwright-core resolved to $PW_VERSION"
         npx --yes "playwright@$PW_VERSION" install chromium --with-deps

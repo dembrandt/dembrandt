@@ -249,7 +249,7 @@ dembrandt dembrandt.com --brand-guide
 The official action wraps extract → compare → gate into one step: it installs a matching Chromium, runs a pinned CLI version, fails the job on drift, and renders the drifted tokens as inline annotations on the PR.
 
 ```yaml
-- uses: dembrandt/dembrandt@v0.23.1
+- uses: dembrandt/dembrandt@v0.24.0
   with:
     url: https://preview.example.com
     baseline: .dembrandt/baseline.json
@@ -267,7 +267,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dembrandt/dembrandt@v0.23.1
+      - uses: dembrandt/dembrandt@v0.24.0
         with:
           url: ${{ github.event.deployment_status.environment_url }}
           baseline: .dembrandt/baseline.json
