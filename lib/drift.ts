@@ -537,6 +537,7 @@ const STAGE_CATEGORY: Record<string, DriftCategory> = {
   "hover-focus": "color",
   "gradient-colors": "color",
   "svg-logo-colors": "color",
+  manifest: "color",
 };
 
 function degradedDriftCategories(r: ExtractionResult): Set<DriftCategory> {

@@ -217,6 +217,25 @@ test('a degraded category is excluded from the score instead of read as removals
   assert.equal(report.summary.removed, 0);
 });
 
+test('a failed manifest injection degrades color: its palette entries must not read as removed brand colors', () => {
+  // Manifest injection pushes theme_color/background_color into the palette
+  // (count 10, high confidence). If the candidate's injection fails, those
+  // colors vanish — without the manifest→color mapping they scored as drift.
+  const palette = [
+    { color: '#ff6600', normalized: '#ff6600', count: 10, confidence: 'high' },
+    { color: '#123456', normalized: '#123456', count: 40, confidence: 'high' },
+  ];
+  const base = fixture({ colors: { palette, semantic: {}, cssVariables: {} } });
+  const cand = fixture({
+    colors: { palette: [palette[1]], semantic: {}, cssVariables: {} },
+    meta: { schemaVersion: '1', degraded: ['manifest'] },
+  });
+
+  const report = computeDrift(base, cand);
+  assert.equal(report.status, 'stable', `a failed manifest stage must not read as color drift, got ${report.score}`);
+  assert.equal(report.changes.filter((c) => c.category === 'color').length, 0);
+});
+
 test('a compare where every comparable category is degraded warns that it is inconclusive', () => {
   const sparse = {
     typography: { styles: typoStyles(3), sources: {} },
