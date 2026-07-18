@@ -281,7 +281,7 @@ jobs:
 | `key` | no | API key for cloud snapshot sync ([dembrandt.com/app/api-keys](https://www.dembrandt.com/app/api-keys)) |
 | `args` | no | Extra CLI flags, e.g. `--wcag` or `--crawl 3` |
 
-Outputs: `report` (path to the drift/extraction JSON) and `score` (drift score, empty without a baseline). The action pins the CLI version per release, so a `@v1` gate never changes behavior under you. For a fully hand-rolled workflow (per-page PR comment, preview vs production, report artifact), see [`examples/drift-gate.yml`](examples/drift-gate.yml).
+Outputs: `report` (path to the drift/extraction JSON) and `score` (drift score, empty without a baseline). The action pins the CLI version per release, so a version-tagged gate never changes behavior under you. For a fully hand-rolled workflow (per-page PR comment, preview vs production, report artifact), see [`examples/drift-gate.yml`](examples/drift-gate.yml).
 
 ### Running the CLI directly
 

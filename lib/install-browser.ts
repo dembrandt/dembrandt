@@ -24,8 +24,13 @@ export function bundledPlaywrightVersion(): string {
 }
 
 /**
- * Runs the version-matched Playwright installer. Returns a process exit code:
+ * Runs the bundled playwright-core installer. Returns a process exit code:
  * 0 on success, 1 on failure (with the manual command echoed for recovery).
+ *
+ * Invoked as `node <resolved cli.js>` rather than through npx: the resolved
+ * CLI *is* the bundled playwright-core, so the version matches by construction
+ * with no registry fetch — and npx is npx.cmd on Windows, which execFileSync
+ * will not spawn without a shell.
  */
 export function installBrowsers(argv: string[]): number {
   const version = bundledPlaywrightVersion();
@@ -35,7 +40,8 @@ export function installBrowsers(argv: string[]): number {
 
   console.log(`Installing Playwright ${targets.join(" ")} for playwright-core ${version}...`);
   try {
-    execFileSync("npx", ["--yes", `playwright@${version}`, "install", ...targets], { stdio: "inherit" });
+    const cli = require.resolve("playwright-core/cli.js");
+    execFileSync(process.execPath, [cli, "install", ...targets], { stdio: "inherit" });
     return 0;
   } catch {
     console.error(
