@@ -18,7 +18,7 @@ inputs:
     required: false
     default: ""
   args:
-    description: 'Extra dembrandt CLI flags, e.g. "--wcag" or "--pages 3".'
+    description: 'Extra dembrandt CLI flags, e.g. "--wcag" or "--crawl 3".'
     required: false
     default: ""
   node-version:
