@@ -10,14 +10,17 @@ Absolute Mode. Eliminate emojis, filler, hype, soft asks, conversational transit
 
 ### Running the tool
 
+Source is TypeScript. Build first, then run the compiled entry point.
+
 ```bash
-node index.js <url>
-node index.js dembrandt.com --json-only
-node index.js dembrandt.com --dark-mode
-node index.js dembrandt.com --mobile
-node index.js dembrandt.com --slow
-node index.js dembrandt.com --stealth
-npm run install-browser
+npm run build
+node dist/index.js <url>
+node dist/index.js dembrandt.com --json-only
+node dist/index.js dembrandt.com --dark-mode
+node dist/index.js dembrandt.com --mobile
+node dist/index.js dembrandt.com --slow
+node dist/index.js dembrandt.com --stealth
+node dist/index.js install-browser
 ```
 
 ### Testing
