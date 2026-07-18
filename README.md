@@ -152,18 +152,17 @@ dembrandt dembrandt.com --browser=firefox --save-output --dtcg
 Browsers are installed on demand, not by `npm install` (dembrandt depends on the lean `playwright-core`, which carries no browser binaries). Fetch the engine you need, matched to the installed `playwright-core`:
 
 ```bash
-npm run install-browser   # chromium (default)
-# or a specific engine:
-npx playwright@$(node -p "require('playwright-core/package.json').version") install firefox
+dembrandt install-browser           # chromium (default)
+dembrandt install-browser firefox   # a specific engine
 ```
 
-If you get `Executable doesn't exist` when using `--browser firefox`, the version resolved above may not match the `playwright-core` bundled inside the global dembrandt install (which can happen if you run the command from inside a project that pins a different version). Use `playwright-core` directly with the exact version dembrandt ships:
+This resolves the browser revision from the `playwright-core` dembrandt actually drives, so the two cannot drift apart. Prefer it over calling Playwright directly: a bare `npx playwright install` fetches whatever version the registry serves, and a mismatch fails with `Executable doesn't exist`.
+
+On Linux and in CI, system libraries are installed separately:
 
 ```bash
-npx playwright-core@$(node -p "require('playwright-core/package.json').version") install firefox
+npx playwright@$(node -p "require('playwright-core/package.json').version") install --with-deps chromium
 ```
-
-Run this from your home directory (outside any Node.js project) so `require` resolves against the global dembrandt install rather than a local `node_modules`.
 
 ### Connect to an existing browser (CDP)
 
@@ -250,7 +249,7 @@ dembrandt dembrandt.com --brand-guide
 The official action wraps extract → compare → gate into one step: it installs a matching Chromium, runs a pinned CLI version, fails the job on drift, and renders the drifted tokens as inline annotations on the PR.
 
 ```yaml
-- uses: dembrandt/dembrandt@v1
+- uses: dembrandt/dembrandt@v0.23.1
   with:
     url: https://preview.example.com
     baseline: .dembrandt/baseline.json
@@ -268,7 +267,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dembrandt/dembrandt@v1
+      - uses: dembrandt/dembrandt@v0.23.1
         with:
           url: ${{ github.event.deployment_status.environment_url }}
           baseline: .dembrandt/baseline.json
@@ -280,7 +279,7 @@ jobs:
 | `url` | yes | URL to extract — typically the PR's preview deployment |
 | `baseline` | no | Committed baseline JSON path, or an App baseline id. Omit to extract without gating |
 | `key` | no | API key for cloud snapshot sync ([dembrandt.com/app/api-keys](https://www.dembrandt.com/app/api-keys)) |
-| `args` | no | Extra CLI flags, e.g. `--wcag` or `--pages 3` |
+| `args` | no | Extra CLI flags, e.g. `--wcag` or `--crawl 3` |
 
 Outputs: `report` (path to the drift/extraction JSON) and `score` (drift score, empty without a baseline). The action pins the CLI version per release, so a `@v1` gate never changes behavior under you. For a fully hand-rolled workflow (per-page PR comment, preview vs production, report artifact), see [`examples/drift-gate.yml`](examples/drift-gate.yml).
 
@@ -291,9 +290,9 @@ Dembrandt drives a real browser, so the browser revision must match `playwright-
 If you are not using the Playwright container image, install the browser revision that matches `playwright-core`:
 
 ```bash
-# in dembrandt's own repo
-npm run install-browser
-# elsewhere — derive the version so it always matches
+# matches the bundled playwright-core automatically
+dembrandt install-browser
+# on a bare Linux runner, add the system libraries too
 npx playwright@$(node -p "require('playwright-core/package.json').version") install --with-deps chromium
 ```
 

@@ -10,7 +10,7 @@
 import { program, Option } from "commander";
 import chalk from "chalk";
 import ora from "ora";
-import { loadBrowserEngines } from "./lib/browser.js";
+import { loadBrowserEngines, PlaywrightMissingError } from "./lib/browser.js";
 import { extractBranding } from "./lib/extractors/index.js";
 import { displayResults } from "./lib/formatters/terminal.js";
 import { color } from "./lib/formatters/theme.js";
@@ -28,6 +28,8 @@ import { fileURLToPath } from "url";
 import { checkRobotsTxt } from "./lib/robots.js";
 import { EXIT, classifyError } from "./lib/exit-codes.js";
 import { activeFlags, pathSummary } from "./lib/run-summary.js";
+import { consumeCloudHint } from "./lib/cli-state.js";
+import { installBrowsers } from "./lib/install-browser.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"));
@@ -159,10 +161,22 @@ program
           spinner.text = "Connecting over CDP...";
           browser = await browserType.connectOverCDP(process.env.BROWSER_CDP_ENDPOINT);
         } else {
-          browser = await browserType.launch({
-            headless: !useHeaded,
-            args: launchArgs,
-          });
+          try {
+            browser = await browserType.launch({
+              headless: !useHeaded,
+              args: launchArgs,
+            });
+          } catch (launchErr) {
+            // playwright-core is a hard dependency so the *module* always
+            // resolves — the guard in loadBrowserEngines can never fire on a
+            // real install. The condition that actually bites is a missing
+            // browser *binary*, which only surfaces here, as raw Playwright
+            // text. Translate it into our own instruction instead.
+            if (/Executable doesn't exist/i.test(launchErr?.message ?? "")) {
+              throw new PlaywrightMissingError();
+            }
+            throw launchErr;
+          }
         }
 
         try {
@@ -588,6 +602,17 @@ program
         if (pathsLine) console.log(pathsLine);
         if (flagsLine) console.log(flagsLine);
         for (const notice of savedNotices) console.log(notice);
+
+        // The CLI is the only surface most users ever see, so without a nudge
+        // the account side is undiscoverable. Restricted to a bare run — anyone
+        // passing flags already knows the tool and would just read this as
+        // noise — shown on the first few such runs only (see cli-state), and
+        // never once the user already syncs with --key. Points at the recipe
+        // rather than /app: the reader is still deciding, not signing up.
+        if (!apiKey && flagBits.length === 0 && consumeCloudHint()) {
+          console.log(chalk.dim("   Tip: --key <token> keeps runs in your account and diffs them over time."));
+          console.log(chalk.dim("        dembrandt.com/recipes/cloud-drift-ci"));
+        }
       }
     } catch (err) {
       const { code, exit } = classifyError(err);
@@ -667,5 +692,12 @@ program.configureHelp({
     return out.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
   },
 });
+
+// Handled before parse(): the root command takes a required <url> argument, so
+// a real Commander subcommand would collide with it. Intercepting the bare verb
+// keeps `dembrandt install-browser` working without restructuring the CLI.
+if (process.argv[2] === "install-browser") {
+  process.exit(installBrowsers(process.argv.slice(3)));
+}
 
 program.parse();

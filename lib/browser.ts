@@ -13,7 +13,7 @@
 
 export class PlaywrightMissingError extends Error {
   constructor() {
-    super('browser engine not available, run: npx playwright install chromium');
+    super('browser engine not available, run: dembrandt install-browser');
     this.name = 'PlaywrightMissingError';
   }
 }
