@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   unit:
     runs-on: ubuntu-latest
@@ -47,21 +50,29 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Keyed on the lockfile so a Playwright bump invalidates the cache and
+      # everything else reuses the ~100MB download.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
       - name: Build
         run: npm run build
 
-      - name: Run smoke extraction
-        run: node test/qa.mjs --baseline --ci --sites-file sites-smoke.json
+      - name: Liveness smoke
+        run: node test/liveness.mjs sites-smoke.json
         env:
           CI: true
 
-      - name: Upload results
+      - name: Upload report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-results
-          path: test/golden/
+          name: liveness-report
+          path: test/liveness-report.json
           retention-days: 7

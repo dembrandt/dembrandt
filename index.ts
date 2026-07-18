@@ -12,7 +12,7 @@ import chalk from "chalk";
 import ora from "ora";
 import { loadBrowserEngines, PlaywrightMissingError } from "./lib/browser.js";
 import { extractBranding } from "./lib/extractors/index.js";
-import { displayResults } from "./lib/formatters/terminal.js";
+import { displayResults, terminalLink } from "./lib/formatters/terminal.js";
 import { color } from "./lib/formatters/theme.js";
 import { toDtcgTokens } from "./lib/formatters/dtcg.js";
 import { generatePDF } from "./lib/formatters/pdf.js";
@@ -610,8 +610,7 @@ program
         // never once the user already syncs with --key. Points at the recipe
         // rather than /app: the reader is still deciding, not signing up.
         if (!apiKey && flagBits.length === 0 && consumeCloudHint()) {
-          console.log(chalk.dim("   Tip: --key <token> keeps runs in your account and diffs them over time."));
-          console.log(chalk.dim("        dembrandt.com/recipes/cloud-drift-ci"));
+          console.log(chalk.dim("💡 --key <token> snapshots each run to your account and catches design drift over time: ") + chalk.dim(terminalLink("https://www.dembrandt.com/recipes/cloud-drift-ci", "dembrandt.com/recipes/cloud-drift-ci")));
         }
       }
     } catch (err) {

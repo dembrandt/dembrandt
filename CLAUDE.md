@@ -26,10 +26,14 @@ node dist/index.js install-browser
 ### Testing
 
 ```bash
-npm run qa:baseline
-npm run qa:diff
-npm run qa:site
+npm test              # unit tests
+npm run liveness      # live extraction smoke on sites-smoke.json (same as CI)
+npm run gold:run      # accuracy scoring vs test/gold expectations (live runs)
 ```
+
+Accuracy ground truth lives in ../dembrandt-ml (labeled dataset + ONNX ranking
+model). The old qa.mjs golden-baseline layer was removed: baselines encoded
+yesterday's output as truth and nothing consumed them.
 
 ## Architecture
 

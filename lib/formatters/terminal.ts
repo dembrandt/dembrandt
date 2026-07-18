@@ -17,7 +17,7 @@ import { convertColor } from '../colors.js';
  * @param {string} text - The text to display (defaults to url)
  * @returns {string} ANSI-formatted clickable link
  */
-function terminalLink(url, text = url) {
+export function terminalLink(url, text = url) {
   // OSC 8 hyperlink format: \x1b]8;;URL\x1b\\TEXT\x1b]8;;\x1b\\
   return `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\`;
 }
