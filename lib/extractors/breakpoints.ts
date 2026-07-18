@@ -23,7 +23,7 @@ export async function detectIconSystem(page) {
   return await page.evaluate(() => {
     const systems = [];
 
-    if (document.querySelector('[class*="fa-"]')) {
+    if (document.querySelector('[class^="fa-"], [class*=" fa-"], .fa, .fas, .far, .fab')) {
       systems.push({ name: "Font Awesome", type: "icon-font" });
     }
     if (document.querySelector('[class*="material-icons"]')) {
@@ -114,8 +114,10 @@ export async function detectFrameworks(page) {
     if (polarisCount > 2) frameworks.push({ name: 'Shopify Polaris', confidence: 'high', evidence: `${polarisCount} Polaris components` });
 
     // Radix UI
-    const radixCount = document.querySelectorAll('[data-radix-], [data-state]').length;
-    if (radixCount > 5) frameworks.push({ name: 'Radix UI', confidence: 'high', evidence: `${radixCount} Radix primitives` });
+    // data-state alone is emitted by Headless UI, Base UI and hand-rolled code; require a real Radix marker
+    const radixMarkers = document.querySelectorAll('[data-radix-collection-item], [data-radix-popper-content-wrapper], [data-radix-scroll-area-viewport], [data-radix-focus-guard], [data-radix-aspect-ratio-wrapper]').length;
+    const dataStateCount = document.querySelectorAll('[data-state]').length;
+    if (radixMarkers > 0) frameworks.push({ name: 'Radix UI', confidence: 'high', evidence: `${radixMarkers} Radix primitives` });
 
     // DaisyUI
     if (tailwindEvidence.length >= 2) {
@@ -148,7 +150,7 @@ export async function detectFrameworks(page) {
     }
 
     // UIkit
-    const uikitCount = countMatches('[class*="uk-"], [uk-grid], [uk-navbar]');
+    const uikitCount = countMatches('[class^="uk-"], [class*=" uk-"], [uk-grid], [uk-navbar]');
     if (uikitCount > 3 || hasResource(/uikit\.min\.css|getuikit\.com/)) {
       frameworks.push({ name: 'UIkit', confidence: 'high', evidence: `${uikitCount} uk- components` });
     }
@@ -156,7 +158,7 @@ export async function detectFrameworks(page) {
     // shadcn/ui
     const shadcnClasses = /\bcn\(|\bslot-\w+|\bdata-\[state=/.test(html);
     const hasShadcnComponents = countMatches('[data-slot], [data-state]') > 5;
-    if (tailwindEvidence.length >= 2 && radixCount > 3 && (shadcnClasses || hasShadcnComponents)) {
+    if (tailwindEvidence.length >= 2 && (radixMarkers > 3 || dataStateCount > 3) && (shadcnClasses || hasShadcnComponents)) {
       frameworks.push({ name: 'shadcn/ui', confidence: 'medium', evidence: 'Tailwind + Radix + component patterns' });
     }
 
@@ -167,7 +169,8 @@ export async function detectFrameworks(page) {
     }
 
     // PrimeReact/Vue/NG
-    const primeCount = countMatches('[class*="p-"], .p-component, .p-button, .p-datatable');
+    // no generic p- matching: it collides with Tailwind p-4 and any class containing top-/gap-/group-
+    const primeCount = countMatches('.p-component, .p-button, .p-datatable, .p-inputtext, .p-dropdown, .p-dialog, .p-menubar');
     if (primeCount > 5) frameworks.push({ name: 'PrimeReact/Vue/NG', confidence: 'high', evidence: `${primeCount} Prime components` });
 
     // Mantine
@@ -179,17 +182,23 @@ export async function detectFrameworks(page) {
     if (carbonCount > 3) frameworks.push({ name: 'Carbon Design System', confidence: 'high', evidence: `${carbonCount} Carbon components` });
 
     // Fluent UI
-    const fluentCount = countMatches('[class*="ms-"], .ms-Button, .ms-TextField');
+    // Fluent v8 classes are capitalized (ms-Button); plain ms- collides with items-center and Tailwind ms-4
+    let fluentCount = 0;
+    for (const el of document.querySelectorAll('[class*="ms-"]')) {
+      for (const c of el.classList) {
+        if (/^ms-[A-Z]/.test(c)) { fluentCount++; break; }
+      }
+    }
     if (fluentCount > 5) frameworks.push({ name: 'Fluent UI', confidence: 'high', evidence: `${fluentCount} Fluent components` });
 
     // Quasar
-    const quasarCount = countMatches('[class*="q-"]');
+    const quasarCount = countMatches('[class^="q-"], [class*=" q-"]');
     if (quasarCount > 5 || body.classList.contains('q-app')) {
       frameworks.push({ name: 'Quasar', confidence: 'high', evidence: `${quasarCount} q- components` });
     }
 
     // Element Plus/UI
-    const elementCount = countMatches('[class*="el-"]');
+    const elementCount = countMatches('[class^="el-"], [class*=" el-"]');
     if (elementCount > 5) frameworks.push({ name: 'Element Plus/UI', confidence: 'high', evidence: `${elementCount} el- components` });
 
     return frameworks;
