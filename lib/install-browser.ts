@@ -15,6 +15,7 @@
 
 import { execFileSync } from "child_process";
 import { createRequire } from "module";
+import { dirname, join } from "path";
 
 const require = createRequire(import.meta.url);
 
@@ -40,7 +41,9 @@ export function installBrowsers(argv: string[]): number {
 
   console.log(`Installing Playwright ${targets.join(" ")} for playwright-core ${version}...`);
   try {
-    const cli = require.resolve("playwright-core/cli.js");
+    // cli.js is not in playwright-core's exports map, so it cannot be
+    // require.resolve'd directly — derive its path from package.json, which is.
+    const cli = join(dirname(require.resolve("playwright-core/package.json")), "cli.js");
     execFileSync(process.execPath, [cli, "install", ...targets], { stdio: "inherit" });
     return 0;
   } catch {
