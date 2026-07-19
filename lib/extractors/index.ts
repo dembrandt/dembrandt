@@ -14,6 +14,7 @@ import { extractWcagPairs } from './colors.js';
 import { SCHEMA_VERSION } from '../version.js';
 import { buildContextOptions, parseCookies, parseScreenSize, DEFAULT_LOCALE } from './context-config.js';
 import { guardExtractor } from './guard.js';
+import { dismissConsent } from './consent.js';
 import type { Browser, Page } from 'playwright';
 import type { ExtractOptions, BrandingResult, Spinner, ExtractorError, WcagPair } from '../types.js';
 
@@ -524,38 +525,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         log(color.success(`  ✓ Full page scrolled (lazy content triggered)`));
 
         spinner.start("Dismissing cookie consent banners...");
-        const dismissed = await page.evaluate(async () => {
-          const selectors = [
-            // Generic accept patterns
-            'button[id*="accept"]', 'button[class*="accept"]',
-            'button[id*="agree"]', 'button[class*="agree"]',
-            'button[id*="consent"]', 'button[class*="consent"]',
-            '[data-testid*="accept"]', '[data-testid*="agree"]',
-            // Common consent libraries
-            '#onetrust-accept-btn-handler',
-            '.cc-btn.cc-allow', '.cc-accept',
-            '[aria-label*="Accept"]', '[aria-label*="agree"]',
-            // EU/GDPR common patterns
-            'button[data-cookiebanner]',
-            '.cookiebanner button', '#cookiebanner button',
-            '[class*="cookie"] button[class*="primary"]',
-            '[id*="cookie"] button[class*="primary"]',
-            '[class*="gdpr"] button', '[id*="gdpr"] button',
-            // CMP patterns
-            '.sp-message-open .message-button',
-            '#sp-cc-accept', '.optanon-allow-all',
-          ];
-          for (const sel of selectors) {
-            try {
-              const el = document.querySelector(sel) as HTMLElement | null;
-              if (el && el.offsetParent !== null) {
-                el.click();
-                return sel;
-              }
-            } catch {}
-          }
-          return null;
-        });
+        const dismissed = await dismissConsent(page);
         spinner.stop();
         if (dismissed) {
           log(color.success(`  ✓ Cookie banner dismissed (${dismissed})`));
