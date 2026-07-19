@@ -26,14 +26,16 @@ node dist/index.js install-browser
 ### Testing
 
 ```bash
-npm test              # unit tests
-npm run liveness      # live extraction smoke on sites-smoke.json (same as CI)
-npm run gold:run      # accuracy scoring vs test/gold expectations (live runs)
+npm test               # unit tests
+npm run liveness       # live extraction smoke on sites-smoke.json (same as CI)
+npm run release:churn  # before release notes: published vs local build, what changed / which tokens disappeared
 ```
 
 Accuracy ground truth lives in ../dembrandt-ml (labeled dataset + ONNX ranking
-model). The old qa.mjs golden-baseline layer was removed: baselines encoded
-yesterday's output as truth and nothing consumed them.
+model); never add a dembrandt -> dembrandt-ml dependency. The old qa.mjs
+golden-baseline and gold:* harness layers were removed: baselines encoded
+yesterday's output as truth, and gold scores were never read. The five
+hand-labeled gold sites are archived in dembrandt-ml/data/archive/gold-import.
 
 ## Architecture
 

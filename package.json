@@ -52,16 +52,11 @@
     "prepublishOnly": "npm run build",
     "test": "npm run build && node --test dist/test/*.test.js",
     "install-browser": "node tools/install-browser.mjs",
-    "gold:label": "npm run build && node tools/gold-label.mjs",
-    "gold:run": "npm run build && node tools/gold-run.mjs",
-    "gold:judge": "npm run build && node tools/gold-ai-judge.mjs",
-    "gold:tune": "node tools/gold-tune.mjs",
-    "gold:cluster": "node tools/gold-cluster.mjs",
-    "gold:analyze": "node tools/gold-analyze.mjs",
     "dev": "tsc --watch",
     "build": "tsc && cp package.json dist/package.json && mkdir -p dist/lib/ml && cp lib/ml/model.onnx lib/ml/meta.json dist/lib/ml/",
     "lint": "eslint .",
-    "liveness": "npm run build && node test/liveness.mjs sites-smoke.json"
+    "liveness": "npm run build && node test/liveness.mjs sites-smoke.json",
+    "release:churn": "npm run build && node tools/release-churn.mjs"
   },
   "keywords": [
     "design-tokens",
