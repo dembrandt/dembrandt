@@ -1,0 +1,55 @@
+{
+  "generatedFor": "sites-smoke.json",
+  "total": 6,
+  "failed": 0,
+  "results": [
+    {
+      "site": "stripe.com",
+      "code": 0,
+      "colors": 35,
+      "styles": 49,
+      "degraded": 0,
+      "ok": true
+    },
+    {
+      "site": "linear.app",
+      "code": 0,
+      "colors": 10,
+      "styles": 47,
+      "degraded": 0,
+      "ok": true
+    },
+    {
+      "site": "vercel.com",
+      "code": 0,
+      "colors": 6,
+      "styles": 30,
+      "degraded": 0,
+      "ok": true
+    },
+    {
+      "site": "shopify.com",
+      "code": 0,
+      "colors": 10,
+      "styles": 50,
+      "degraded": 0,
+      "ok": true
+    },
+    {
+      "site": "wikipedia.org",
+      "code": 0,
+      "colors": 11,
+      "styles": 19,
+      "degraded": 0,
+      "ok": true
+    },
+    {
+      "site": "gov.uk",
+      "code": 0,
+      "colors": 7,
+      "styles": 22,
+      "degraded": 0,
+      "ok": true
+    }
+  ]
+}
