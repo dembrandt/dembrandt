@@ -643,14 +643,12 @@ const OPTION_GROUPS = [
 
 program.configureHelp({
   formatHelp(cmd, helper) {
-    const helpWidth = helper.helpWidth ?? 80;
     const termWidth = helper.padWidth(cmd, helper);
     const indent = 2;
 
     const item = (term, desc) => {
       if (!desc) return term;
-      const full = `${term.padEnd(termWidth + 2)}${desc}`;
-      return helper.wrap(full, helpWidth - indent, termWidth + 2);
+      return helper.formatItem(term, termWidth, desc, helper).trimEnd().split("\n").map((l) => l.slice(2)).join("\n");
     };
     const block = (lines) => lines.map((l) => " ".repeat(indent) + l).join("\n");
 
