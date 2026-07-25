@@ -8,7 +8,6 @@
 ### Changed
 - Framework detection anchors class-prefix selectors (`fa-`, `uk-`, `p-`, `ms-`, `q-`, `el-`) instead of substring matching, and requires real `data-radix-*` markers; removes false positives from Tailwind and unrelated utility classes (#125)
 - Cloud hint is a single line with a clickable recipe link (#126)
-
 - Dependencies upgraded: commander 15, ora 9, @types/node 26, and the GitHub Actions used by CI. `--help` grouping now uses commander's own item formatter after `Help.wrap` was removed in commander 15; rendered output is unchanged
 - Dependabot groups every update into one PR per ecosystem, monthly, instead of one PR per package
 
