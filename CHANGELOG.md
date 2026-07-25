@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.25.0] - 2026-07-26
+
+### Added
+- Consent dismissal now sweeps child iframes and pierces open shadow roots, reaching iframe-hosted CMPs (Sourcepoint, TrustArc, Quantcast, Cookiebot) and shadow-DOM CMPs (Usercentrics, Osano, CookieYes) that the main-document pass could not (#129)
+
+### Changed
+- Framework detection anchors class-prefix selectors (`fa-`, `uk-`, `p-`, `ms-`, `q-`, `el-`) instead of substring matching, and requires real `data-radix-*` markers; removes false positives from Tailwind and unrelated utility classes (#125)
+- Cloud hint is a single line with a clickable recipe link (#126)
+
+### Removed
+- Golden-baseline `qa.mjs` and `gold:*` harness layers; replaced by a minimal liveness smoke and `release:churn`. Accuracy ground truth lives in dembrandt-ml (#127)
+
+## [0.24.0] - 2026-07-18
+
+### Changed
+- Drift comparison: validity warnings, scoring calibration, meta provenance (schema 1.3.0) (#123)
+
+### Fixed
+- `install-browser` installs the Playwright version matched to the resolved CLI; corrected CI docs (#124)
+
+### Refactored
+- Brand-guide: split the HTML builder from the PDF generator (#122)
+
 ## [0.23.1] - 2026-07-10
 
 ### Fixed
