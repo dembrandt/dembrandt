@@ -48,7 +48,7 @@ runs:
         path: ~/.cache/ms-playwright
         # The CLI version pinned in the install step below fixes playwright-core
         # transitively; bump this key together with that pin on release.
-        key: dembrandt-chromium-${{ runner.os }}-0.23.1
+        key: dembrandt-chromium-${{ runner.os }}-0.25.0
 
     - name: Install dembrandt CLI and Chromium
       shell: bash
