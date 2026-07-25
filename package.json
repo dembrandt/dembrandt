@@ -106,5 +106,13 @@
     "playwright-core": "1.60.0",
     "typescript": "6.0.3",
     "typescript-eslint": "8.60.1"
+  },
+  "overrides": {
+    "hono": "^4.12.32",
+    "@hono/node-server": "^2.0.11",
+    "fast-uri": "^4.1.1",
+    "brace-expansion": "^5.0.8",
+    "body-parser": "^2.3.0",
+    "adm-zip": "^0.6.0"
   }
 }

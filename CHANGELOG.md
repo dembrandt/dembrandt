@@ -11,6 +11,9 @@
 - Dependencies upgraded: commander 15, ora 9, @types/node 26, and the GitHub Actions used by CI. `--help` grouping now uses commander's own item formatter after `Help.wrap` was removed in commander 15; rendered output is unchanged
 - Dependabot groups every update into one PR per ecosystem, monthly, instead of one PR per package
 
+### Security
+- All 8 reported advisories cleared (5 high). The vulnerable packages are transitive under `@modelcontextprotocol/sdk` (hono, @hono/node-server, fast-uri, body-parser) and `onnxruntime-node` (adm-zip), both already at their latest release, so patched versions are pinned via npm `overrides` rather than by downgrading the roots. `npm audit` reports 0 vulnerabilities
+
 ### Removed
 - Golden-baseline `qa.mjs` and `gold:*` harness layers; replaced by a minimal liveness smoke and `release:churn`. Accuracy ground truth lives in dembrandt-ml (#127)
 
