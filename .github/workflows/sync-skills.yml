@@ -9,6 +9,11 @@ on:
         required: true
         default: "v0.12.0"
 
+# Cross-repo writes use SKILLS_REPO_PAT / NEXT_REPO_PAT, not GITHUB_TOKEN, so
+# the default token stays read-only.
+permissions:
+  contents: read
+
 jobs:
   sync-skills:
     runs-on: ubuntu-latest

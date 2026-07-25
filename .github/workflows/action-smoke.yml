@@ -11,6 +11,9 @@ on:
       - "action.yml"
       - ".github/workflows/action-smoke.yml"
 
+permissions:
+  contents: read
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
