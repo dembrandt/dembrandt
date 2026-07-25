@@ -26,6 +26,9 @@ jobs:
         uses: ./
         with:
           url: https://www.dembrandt.com
+          # Test the code in this checkout, not the published release: the
+          # version pinned in action.yml only reaches npm after publish.
+          cli-version: local
 
       - name: Assert report exists and is valid JSON
         run: |

@@ -25,6 +25,10 @@ inputs:
     description: "Node.js version used to run the CLI."
     required: false
     default: "24"
+  cli-version:
+    description: 'Dembrandt CLI version to install. Set to "local" to build and install the action checkout itself — used by this repo\'s own pre-release smoke, since the pinned version is not on npm until publish.'
+    required: false
+    default: "0.25.0"
 
 outputs:
   report:
@@ -60,8 +64,16 @@ runs:
       # actually resolved for the CLI (its ranges float), so derive it from the
       # installed tree instead of hardcoding — same rule as README "Continuous
       # integration".
+      env:
+        CLI_VERSION: ${{ inputs.cli-version }}
       run: |
-        npm install -g dembrandt@0.25.0
+        if [ "$CLI_VERSION" = "local" ]; then
+          npm --prefix "$GITHUB_ACTION_PATH" ci
+          npm --prefix "$GITHUB_ACTION_PATH" run build
+          npm install -g "$GITHUB_ACTION_PATH"
+        else
+          npm install -g "dembrandt@$CLI_VERSION"
+        fi
         PW_VERSION=$(node -p "require('$(npm root -g)/dembrandt/node_modules/playwright-core/package.json').version")
         echo "playwright-core resolved to $PW_VERSION"
         npx --yes "playwright@$PW_VERSION" install chromium --with-deps
