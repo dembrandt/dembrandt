@@ -23,15 +23,15 @@
       "site": "vercel.com",
       "code": 0,
       "colors": 6,
-      "styles": 28,
+      "styles": 30,
       "degraded": 0,
       "ok": true
     },
     {
       "site": "shopify.com",
       "code": 0,
-      "colors": 9,
-      "styles": 51,
+      "colors": 10,
+      "styles": 50,
       "degraded": 0,
       "ok": true
     },
