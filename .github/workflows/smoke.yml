@@ -35,7 +35,7 @@ jobs:
       # consent.test.ts drives a real page, so the unit suite needs chromium.
       # Same cache key as the smoke job reuses the ~100MB download.
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -64,7 +64,7 @@ jobs:
       # Keyed on the lockfile so a Playwright bump invalidates the cache and
       # everything else reuses the ~100MB download.
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
