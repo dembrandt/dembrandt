@@ -26,7 +26,7 @@ jobs:
           token: ${{ secrets.SKILLS_REPO_PAT }}
           path: dembrandt-skills
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
 
@@ -73,7 +73,7 @@ jobs:
           token: ${{ secrets.NEXT_REPO_PAT }}
           path: dembrandt-next
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
 
