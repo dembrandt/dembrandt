@@ -9,6 +9,13 @@ updates:
       npm:
         patterns: ["*"]
         update-types: [major, minor, patch]
+    # TypeScript 7 is held back: no released typescript-eslint accepts it
+    # (peer caps at <6.1.0), so npm ci cannot resolve the lockfile and the
+    # whole group fails on one package. Drop this once typescript-eslint
+    # widens its peer range.
+    ignore:
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
     labels: [dependencies]
 
   - package-ecosystem: github-actions
