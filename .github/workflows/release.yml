@@ -28,6 +28,17 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # consent.test.ts drives a real page, so the unit suite needs chromium.
+      # Same cache key as smoke.yml reuses the ~100MB download.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium --with-deps
+
       - name: Run unit tests
         run: npm test
 
