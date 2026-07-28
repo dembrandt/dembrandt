@@ -10,7 +10,7 @@ import { mergeResults } from '../lib/merger.js';
  * semantics, and the pages provenance array.
  */
 
-function page(url, overrides: any = {}) {
+function page(url, overrides: Record<string, unknown> = {}) {
   return {
     url,
     extractedAt: `${url}-time`,

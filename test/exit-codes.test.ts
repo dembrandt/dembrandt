@@ -53,7 +53,7 @@ test('classifyError never throws on malformed input', () => {
   // index.ts catch blocks pass `err` straight in; a bare string, null, or an
   // object without a message must degrade to a runtime failure, not crash.
   for (const bad of [null, undefined, 'a string', 42, {}, { message: null }]) {
-    const r = classifyError(bad as any);
+    const r = classifyError(bad);
     assert.equal(r.exit, EXIT.RUNTIME);
     assert.equal(r.code, 'EXTRACTION_FAILED');
   }

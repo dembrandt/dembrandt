@@ -8,7 +8,7 @@ import { computeFindings } from '../lib/findings.js';
  * every gauge number must trace back to a finding here.
  */
 
-function base(overrides: any = {}): any {
+function base(overrides: Record<string, unknown> = {}): any {
   return {
     url: 'https://example.com/',
     colors: { palette: [{ normalized: '#133174', confidence: 'high', count: 40 }], semantic: { primary: '#133174' } },

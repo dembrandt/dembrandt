@@ -18,7 +18,7 @@ const TRANSIENT_KEYS = ['_discoveredLinks', '_extractedUrls', '_pageResults'] as
  * crawl object is fed in. Returns a shallow copy; the input is untouched.
  */
 export function stripTransient<T extends BrandingResult>(result: T): T {
-  const clean: any = { ...result };
+  const clean = { ...result } as T & Record<string, unknown>;
   for (const key of TRANSIENT_KEYS) delete clean[key];
   return clean;
 }
@@ -44,7 +44,7 @@ const toNumber = (v: unknown): number | undefined => {
  *  - components inputs/badges : array | object  -> array
  */
 export function normalizeExtraction<T extends BrandingResult>(result: T): T {
-  const out: any = stripTransient(result);
+  const out = stripTransient(result);
 
   for (const s of out.typography?.styles ?? []) {
     const w = toNumber(s.weight);

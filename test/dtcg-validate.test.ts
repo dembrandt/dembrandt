@@ -2195,7 +2195,7 @@ describe('DTCG Validator - W3C Spec Compliant', () => {
         ]
       });
       const result = validateTokens(doc);
-      expect((result as any).documentType).toBe('resolver');
+      expect((result as { documentType?: string }).documentType).toBe('resolver');
       expect(result.valid).toBe(true);
     });
 

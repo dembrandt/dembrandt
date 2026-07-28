@@ -11,7 +11,7 @@ import { computeDrift } from '../lib/drift.js';
  * (dropped for size; the machine-readable form is --json-only).
  */
 
-function fixture(overrides: any = {}): any {
+function fixture(overrides: Record<string, unknown> = {}): any {
   return {
     url: 'https://example.com/',
     extractedAt: '2026-06-13T00:00:00.000Z',

@@ -9,7 +9,7 @@ import { computeDrift } from '../lib/drift.js';
  * produce phantom drift.
  */
 
-function fixture(overrides: any = {}): any {
+function fixture(overrides: Record<string, unknown> = {}): any {
   return {
     url: 'https://example.com/',
     extractedAt: 't',
