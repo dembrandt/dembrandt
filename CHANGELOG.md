@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.25.1] - 2026-07-28
+
+### Fixed
+- The main entry and the `./dtcg` and `./normalize` subpaths now declare their type definitions. `dist` already shipped the `.d.ts` files, but without a `types` condition consumers importing `dembrandt` resolved no types at all
+
+### Changed
+- `no-explicit-any` is an eslint error with an explicit allowlist of pre-existing files, and `npm run lint` runs with `--max-warnings 0`, so no new file can introduce one
+- `release.yml` installs chromium before the unit suite. The consent tests drive a real page, so the v0.25.0 release job failed and skipped downstream sync
+- Dependabot ignores TypeScript majors until typescript-eslint accepts them, so one blocked package no longer fails the whole group
+
 ## [0.25.0] - 2026-07-26
 
 ### Added

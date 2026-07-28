@@ -28,7 +28,7 @@ inputs:
   cli-version:
     description: 'Dembrandt CLI version to install. Set to "local" to build and install the action checkout itself, which the pre-release smoke in this repo uses because the pinned version is not on npm until publish.'
     required: false
-    default: "0.25.0"
+    default: "0.25.1"
 
 outputs:
   report:
@@ -52,7 +52,7 @@ runs:
         path: ~/.cache/ms-playwright
         # The CLI version pinned in the install step below fixes playwright-core
         # transitively; bump this key together with that pin on release.
-        key: dembrandt-chromium-${{ runner.os }}-0.25.0
+        key: dembrandt-chromium-${{ runner.os }}-0.25.1
 
     - name: Install dembrandt CLI and Chromium
       shell: bash
