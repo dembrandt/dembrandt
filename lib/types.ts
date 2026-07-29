@@ -64,6 +64,8 @@ export interface Typography {
     variableAxes?: VariableFontAxis[];
     /** OpenType features actively enabled via font-feature-settings (e.g. ss01, calt). */
     openTypeFeatures?: string[];
+    /** Resolved font asset/stylesheet URLs discovered during extraction. */
+    urls?: string[];
   };
 }
 

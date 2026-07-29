@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseVariableAxes, parseOpenTypeFeatures, pickBodyFamily } from '../lib/extractors/typography.js';
+import { parseVariableAxes, parseOpenTypeFeatures, pickBodyFamily, filterFontUrls } from '../lib/extractors/typography.js';
 
 /**
  * The typography extractor reads computed styles in the browser, but the
@@ -69,4 +69,73 @@ test('pickBodyFamily breaks coverage ties on first-seen for determinism', () => 
 test('pickBodyFamily returns null when neither signal yields a family', () => {
   assert.equal(pickBodyFamily(null, {}), null);
   assert.equal(pickBodyFamily('', { Inter: 0 }), null);
+});
+
+test('filterFontUrls dedupes repeated URLs', () => {
+  const urls = filterFontUrls([
+    'https://example.com/fonts/a.woff2',
+    'https://example.com/fonts/a.woff2',
+  ]);
+  assert.deepEqual(urls, ['https://example.com/fonts/a.woff2']);
+});
+
+test('filterFontUrls drops data: URIs', () => {
+  const urls = filterFontUrls([
+    'data:font/woff2;base64,AAAA',
+    'https://example.com/fonts/a.woff2',
+  ]);
+  assert.deepEqual(urls, ['https://example.com/fonts/a.woff2']);
+});
+
+test('filterFontUrls keeps font file extensions with and without query strings', () => {
+  const urls = filterFontUrls([
+    'https://example.com/a.woff2',
+    'https://example.com/b.woff?v=2',
+    'https://example.com/c.ttf#hash',
+    'https://example.com/d.otf',
+    'https://example.com/e.eot',
+  ]);
+  assert.deepEqual(urls, [
+    'https://example.com/a.woff2',
+    'https://example.com/b.woff?v=2',
+    'https://example.com/c.ttf#hash',
+    'https://example.com/d.otf',
+    'https://example.com/e.eot',
+  ].sort());
+});
+
+test('filterFontUrls keeps webfont provider stylesheet URLs without a font extension', () => {
+  const urls = filterFontUrls([
+    'https://fonts.googleapis.com/css2?family=Inter',
+    'https://fonts.gstatic.com/s/inter/v1/foo.woff2',
+    'https://use.typekit.net/abc123.css',
+    'https://fonts.bunny.net/css?family=inter',
+  ]);
+  assert.deepEqual(urls, [
+    'https://fonts.googleapis.com/css2?family=Inter',
+    'https://fonts.gstatic.com/s/inter/v1/foo.woff2',
+    'https://use.typekit.net/abc123.css',
+    'https://fonts.bunny.net/css?family=inter',
+  ].sort());
+});
+
+test('filterFontUrls drops unrelated URLs', () => {
+  const urls = filterFontUrls([
+    'https://example.com/images/logo.png',
+    'https://example.com/analytics.js',
+  ]);
+  assert.deepEqual(urls, []);
+});
+
+test('filterFontUrls returns [] for empty input', () => {
+  assert.deepEqual(filterFontUrls([]), []);
+});
+
+test('filterFontUrls rejects non-http(s) schemes even with a font-like path', () => {
+  const urls = filterFontUrls([
+    'javascript:alert(1)//a.woff2',
+    'data:font/woff2;base64,AAAA',
+    'file:///etc/passwd.woff2',
+  ]);
+  assert.deepEqual(urls, []);
 });

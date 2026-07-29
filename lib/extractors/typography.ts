@@ -72,6 +72,34 @@ export function parseOpenTypeFeatures(settings: string[]): string[] {
   return [...set].sort();
 }
 
+const FONT_FILE_EXTENSIONS = /\.(woff2?|ttf|otf|eot)(?:[?#].*)?$/i;
+const WEBFONT_PROVIDER_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'use.typekit.net', 'fonts.bunny.net'];
+
+/**
+ * Filter raw, already-absolute candidate URLs down to real font asset/
+ * stylesheet URLs: font files by extension, or known webfont provider hosts
+ * (whose stylesheet URLs carry no file extension). Pure and unit-testable,
+ * same convention as parseVariableAxes / parseOpenTypeFeatures.
+ */
+export function filterFontUrls(urls: string[]): string[] {
+  const set = new Set<string>();
+  for (const url of urls) {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      continue; // not a parseable absolute URL — skip
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') continue;
+    if (FONT_FILE_EXTENSIONS.test(parsed.pathname)) {
+      set.add(parsed.href);
+      continue;
+    }
+    if (WEBFONT_PROVIDER_HOSTS.includes(parsed.hostname)) set.add(parsed.href);
+  }
+  return [...set].sort();
+}
+
 export async function extractTypography(page) {
   const data = await page.evaluate(() => {
     const seen = new Map();
@@ -87,6 +115,21 @@ export async function extractTypography(page) {
       customFonts: [],
       variableFonts: new Set(),
     };
+    const fontUrlCandidates: string[] = [];
+    const webfontProviderHosts = ['fonts.googleapis.com', 'fonts.gstatic.com', 'use.typekit.net', 'fonts.bunny.net'];
+
+    document
+      .querySelectorAll('link[rel*="stylesheet"]')
+      .forEach((l: any) => {
+        if (webfontProviderHosts.some(h => l.href.includes(h))) {
+          fontUrlCandidates.push(new URL(l.href, location.href).href);
+        }
+      });
+    document
+      .querySelectorAll('link[rel*="preload"][as="font"]')
+      .forEach((l: any) => {
+        if (l.href) fontUrlCandidates.push(new URL(l.href, location.href).href);
+      });
 
     document
       .querySelectorAll(
@@ -122,6 +165,11 @@ export async function extractTypography(page) {
           for (const rule of sheet.cssRules || []) {
             if (rule instanceof CSSFontFaceRule) {
               const src = rule.style.getPropertyValue('src') || '';
+              for (const m of src.matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/g)) {
+                try {
+                  fontUrlCandidates.push(new URL(m[1], location.href).href);
+                } catch {}
+              }
               const family = (rule.style.getPropertyValue('font-family') || '').replace(/['"]/g, '').trim();
               if (!family) continue;
               const isThirdParty = thirdPartyHosts.some(h => src.includes(h));
@@ -276,6 +324,7 @@ export async function extractTypography(page) {
       featureSettings,
       familyBodyWeight,
       bodyComputedFamily,
+      fontUrlCandidates,
     };
   });
 
@@ -283,6 +332,7 @@ export async function extractTypography(page) {
   // unit-testable. Attach to sources only when present — no empty arrays.
   const variableAxes = parseVariableAxes(data.variationSettings);
   const openTypeFeatures = parseOpenTypeFeatures(data.featureSettings);
+  const urls = filterFontUrls(data.fontUrlCandidates);
 
   // Disambiguate the body font. The size/tag heuristic labels every non-special
   // element "body", so a decorative face on one stray element can masquerade as
@@ -303,6 +353,7 @@ export async function extractTypography(page) {
       ...data.sources,
       ...(variableAxes.length ? { variableAxes } : {}),
       ...(openTypeFeatures.length ? { openTypeFeatures } : {}),
+      urls,
     },
   };
 }

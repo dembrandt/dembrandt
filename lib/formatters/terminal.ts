@@ -297,6 +297,16 @@ function displayTypography(typography) {
     }
   }
 
+  const fontUrls = typography.sources?.urls || [];
+  if (fontUrls.length > 0) {
+    fontUrls.slice(0, 3).forEach((url: string) => {
+      console.log(chalk.dim('│  ├─') + ' ' + chalk.blue(terminalLink(url)));
+    });
+    if (fontUrls.length > 3) {
+      console.log(chalk.dim('│  ├─') + ' ' + chalk.dim(`+${fontUrls.length - 3} more`));
+    }
+  }
+
   // Group styles by font family: collect unique sizes (largest first) and weights
   if (typography.styles?.length > 0) {
     const fontFamilies = new Map();
