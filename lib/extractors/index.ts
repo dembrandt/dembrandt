@@ -1317,8 +1317,10 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         }
       } catch {}
 
-      // Let panels / slides render / animate in before scanning.
-      await page.waitForTimeout(400 * timeoutMultiplier);
+      // Let panels / slides settle before scanning. A fixed sleep here sampled
+      // mid-animation on slow menus, wobbling revealed-colour counts run-to-run
+      // (DEM-84); wait for the DOM to actually stop mutating instead.
+      await waitForSettled(page, 2000 * timeoutMultiplier);
 
       const menuColors = await extractColors(page);
       const mergedPalette = [...colors.palette];
