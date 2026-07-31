@@ -215,8 +215,12 @@ export async function extractColors(page) {
       const textColor = computed.color;
       const borderColor = computed.borderColor;
 
+      // SVG elements expose className as SVGAnimatedString; unguarded string
+      // concat yields "[object svganimatedstring]", so SVG-sampled colours
+      // (inline logos above all) never matched context keywords.
+      const elClass = typeof el.className === 'string' ? el.className : (el.className as any)?.baseVal || '';
       const context = (
-        el.className + " " + el.id + " " +
+        elClass + " " + el.id + " " +
         (el.getAttribute('data-tracking-linkid') || '') + " " +
         (el.getAttribute('data-cta') || '') + " " +
         (el.getAttribute('data-component') || '') + " " +
@@ -245,7 +249,8 @@ export async function extractColors(page) {
         let lift = 0;
         let node = el.parentElement;
         for (let hop = 0; hop < 4 && node && lift < ancestorLiftMax; hop++) {
-          const actx = (String(node.className || "") + " " + (node.id || "")).toLowerCase();
+          const nodeClass = typeof node.className === 'string' ? node.className : (node.className as any)?.baseVal || '';
+          const actx = (nodeClass + " " + (node.id || "")).toLowerCase();
           for (const [keyword, weight] of Object.entries(contextScores)) {
             if (weight > ancestorLiftMax) continue;
             if (actx.includes(keyword)) lift = Math.max(lift, Math.min(weight, ancestorLiftMax));
