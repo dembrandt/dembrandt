@@ -36,6 +36,15 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.4.0 — colors.cssVariables entries gain `hex` (parseable identity beside
+ *          the authored token value, which may be a modern colour function).
+ *          Additive: 1.3.x consumers ignore it. BEHAVIOR: modern CSS colour
+ *          functions (oklab/oklch/lab/lch/color/hwb) now normalise instead of
+ *          leaking raw strings or being dropped; palette/semantic originals
+ *          serialise as legacy rgb()/rgba() with alpha preserved; emitted
+ *          lch() strings are D50 per the CSS spec (previously D65 — every lch
+ *          value changes; hex/rgb/oklch are unaffected). Shipped in CLI 0.26.0
+ *          which erroneously still declared 1.3.0.
  *  1.3.0 — meta gains snapshotId (canonical snapshot key: pin/dedupe on this,
  *          not on extractedAt or storage timestamps), viewport (extraction
  *          width/height; mismatched widths produce false layout drift),
@@ -57,7 +66,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.3.0';
+export const SCHEMA_VERSION = '1.4.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
