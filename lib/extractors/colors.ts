@@ -6,7 +6,54 @@ export async function extractColors(page) {
     _canvas.width = _canvas.height = 1;
     const _ctx = _canvas.getContext('2d');
     const _colorMemo = new Map();
+
+    // Chromium serialises computed styles that pass through modern colour
+    // functions (Tailwind v4 opacity modifiers compile to color-mix in oklab)
+    // as oklab()/oklch()/color() strings. Rewrite them to legacy rgb()/rgba()
+    // once, at the read boundary, so every downstream consumer sees one
+    // grammar and alpha survives (GitHub #149). The alpha is parsed textually
+    // and the opaque remainder resolved through canvas, because getImageData
+    // on a semi-transparent fill round-trips through premultiplication and
+    // corrupts the channels.
+    const _modernColorRe = /^(?:oklab|oklch|lab|lch|hwb|color)\(/i;
+    const _legacyMemo = new Map();
+    function toLegacy(color) {
+      if (!color || typeof color !== 'string') return color;
+      const str = color.trim();
+      if (!_modernColorRe.test(str)) return color;
+      if (_legacyMemo.has(str)) return _legacyMemo.get(str);
+      let result = color;
+      if (_ctx) {
+        let alpha = 1;
+        let opaque = str;
+        const am = str.match(/\/\s*([\d.]+%?)\s*\)$/);
+        if (am) {
+          alpha = am[1].endsWith('%') ? parseFloat(am[1]) / 100 : parseFloat(am[1]);
+          opaque = str.slice(0, str.lastIndexOf('/')).trimEnd() + ')';
+        }
+        try {
+          // Sentinel detects parse failure: an invalid assignment leaves
+          // fillStyle untouched.
+          _ctx.fillStyle = '#010203';
+          _ctx.fillStyle = opaque;
+          if (_ctx.fillStyle !== '#010203') {
+            _ctx.clearRect(0, 0, 1, 1);
+            _ctx.fillRect(0, 0, 1, 1);
+            const [r, g, b] = _ctx.getImageData(0, 0, 1, 1).data;
+            result = alpha >= 1
+              ? `rgb(${r}, ${g}, ${b})`
+              : `rgba(${r}, ${g}, ${b}, ${Math.round(alpha * 1000) / 1000})`;
+          }
+        } catch (e) {
+          result = color;
+        }
+      }
+      _legacyMemo.set(str, result);
+      return result;
+    }
+
     function normalizeColor(color) {
+      color = toLegacy(color);
       if (_colorMemo.has(color)) return _colorMemo.get(color);
       let result;
       const rgbaMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
@@ -101,7 +148,9 @@ export async function extractColors(page) {
       if (value.includes("calc(") || value.includes("clamp(") || value.includes("var(")) {
         return /#[0-9a-f]{3,6}|rgba?\(|hsla?\(/i.test(value);
       }
-      if (/^(oklab|oklch|lch|lab|color)\s*\(/i.test(value)) return false;
+      // Modern colour functions are valid iff they resolve; toLegacy returns
+      // the input unchanged when parsing fails.
+      if (_modernColorRe.test(value.trim())) return toLegacy(value) !== value;
       return /^(#[0-9a-f]{3,8}|rgba?\(|hsla?\(|[a-z]+)/i.test(value);
     }
 
@@ -154,7 +203,7 @@ export async function extractColors(page) {
       if (/^--(?:tw-)?colors?-(?:transparent|current|black|white|inherit)$/.test(prop)) continue;
 
       const value = styles.getPropertyValue(prop).trim();
-      if (!value.match(/^(#|rgb|hsl|var\(--.*color|color\()/i)) continue;
+      if (!value.match(/^(#|rgb|hsl|hwb|var\(--.*color|color\(|oklab\(|oklch\(|lab\(|lch\()/i)) continue;
       if (
         value.includes("color.adjust(") || value.includes("rgba(0, 0, 0, 0)") ||
         value.includes("rgba(0,0,0,0)") || value.includes("lighten(") ||
@@ -211,9 +260,9 @@ export async function extractColors(page) {
       const rect = el.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
 
-      const bgColor = computed.backgroundColor;
-      const textColor = computed.color;
-      const borderColor = computed.borderColor;
+      const bgColor = toLegacy(computed.backgroundColor);
+      const textColor = toLegacy(computed.color);
+      const borderColor = toLegacy(computed.borderColor);
 
       const context = (
         el.className + " " + el.id + " " +
@@ -275,12 +324,15 @@ export async function extractColors(page) {
 
       function extractColorsFromValue(colorValue) {
         if (!colorValue) return [];
-        const colorRegex = /(#[0-9a-f]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\)|[a-z]+)/gi;
-        const matches = colorValue.match(colorRegex) || [];
-        const cssColorFunctions = new Set(['oklab','oklch','lch','lab','color','display','hsl','rgb','rgba','hsla','inherit','initial','unset','none','auto','normal']);
+        // Functional notations are matched whole (so color(srgb ...) cannot
+        // leak a bare `srgb` token) and rewritten to legacy form; anything
+        // that fails to resolve is dropped by the modern-form filter below.
+        const colorRegex = /((?:oklab|oklch|lab|lch|hwb|color)\([^)]+\)|#[0-9a-f]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\)|[a-z]+)/gi;
+        const matches = (colorValue.match(colorRegex) || []).map(toLegacy);
+        const cssColorFunctions = new Set(['oklab','oklch','lch','lab','color','display','hsl','rgb','rgba','hsla','hwb','srgb','inherit','initial','unset','none','auto','normal']);
         return matches.filter(c =>
           c !== 'transparent' && c !== 'rgba(0, 0, 0, 0)' && c !== 'rgba(0,0,0,0)' &&
-          c.length > 2 && !cssColorFunctions.has(c.toLowerCase())
+          c.length > 2 && !cssColorFunctions.has(c.toLowerCase()) && !_modernColorRe.test(c)
         );
       }
 
@@ -294,6 +346,9 @@ export async function extractColors(page) {
         if (color && color !== "rgba(0, 0, 0, 0)" && color !== "transparent" && colorAlpha(color) >= 0.3) {
           const normalized = normalizeColor(color);
           const existing = colorMap.get(normalized) || { original: color, count: 0, bgCount: 0, score: 0, sources: new Set(), statusCount: 0, nonStatusCount: 0, isToken: tokenHexes.has(normalized) };
+          // The opaque form represents the token; alpha variants of the same
+          // normalized colour are usage, not identity.
+          if (colorAlpha(color) > colorAlpha(existing.original)) existing.original = color;
           existing.count++;
           if (isStatus) existing.statusCount++; else existing.nonStatusCount++;
           if (extractColorsFromValue(bgColor).includes(color)) existing.bgCount++;
@@ -325,7 +380,7 @@ export async function extractColors(page) {
     if (surfaceEl) {
       let bgNode: Element | null = surfaceEl;
       for (let hop = 0; hop < 5 && bgNode; hop++) {
-        const bg = getComputedStyle(bgNode).backgroundColor;
+        const bg = toLegacy(getComputedStyle(bgNode).backgroundColor);
         if (bg && colorAlpha(bg) >= 0.9) { semanticColors.background = bg; break; }
         bgNode = bgNode.parentElement;
       }
@@ -333,7 +388,7 @@ export async function extractColors(page) {
       // user actually sees. Dark sites always set an explicit dark background, so
       // an unset chain means the rendered backdrop is white.
       if (!semanticColors.background) semanticColors.background = 'rgb(255, 255, 255)';
-      const txt = getComputedStyle(surfaceEl).color;
+      const txt = toLegacy(getComputedStyle(surfaceEl).color);
       if (txt && colorAlpha(txt) >= 0.5) semanticColors.text = txt;
     }
 

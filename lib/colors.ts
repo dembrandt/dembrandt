@@ -2,7 +2,10 @@
  * Color Conversion Utilities
  *
  * Converts colors between RGB, LCH, and OKLCH color spaces.
+ * Parsing of arbitrary CSS color strings lives in color-parse.ts.
  */
+
+import { parseCssColor } from './color-parse.js';
 
 /**
  * Convert sRGB to linear RGB
@@ -24,19 +27,15 @@ function linearRgbToXyz(r, g, b) {
 }
 
 /**
- * Convert XYZ to Lab (D65 reference white)
+ * Convert XYZ to Lab against a reference white. Defaults to D65, which is what
+ * the perceptual-distance helpers below use; CSS lch() emission passes D50.
  */
-function xyzToLab(x, y, z) {
-  // D65 reference white
-  const xn = 0.95047;
-  const yn = 1.00000;
-  const zn = 1.08883;
-
+function xyzToLab(x, y, z, white = { x: 0.95047, y: 1.00000, z: 1.08883 }) {
   const f = (t) => t > 0.008856 ? Math.cbrt(t) : (903.3 * t + 16) / 116;
 
-  const fx = f(x / xn);
-  const fy = f(y / yn);
-  const fz = f(z / zn);
+  const fx = f(x / white.x);
+  const fy = f(y / white.y);
+  const fz = f(z / white.z);
 
   return {
     l: 116 * fy - 16,
@@ -44,6 +43,16 @@ function xyzToLab(x, y, z) {
     b: 200 * (fy - fz)
   };
 }
+
+// Bradford adaptation D65 → D50. CSS lab()/lch() are specified at D50 while
+// sRGB lives at D65, so emitted lch() strings must adapt or they are ~ΔE 1 off
+// (GitHub #149).
+const D50_WHITE = { x: 0.96422, y: 1.00000, z: 0.82521 };
+const XYZ_D65_TO_D50 = [
+  [1.0479298208405488, 0.022946793341019088, -0.05019222954313557],
+  [0.029627815688159344, 0.990434484573249, -0.01707382502938514],
+  [-0.009243058152591178, 0.015055144896577895, 0.7518742899580008],
+];
 
 /**
  * Convert Lab to LCH
@@ -72,8 +81,14 @@ export function rgbToLch(r, g, b) {
   const lg = srgbToLinear(g);
   const lb = srgbToLinear(b);
 
-  const xyz = linearRgbToXyz(lr, lg, lb);
-  const lab = xyzToLab(xyz.x, xyz.y, xyz.z);
+  const d65 = linearRgbToXyz(lr, lg, lb);
+  const m = XYZ_D65_TO_D50;
+  const xyz = {
+    x: m[0][0] * d65.x + m[0][1] * d65.y + m[0][2] * d65.z,
+    y: m[1][0] * d65.x + m[1][1] * d65.y + m[1][2] * d65.z,
+    z: m[2][0] * d65.x + m[2][1] * d65.y + m[2][2] * d65.z,
+  };
+  const lab = xyzToLab(xyz.x, xyz.y, xyz.z, D50_WHITE);
   return labToLch(lab.l, lab.a, lab.b);
 }
 
@@ -370,45 +385,12 @@ export function computeWcag(palette) {
  * @returns {{ hex: string, rgb: string, lch: string, oklch: string, hasAlpha: boolean } | null}
  */
 export function convertColor(colorString) {
-  let r, g, b, a;
-
-  // Parse rgba/rgb
-  const rgbaMatch = colorString.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-  if (rgbaMatch) {
-    r = parseInt(rgbaMatch[1]);
-    g = parseInt(rgbaMatch[2]);
-    b = parseInt(rgbaMatch[3]);
-    a = rgbaMatch[4] ? parseFloat(rgbaMatch[4]) : undefined;
-  } else if (/^hsla?\(/.test(colorString)) {
-    // Parse hsl/hsla
-    const hslMatch = colorString.match(/hsla?\(([\d.]+),\s*([\d.]+)%?,\s*([\d.]+)%?(?:,\s*([\d.]+))?\)/);
-    if (!hslMatch) return null;
-    const h = parseFloat(hslMatch[1]) / 360;
-    const s = parseFloat(hslMatch[2]) / 100;
-    const l = parseFloat(hslMatch[3]) / 100;
-    a = hslMatch[4] ? parseFloat(hslMatch[4]) : undefined;
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-    const p = 2 * l - q;
-    const hue2rgb = (p, q, t) => {
-      if (t < 0) t += 1;
-      if (t > 1) t -= 1;
-      if (t < 1/6) return p + (q - p) * 6 * t;
-      if (t < 1/2) return q;
-      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-      return p;
-    };
-    r = Math.round(hue2rgb(p, q, h + 1/3) * 255);
-    g = Math.round(hue2rgb(p, q, h) * 255);
-    b = Math.round(hue2rgb(p, q, h - 1/3) * 255);
-  } else {
-    // Try hex
-    const rgb = hexToRgb(colorString);
-    if (!rgb) return null;
-    r = rgb.r;
-    g = rgb.g;
-    b = rgb.b;
-    a = rgb.a;
-  }
+  // Spec-complete parsing (hex, named, rgb/hsl legacy+modern, hwb, lab/lch,
+  // oklab/oklch, color()) with CSS Color 4 gamut mapping.
+  const parsed = parseCssColor(String(colorString));
+  if (!parsed) return null;
+  const { r, g, b } = parsed;
+  const a = parsed.a < 1 ? parsed.a : undefined;
 
   const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
   const rgbStr = a !== undefined ? `rgba(${r}, ${g}, ${b}, ${a})` : `rgb(${r}, ${g}, ${b})`;
