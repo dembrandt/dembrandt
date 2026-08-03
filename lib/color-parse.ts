@@ -533,3 +533,13 @@ export function serializeRgb(c: RgbaColor): string {
   const alpha = Math.round(clamp01(c.a) * 10000) / 10000;
   return `rgba(${c.r}, ${c.g}, ${c.b}, ${alpha})`;
 }
+
+/**
+ * Convenience for extractor injection paths: any CSS color string to its
+ * opaque 6-hex identity plus a legacy serialisation that preserves alpha.
+ */
+export function normalizeCssColor(input: string): { hex: string; legacy: string; alpha: number } | null {
+  const c = parseCssColor(input);
+  if (!c) return null;
+  return { hex: serializeHex({ ...c, a: 1 }), legacy: serializeRgb(c), alpha: c.a };
+}

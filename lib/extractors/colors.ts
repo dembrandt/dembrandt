@@ -648,7 +648,9 @@ export async function extractColors(page) {
     for (const [name, value] of Object.entries(result.cssVariables)) {
       const converted = convertColor(value);
       if (converted) {
-        enhancedCssVariables[name] = { value, lch: converted.lch, oklch: converted.oklch };
+        // value stays the author's declared token verbatim (provenance);
+        // hex gives consumers a parseable identity for modern notations.
+        enhancedCssVariables[name] = { value, hex: converted.hex, lch: converted.lch, oklch: converted.oklch };
       } else {
         enhancedCssVariables[name] = { value };
       }

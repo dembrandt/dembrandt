@@ -814,35 +814,9 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         manifest.backgroundColor && { color: manifest.backgroundColor, label: 'manifest:background_color' },
       ].filter(Boolean);
 
-      const rawManifestColors = manifestColorEntries.map(e => e.color);
-      const manifestNormMap = rawManifestColors.length ? await page.evaluate((cols) => {
-        const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = 1;
-        const ctx = canvas.getContext('2d');
-        const out = {};
-        for (const c of cols) {
-          if (/^#[0-9a-f]{6}$/i.test(c)) { out[c] = c.toLowerCase(); continue; }
-          if (/^#[0-9a-f]{3}$/i.test(c)) { out[c] = `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}`.toLowerCase(); continue; }
-          if (/^#[0-9a-f]{8}$/i.test(c)) { out[c] = c.toLowerCase().slice(0, 7); continue; }
-          const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-          if (m) { out[c] = `#${parseInt(m[1]).toString(16).padStart(2,'0')}${parseInt(m[2]).toString(16).padStart(2,'0')}${parseInt(m[3]).toString(16).padStart(2,'0')}`; continue; }
-          if (ctx) {
-            try {
-              ctx.clearRect(0, 0, 1, 1);
-              ctx.fillStyle = 'rgba(0,0,0,0)';
-              ctx.fillStyle = c;
-              ctx.fillRect(0, 0, 1, 1);
-              const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-              if (a > 0) { out[c] = `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`; continue; }
-            } catch {}
-          }
-          out[c] = c.toLowerCase();
-        }
-        return out;
-      }, rawManifestColors) : {};
-
+      const { normalizeCssColor } = await import('../color-parse.js');
       for (const { color: raw, label } of manifestColorEntries) {
-        const normalized = manifestNormMap[raw] ?? raw.toLowerCase();
+        const normalized = normalizeCssColor(raw)?.hex ?? raw.toLowerCase();
         if (!colors.palette.some(c => c.normalized === normalized)) {
           colors.palette.push({ color: raw, normalized, count: 10, confidence: 'high', sources: [label] });
         } else {
@@ -903,35 +877,15 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       }
       const stopColors = Array.from(stopColorSet);
       if (stopColors.length) {
-        const normMap = await page.evaluate((cols) => {
-          const canvas = document.createElement('canvas');
-          canvas.width = canvas.height = 1;
-          const ctx = canvas.getContext('2d');
-          const out = {};
-          for (const c of cols) {
-            if (/^#[0-9a-f]{6}$/i.test(c)) { out[c] = c.toLowerCase(); continue; }
-            if (/^#[0-9a-f]{3}$/i.test(c)) { out[c] = `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}`.toLowerCase(); continue; }
-            if (/^#[0-9a-f]{8}$/i.test(c)) { out[c] = c.toLowerCase().slice(0, 7); continue; }
-            const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-            if (m) {
-              if (m[4] !== undefined && parseFloat(m[4]) < 0.3) { out[c] = null; continue; }
-              out[c] = `#${parseInt(m[1]).toString(16).padStart(2,'0')}${parseInt(m[2]).toString(16).padStart(2,'0')}${parseInt(m[3]).toString(16).padStart(2,'0')}`;
-              continue;
-            }
-            if (ctx) {
-              try {
-                ctx.clearRect(0, 0, 1, 1);
-                ctx.fillStyle = 'rgba(0,0,0,0)';
-                ctx.fillStyle = c;
-                ctx.fillRect(0, 0, 1, 1);
-                const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-                if (a > 76) { out[c] = `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`; continue; }
-              } catch {}
-            }
-            out[c] = null;
-          }
-          return out;
-        }, stopColors);
+        const { normalizeCssColor } = await import('../color-parse.js');
+        // Alpha gate matches the old behaviour: stops under 0.3 are decorative.
+        const normMap: Record<string, string | null> = {};
+        const legacyMap: Record<string, string> = {};
+        for (const c of stopColors) {
+          const n = normalizeCssColor(c);
+          normMap[c] = n && n.alpha >= 0.3 ? n.hex : null;
+          if (n) legacyMap[c] = n.legacy;
+        }
 
         const { convertColor } = await import('../colors.js');
         const chromaOf = (hex) => {
@@ -949,7 +903,10 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
           if (!normalized || !/^#[0-9a-f]{6}$/.test(normalized)) continue;
           if (chromaOf(normalized) < 0.2) continue;                          // skip neutral/decorative stops
           if (colors.palette.some(c => c.normalized === normalized)) continue;
-          const entry: any = { color: raw, normalized, count: 2, confidence: 'low', sources: ['gradient'] };
+          // Legacy serialisation, not the raw stop string: gradient stops on
+          // modern sites serialise as oklab()/color() and must not leak.
+          const colorOut = /^(#|rgba?\()/i.test(raw) ? raw : (legacyMap[raw] ?? normalized);
+          const entry: any = { color: colorOut, normalized, count: 2, confidence: 'low', sources: ['gradient'] };
           const converted = convertColor(normalized);
           if (converted) { entry.lch = converted.lch; entry.oklch = converted.oklch; }
           colors.palette.push(entry);
@@ -1135,36 +1092,16 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
 
     await page.mouse.move(0, 0).catch(() => {});
 
-    // Batch-normalize hover/focus colors via browser canvas to handle oklab/oklch/lab
-    const rawHoverColors = [...new Set(hoverFocusColors.map(h => h.color).filter(Boolean))];
-    const hoverColorMap = rawHoverColors.length ? await page.evaluate((cols) => {
-      const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = 1;
-      const ctx = canvas.getContext('2d');
-      const out = {};
-      for (const color of cols) {
-        const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-        if (m) { out[color] = `#${parseInt(m[1]).toString(16).padStart(2,'0')}${parseInt(m[2]).toString(16).padStart(2,'0')}${parseInt(m[3]).toString(16).padStart(2,'0')}`; continue; }
-        if (/^#[0-9a-f]{6}$/i.test(color)) { out[color] = color.toLowerCase(); continue; }
-        if (ctx) {
-          try {
-            ctx.clearRect(0, 0, 1, 1);
-            ctx.fillStyle = 'rgba(0,0,0,0)';
-            ctx.fillStyle = color;
-            ctx.fillRect(0, 0, 1, 1);
-            const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-            if (a > 0) { out[color] = `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`; continue; }
-          } catch {}
-        }
-        out[color] = color.toLowerCase();
-      }
-      return out;
-    }, rawHoverColors) : {};
-
+    // Normalize hover/focus colors through the spec parser; unresolvable or
+    // near-transparent values are dropped rather than leaked as raw strings.
+    const { normalizeCssColor: normHover } = await import('../color-parse.js');
     hoverFocusColors.forEach(({ color, property }) => {
-      const normalized = hoverColorMap[color] || color.toLowerCase();
+      if (!color) return;
+      const n = normHover(color);
+      if (!n || n.alpha < 0.05) return;
+      const normalized = n.hex;
       const isDuplicate = colors.palette.some((c) => c.normalized === normalized);
-      if (!isDuplicate && color) {
+      if (!isDuplicate) {
         if (property !== 'background-color') {
           const hex = normalized.replace('#', '');
           const r = parseInt(hex.substring(0, 2), 16);
@@ -1175,7 +1112,8 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
           const saturation = max === 0 ? 0 : (max - min) / max;
           if (saturation > 0.3) return;
         }
-        colors.palette.push({ color, normalized, count: 1, confidence: "medium", sources: ["hover/focus"] });
+        const colorOut = /^(#|rgba?\()/i.test(color) ? color : n.legacy;
+        colors.palette.push({ color: colorOut, normalized, count: 1, confidence: "medium", sources: ["hover/focus"] });
       }
     });
 
