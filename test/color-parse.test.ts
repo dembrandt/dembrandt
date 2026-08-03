@@ -258,3 +258,31 @@ test('hex is case-insensitive and exact-length only', () => {
   assert.equal(parseCssColor('#aabbccddee'), null);
   assert.equal(parseCssColor('aabbcc'), null);
 });
+
+// --- Hex notation, W3C CSS Color 4 §5.2 verbatim examples ---
+
+test('hex spec §5.2: worked examples from the spec text', () => {
+  // "#00ff00 represents the same color as rgb(0 255 0)"
+  assert.deepEqual(parseCssColor('#00ff00'), parseCssColor('rgb(0 255 0)'));
+  // "#00ff00 is identical to #00FF00"
+  assert.deepEqual(parseCssColor('#00ff00'), parseCssColor('#00FF00'));
+  // "#0000ffcc represents the same color as rgb(0 0 100% / 80%)"
+  const cc = parseCssColor('#0000ffcc');
+  assert.equal(cc?.b, 255);
+  assert.ok(Math.abs((cc?.a ?? 0) - 0.8) < 0.002);
+  // "#123 specifies the same color as #112233"
+  assert.deepEqual(parseCssColor('#123'), parseCssColor('#112233'));
+  // 4-digit expands like 3-digit, fourth digit is alpha
+  assert.deepEqual(parseCssColor('#123f'), parseCssColor('#112233'));
+  const half = parseCssColor('#1238');
+  assert.ok(Math.abs((half?.a ?? 0) - 136 / 255) < 1e-9);
+});
+
+test('hex spec §5.2: only 3, 4, 6, 8 digit lengths are valid', () => {
+  for (const bad of ['#', '#f', '#ff', '#fffff', '#fffffff', '#fffffffff', '# fff', '#ff f']) {
+    assert.equal(parseCssColor(bad), null, bad);
+  }
+  for (const good of ['#fff', '#ffff', '#ffffff', '#ffffffff']) {
+    assert.ok(parseCssColor(good), good);
+  }
+});
