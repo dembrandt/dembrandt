@@ -967,7 +967,7 @@ ${(() => {
 </html>`;
 }
 
-function getLogoImageUrl(data) {
+export function getLogoImageUrl(data) {
   const isImageUrl = (url) => {
     if (/\.(svg|png|jpg|jpeg|webp|gif|avif)(\?.*)?$/i.test(url)) return true;
     // Image optimizers (Next.js /_next/image, Cloudflare /cdn-cgi/image, etc.)
