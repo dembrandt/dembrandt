@@ -395,10 +395,22 @@ function typographySection(result: BrandingResult): string {
     ...(srcs.selfHostedFonts ?? []),
   ];
   const srcLine = fams.length ? `<p class="sub">Sources: ${esc(fams.join(", "))}</p>` : "";
+  const isHttpUrl = (u: string): boolean => {
+    try {
+      const p = new URL(u).protocol;
+      return p === "http:" || p === "https:";
+    } catch {
+      return false;
+    }
+  };
+  const fontUrls = (srcs.urls ?? []).filter(isHttpUrl);
+  const urlsLine = fontUrls.length
+    ? `<p class="sub">Font files: ${fontUrls.map((u) => `<a href="${esc(u)}">${esc(u)}</a>`).join(", ")}</p>`
+    : "";
   const all = styles.map((s) => `${s.context}: ${(s.family ?? "").split(",")[0]} ${s.size}/${s.weight}${s.lineHeight ? ` lh ${s.lineHeight}` : ""}`).join("\n");
   return section(
     "Typography",
-    `<table><thead><tr><th>Context</th><th>Family</th><th>Size</th><th>Weight</th><th>Line height</th></tr></thead><tbody>${rows}</tbody></table>${srcLine}`,
+    `<table><thead><tr><th>Context</th><th>Family</th><th>Size</th><th>Weight</th><th>Line height</th></tr></thead><tbody>${rows}</tbody></table>${srcLine}${urlsLine}`,
     undefined,
     all
   );

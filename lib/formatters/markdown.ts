@@ -269,6 +269,10 @@ function buildTypographySection(result, typographyTokens) {
     lines.push(`- **Font source**: Google Fonts (${result.typography.sources.googleFonts.join(', ')})`);
   }
 
+  if (result.typography?.sources?.urls?.length) {
+    lines.push(`- **Font URLs**: ${result.typography.sources.urls.join(', ')}`);
+  }
+
   return lines.join('\n');
 }
 
