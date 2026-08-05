@@ -126,3 +126,14 @@ test('an unknown format degrades to hex instead of printing undefined', () => {
   assert.ok(lines[0].includes('#1a73e8'), lines[0]);
   assert.ok(!lines[0].includes('undefined'), lines[0]);
 });
+
+test('rendering never mutates the extraction payload', () => {
+  // The flag is presentational, so the JSON that drift and the ML features read
+  // must be byte-identical before and after any render.
+  const formats: ColorFormat[] = ['hex', 'rgb', 'oklch', 'lch', 'source'];
+  for (const f of formats) {
+    const before = JSON.stringify(COLORS);
+    render(f);
+    assert.equal(JSON.stringify(COLORS), before, `${f} mutated the payload`);
+  }
+});
