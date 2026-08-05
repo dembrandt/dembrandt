@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { rgbToLch, rgbToOklch, formatLch, formatOklch, convertColor } from '../lib/colors.js';
+import { rgbToLch, rgbToOklch, formatLch, formatOklch, convertColor, formatColor, isColorFormat, COLOR_FORMATS } from '../lib/colors.js';
 import { parseCssColor } from '../lib/color-parse.js';
 
 // Pins the serialisation half of the colour engine: rgbToLch / rgbToOklch and
@@ -29,19 +29,19 @@ test('rgbToOklch: mid grey is achromatic with a residual float hue', () => {
   // emitted string is oklch(59.99% 0 89.88) and the hue channel is inert.
   const grey = rgbToOklch(128, 128, 128);
   assert.ok(grey.c < 1e-6, String(grey.c));
-  assert.equal(formatOklch(grey, undefined), 'oklch(59.99% 0 89.88)');
+  assert.equal(formatOklch(grey), 'oklch(59.99% 0 89.88)');
 });
 
 test('formatOklch: lightness as percent, chroma to 3dp, hue to 2dp', () => {
-  assert.equal(formatOklch({ l: 0.6279553606, c: 0.2576833077, h: 29.2338851 }, undefined), 'oklch(62.8% 0.258 29.23)');
-  assert.equal(formatOklch({ l: 0.8781060522, c: 0.1687623350, h: 91.8567430 }, undefined), 'oklch(87.81% 0.169 91.86)');
+  assert.equal(formatOklch({ l: 0.6279553606, c: 0.2576833077, h: 29.2338851 }), 'oklch(62.8% 0.258 29.23)');
+  assert.equal(formatOklch({ l: 0.8781060522, c: 0.1687623350, h: 91.8567430 }), 'oklch(87.81% 0.169 91.86)');
 });
 
 test('formatOklch: alpha emitted only below 1', () => {
   const red = rgbToOklch(255, 0, 0);
   assert.equal(formatOklch(red, 0.5), 'oklch(62.8% 0.258 29.23 / 0.5)');
   assert.equal(formatOklch(red, 1), 'oklch(62.8% 0.258 29.23)');
-  assert.equal(formatOklch(red, undefined), 'oklch(62.8% 0.258 29.23)');
+  assert.equal(formatOklch(red), 'oklch(62.8% 0.258 29.23)');
 });
 
 test('formatLch: alpha emitted only below 1', () => {
@@ -65,7 +65,7 @@ test('emitted oklch() re-parses to within 3 channel steps of the source', () => 
   let worst = 0;
   for (let i = 0; i < 600; i++) {
     const r = (i * 97) % 256, g = (i * 53) % 256, b = (i * 29) % 256;
-    const back = parseCssColor(formatOklch(rgbToOklch(r, g, b), undefined));
+    const back = parseCssColor(formatOklch(rgbToOklch(r, g, b)));
     assert.ok(back, `unparseable at ${r},${g},${b}`);
     worst = Math.max(worst, Math.abs(back.r - r), Math.abs(back.g - g), Math.abs(back.b - b));
   }
@@ -76,7 +76,7 @@ test('emitted lch() re-parses to within 3 channel steps of the source', () => {
   let worst = 0;
   for (let i = 0; i < 600; i++) {
     const r = (i * 89) % 256, g = (i * 41) % 256, b = (i * 17) % 256;
-    const back = parseCssColor(formatLch(rgbToLch(r, g, b), undefined));
+    const back = parseCssColor(formatLch(rgbToLch(r, g, b)));
     assert.ok(back, `unparseable at ${r},${g},${b}`);
     worst = Math.max(worst, Math.abs(back.r - r), Math.abs(back.g - g), Math.abs(back.b - b));
   }
@@ -126,4 +126,50 @@ test('convertColor returns null rather than a partial record', () => {
   assert.equal(convertColor('currentcolor'), null);
   assert.equal(convertColor('var(--brand)'), null);
   assert.equal(convertColor(''), null);
+});
+
+test('formatColor renders each notation from one input', () => {
+  assert.equal(formatColor('#1a73e8', 'hex'), '#1a73e8');
+  assert.equal(formatColor('#1a73e8', 'rgb'), 'rgb(26, 115, 232)');
+  assert.equal(formatColor('#1a73e8', 'oklch'), 'oklch(57.37% 0.195 257.86)');
+  assert.equal(formatColor('#1a73e8', 'lch'), 'lch(48.77% 68.14 278.17)');
+});
+
+test('formatColor defaults to hex', () => {
+  assert.equal(formatColor('rgb(26, 115, 232)'), '#1a73e8');
+});
+
+test('formatColor source returns the authored string untouched', () => {
+  // Provenance mode: no parse, no normalisation, no gamut mapping. This is what
+  // preserves a declared token like --brand: oklch(...) exactly as written.
+  assert.equal(formatColor('oklch(57.37% 0.195 257.86)', 'source'), 'oklch(57.37% 0.195 257.86)');
+  assert.equal(formatColor('#ABC', 'source'), '#ABC');
+  assert.equal(formatColor('var(--brand)', 'source'), 'var(--brand)');
+});
+
+test('formatColor returns unparseable input verbatim instead of dropping it', () => {
+  assert.equal(formatColor('currentcolor', 'oklch'), 'currentcolor');
+  assert.equal(formatColor('var(--brand)', 'hex'), 'var(--brand)');
+});
+
+test('formatColor preserves alpha in every computed notation', () => {
+  assert.equal(formatColor('rgba(26, 115, 232, 0.4)', 'rgb'), 'rgba(26, 115, 232, 0.4)');
+  assert.equal(formatColor('rgba(26, 115, 232, 0.4)', 'oklch'), 'oklch(57.37% 0.195 257.86 / 0.4)');
+  // hex is the opaque identity, so alpha is intentionally dropped there.
+  assert.equal(formatColor('rgba(26, 115, 232, 0.4)', 'hex'), '#1a73e8');
+});
+
+test('every declared format is renderable and distinct where it should be', () => {
+  const rendered = COLOR_FORMATS.map((f) => formatColor('#1a73e8', f));
+  assert.equal(rendered.length, 5);
+  for (const r of rendered) assert.ok(typeof r === 'string' && r.length > 0);
+  // source and hex coincide only because the input was already hex.
+  assert.equal(new Set(rendered).size, 4);
+});
+
+test('isColorFormat gates the CLI value', () => {
+  for (const f of COLOR_FORMATS) assert.equal(isColorFormat(f), true);
+  assert.equal(isColorFormat('HEX'), false);
+  assert.equal(isColorFormat('hsl'), false);
+  assert.equal(isColorFormat(''), false);
 });

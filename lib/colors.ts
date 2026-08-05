@@ -145,7 +145,7 @@ export function rgbToOklch(r, g, b) {
  * @param {number} [alpha] - Optional alpha value (0-1)
  * @returns {string}
  */
-export function formatLch(lch, alpha) {
+export function formatLch(lch, alpha?: number) {
   const l = Math.round(lch.l * 100) / 100;
   const c = Math.round(lch.c * 100) / 100;
   const h = Math.round(lch.h * 100) / 100;
@@ -162,7 +162,7 @@ export function formatLch(lch, alpha) {
  * @param {number} [alpha] - Optional alpha value (0-1)
  * @returns {string}
  */
-export function formatOklch(oklch, alpha) {
+export function formatOklch(oklch, alpha?: number) {
   // OKLCH lightness is 0-1, displayed as percentage
   const l = Math.round(oklch.l * 10000) / 100;
   const c = Math.round(oklch.c * 1000) / 1000;
@@ -377,6 +377,39 @@ export function computeWcag(palette) {
   }
 
   return pairs.sort((a, b) => b.ratio - a.ratio);
+}
+
+/**
+ * Notations a user may select for emitted colors. `source` keeps the string as
+ * authored (only meaningful where provenance survived extraction, i.e. declared
+ * custom properties); the rest are computed from the parsed sRGB identity.
+ */
+export const COLOR_FORMATS = ['hex', 'rgb', 'oklch', 'lch', 'source'] as const;
+
+export type ColorFormat = (typeof COLOR_FORMATS)[number];
+
+export function isColorFormat(value: string): value is ColorFormat {
+  return (COLOR_FORMATS as readonly string[]).includes(value);
+}
+
+/**
+ * Render one color in the requested notation.
+ *
+ * Presentation only: the caller keeps whatever identity key it already had, so
+ * dedup, drift comparison and ML features are unaffected by the choice. An
+ * unparseable input is returned verbatim rather than dropped, matching how the
+ * formatters already degrade.
+ *
+ * @param {string} colorString - any CSS color, or an already-authored token value
+ * @param {ColorFormat} format - target notation, default 'hex'
+ * @returns {string}
+ */
+export function formatColor(colorString, format: ColorFormat = 'hex'): string {
+  const input = String(colorString);
+  if (format === 'source') return input;
+  const converted = convertColor(input);
+  if (!converted) return input;
+  return converted[format];
 }
 
 /**
