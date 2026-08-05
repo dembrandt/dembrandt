@@ -18,14 +18,42 @@ export interface PaletteColor {
   /** CSS class/id sources */
   sources?: string[];
   confidence: Confidence;
+  /** Declared as a :root custom property, i.e. carries author provenance */
+  isToken?: boolean;
+  /** 'surface' | 'neutral' | 'accent', derived from saturation and confidence */
+  role?: string;
+  /** Best-contrast foreground for this colour */
+  onColor?: string;
+  /** Derived interactive-state variant, always toward better contrast */
+  hover?: string;
+  /** Set to 'primary' when this is an alpha/lightness variant of the primary */
+  variantOf?: string | null;
+  /** Precomputed notations of `normalized`; see convertColor() */
+  lch?: string;
+  oklch?: string;
+}
+
+/**
+ * A declared CSS custom property. `value` is the author's string verbatim, which
+ * is the only surviving provenance of the authored notation; the rest are
+ * computed from it so consumers never have to parse modern colour functions.
+ */
+export interface CssVariable {
+  value: string;
+  hex?: string;
+  lch?: string;
+  oklch?: string;
 }
 
 export interface Colors {
   palette: PaletteColor[];
   /** e.g. { primary: '#hex' } */
   semantic: Record<string, string>;
-  /** CSS custom properties */
-  cssVariables: Record<string, string>;
+  /**
+   * CSS custom properties. Older extractions carry a bare colour string; current
+   * ones carry a CssVariable object, so consumers must handle both.
+   */
+  cssVariables: Record<string, string | CssVariable>;
   rawColors?: PaletteColor[];
 }
 
