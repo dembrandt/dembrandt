@@ -16,12 +16,51 @@ import type { BrandingResult } from "./types.js";
 export type FindingSeverity = "error" | "warn";
 export type FindingCategory = "contrast" | "consistency" | "duplication";
 
+/** What kind of value the competitors are, so a consumer can format them. */
+export type FindingEvidenceKind = "color" | "typography" | "dimension";
+
+/** One of the values a finding is about, with whatever the extractor counted. */
+export interface FindingEvidenceValue {
+  /** Normalised: #rrggbb for colours, "16px" for dimensions. */
+  value: string;
+  /** Elements on the page carrying it. Absent when the extractor did not count. */
+  occurrences?: number;
+  /** CSS class/id sources carrying it, as sampled by the extractor. */
+  sources?: string[];
+  /** The value this one should collapse to, when that is computable. */
+  suggested?: string;
+}
+
+/**
+ * The machine-readable half of a finding. `message` is prose for a human; this
+ * is what a consumer ranks, diffs, or hands to an agent — competing values with
+ * real hex/px, how often each occurs, and which one already dominates.
+ *
+ * Optional throughout: a finding whose evidence cannot be quantified (a type
+ * collision has no per-role element count) still carries the values themselves.
+ */
+export interface FindingEvidence {
+  kind: FindingEvidenceKind;
+  /** The competing values, most-used first when counts exist. */
+  values: FindingEvidenceValue[];
+  /** The value that should win, i.e. the one already most used. */
+  dominant?: string;
+  /** Elements across every competing value — the blast radius. */
+  totalOccurrences?: number;
+  /** Type roles/contexts involved, for collisions between them. */
+  roles?: string[];
+  /** The measured number the finding rests on. */
+  metric?: { name: "deltaE" | "contrastRatio" | "gridBase"; value: number };
+}
+
 export interface Finding {
   category: FindingCategory;
   /** Display grouping for the report (Gestalt proximity): Color, Typography, … */
   group: string;
   severity: FindingSeverity;
   message: string;
+  /** Structured form of the same finding. See FindingEvidence. */
+  evidence?: FindingEvidence;
 }
 
 export interface FindingsReport {
@@ -75,9 +114,12 @@ export function computeFindings(result: BrandingResult): FindingsReport {
 
   // 1. Near-duplicate palette colours (ΔE2000 < just-noticeable). The "#133074
   //    where #133174 should be" decay — two tokens that are visually one colour.
-  const palette = (result.colors?.palette ?? [])
-    .map((c) => (c.normalized || c.color || "").toLowerCase())
-    .filter((h) => /^#[0-9a-f]{6}$/i.test(h));
+  // Entries, not bare hexes: the evidence needs each colour's occurrence count
+  // and sources, which only survive on the palette entry.
+  const paletteEntries = (result.colors?.palette ?? [])
+    .map((c) => ({ ...c, hex: (c.normalized || c.color || "").toLowerCase() }))
+    .filter((c) => /^#[0-9a-f]{6}$/i.test(c.hex));
+  const palette = paletteEntries.map((c) => c.hex);
   const seenDup = new Set<string>();
   for (let i = 0; i < palette.length; i++) {
     for (let j = i + 1; j < palette.length; j++) {
@@ -88,11 +130,32 @@ export function computeFindings(result: BrandingResult): FindingsReport {
         const key = [palette[i], palette[j]].sort().join("|");
         if (seenDup.has(key)) continue;
         seenDup.add(key);
+        // Most-used first: the more frequent hex is the one the other should
+        // collapse into, so ordering here *is* the recommendation.
+        const pair = [paletteEntries[i], paletteEntries[j]].sort(
+          (a, b) => (b.count ?? 0) - (a.count ?? 0)
+        );
+        const counted = pair.every((c) => typeof c.count === "number");
+        const dominant = counted ? pair[0].hex : undefined;
         findings.push({
           category: "duplication",
           group: "Color",
           severity: "warn",
           message: `${palette[i]} and ${palette[j]} are perceptually identical (ΔE ${d.toFixed(1)}) — likely one token split in two.`,
+          evidence: {
+            kind: "color",
+            values: pair.map((c) => ({
+              value: c.hex,
+              ...(typeof c.count === "number" && { occurrences: c.count }),
+              ...(c.sources?.length && { sources: c.sources.slice(0, 5) }),
+              ...(dominant && c.hex !== dominant && { suggested: dominant }),
+            })),
+            ...(dominant && { dominant }),
+            ...(counted && {
+              totalOccurrences: pair.reduce((n, c) => n + (c.count ?? 0), 0),
+            }),
+            metric: { name: "deltaE", value: Number(d.toFixed(2)) },
+          },
         });
       }
     }
@@ -122,11 +185,19 @@ export function computeFindings(result: BrandingResult): FindingsReport {
       if (roles.length < 2) continue;
       const relevant = roles.filter(isHierarchy).length >= 2 || (roles.some(isHierarchy) && roles.some(isText));
       if (!relevant) continue;
+      const shared = `${px}px${weight ? ` / ${weight}` : ""}`;
       findings.push({
         category: "consistency",
         group: "Typography",
         severity: "warn",
-        message: `${roles.slice(0, 4).join(", ")} share ${px}px${weight ? ` / ${weight}` : ""} — no visual hierarchy between them.`,
+        message: `${roles.slice(0, 4).join(", ")} share ${shared} — no visual hierarchy between them.`,
+        // No per-role element count exists, so the evidence is the collision
+        // itself: the shared value and every role that lands on it.
+        evidence: {
+          kind: "typography",
+          values: [{ value: shared }],
+          roles: [...roles],
+        },
       });
     }
   }
@@ -145,6 +216,13 @@ export function computeFindings(result: BrandingResult): FindingsReport {
         group: "Contrast",
         severity: "warn",
         message: `Primary ${primary} has low contrast on white (${onWhite.toFixed(1)}:1) — fails WCAG AA for text.`,
+        // No competitor to collapse into: the fix is a darker primary, which
+        // only the brand owner can choose. Evidence carries the measurement.
+        evidence: {
+          kind: "color",
+          values: [{ value: toHex(primary) ?? primary }],
+          metric: { name: "contrastRatio", value: Number(onWhite.toFixed(2)) },
+        },
       });
     }
   }
@@ -153,15 +231,36 @@ export function computeFindings(result: BrandingResult): FindingsReport {
   const scaleType = result.spacing?.scaleType ?? "";
   const base = scaleType === "base-8" ? 8 : scaleType === "base-4" ? 4 : 0;
   if (base) {
-    const off = (result.spacing?.commonValues ?? [])
-      .map((v) => v.px)
-      .filter((px): px is number => typeof px === "number" && px >= base && px % base !== 0);
+    // Entries, not bare numbers: the evidence needs each value's occurrence
+    // count, which only survives on the SpacingValue.
+    const offEntries = (result.spacing?.commonValues ?? []).filter(
+      (v) => typeof v.px === "number" && v.px >= base && (v.px as number) % base !== 0
+    );
+    const off = offEntries.map((v) => v.px as number);
     if (off.length) {
+      const counted = offEntries.every((v) => typeof v.count === "number");
       findings.push({
         category: "consistency",
         group: "Spacing",
         severity: "warn",
         message: `${off.slice(0, 5).map((p) => `${p}px`).join(", ")} ${off.length === 1 ? "is" : "are"} off the ${scaleType} spacing grid.`,
+        // Each stray value snaps to its own nearest multiple of the base, so
+        // the suggestion is per value rather than one dominant winner.
+        evidence: {
+          kind: "dimension",
+          values: offEntries
+            .slice()
+            .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+            .map((v) => ({
+              value: `${v.px}px`,
+              ...(typeof v.count === "number" && { occurrences: v.count }),
+              suggested: `${Math.max(base, Math.round((v.px as number) / base) * base)}px`,
+            })),
+          ...(counted && {
+            totalOccurrences: offEntries.reduce((n, v) => n + (v.count ?? 0), 0),
+          }),
+          metric: { name: "gridBase", value: base },
+        },
       });
     }
   }
