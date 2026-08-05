@@ -2,16 +2,18 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { displayResults } from '../lib/formatters/terminal.js';
 import type { ColorFormat } from '../lib/colors.js';
+import type { BrandingResult, Colors } from '../lib/types.js';
 
 // --color-format is presentational: it selects the notation in the colour column
 // and must not alter identity, dedup, or which colours are shown.
 
-const COLORS = {
+const COLORS: Colors = {
   semantic: { primary: 'rgb(26, 115, 232)' },
   palette: [
     {
       color: 'rgb(255, 210, 48)',
       normalized: '#ffd230',
+      count: 12,
       confidence: 'high',
       role: 'accent',
       oklch: 'oklch(87.81% 0.169 91.86)',
@@ -29,15 +31,16 @@ const COLORS = {
 };
 
 function render(colorFormat?: ColorFormat): string[] {
-  const data: any = {
+  const data: BrandingResult = {
     url: 'https://example.test',
+    extractedAt: '2026-08-05T00:00:00.000Z',
     colors: COLORS,
     typography: { styles: [], sources: {} },
     spacing: { scaleType: 'unknown', commonValues: [] },
     borderRadius: { values: [] },
     borders: { combinations: [] },
     shadows: [],
-    components: {},
+    components: { buttons: [], inputs: [], links: [], badges: [] },
     breakpoints: [],
     iconSystem: [],
     frameworks: [],
