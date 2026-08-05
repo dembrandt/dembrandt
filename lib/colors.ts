@@ -145,10 +145,16 @@ export function rgbToOklch(r, g, b) {
  * @param {number} [alpha] - Optional alpha value (0-1)
  * @returns {string}
  */
-export function formatLch(lch, alpha) {
-  const l = Math.round(lch.l * 100) / 100;
-  const c = Math.round(lch.c * 100) / 100;
-  const h = Math.round(lch.h * 100) / 100;
+export function formatLch(lch, alpha?: number) {
+  // Precision is chosen so a serialise/parse round trip is lossless at 8-bit
+  // sRGB: at 2 decimals the cycle shifted a channel by up to 1/255, which is a
+  // silent colour change for anyone pasting the emitted value back into CSS.
+  const l = Math.round(lch.l * 1000) / 1000;
+  const c = Math.round(lch.c * 1000) / 1000;
+  // Hue is meaningless once chroma rounds away (atan2 on denormal a/b yields a
+  // stable but arbitrary angle for neutrals), so pin achromatic colours to 0
+  // rather than emitting lch(53.59% 0 53.35) for mid grey.
+  const h = c === 0 ? 0 : Math.round(lch.h * 1000) / 1000;
 
   if (alpha !== undefined && alpha < 1) {
     return `lch(${l}% ${c} ${h} / ${alpha})`;
@@ -162,11 +168,15 @@ export function formatLch(lch, alpha) {
  * @param {number} [alpha] - Optional alpha value (0-1)
  * @returns {string}
  */
-export function formatOklch(oklch, alpha) {
-  // OKLCH lightness is 0-1, displayed as percentage
-  const l = Math.round(oklch.l * 10000) / 100;
-  const c = Math.round(oklch.c * 1000) / 1000;
-  const h = Math.round(oklch.h * 100) / 100;
+export function formatOklch(oklch, alpha?: number) {
+  // OKLCH lightness is 0-1, displayed as percentage. Precision is chosen so a
+  // serialise/parse round trip is lossless at 8-bit sRGB: at 2 decimals on L and
+  // 3 on C the cycle shifted a channel by up to 6/255, a visible shift for
+  // anyone pasting the emitted value back into their CSS.
+  const l = Math.round(oklch.l * 1000000) / 10000;
+  const c = Math.round(oklch.c * 100000) / 100000;
+  // See formatLch: a neutral's hue is float noise, so pin it to 0.
+  const h = c === 0 ? 0 : Math.round(oklch.h * 1000) / 1000;
 
   if (alpha !== undefined && alpha < 1) {
     return `oklch(${l}% ${c} ${h} / ${alpha})`;
@@ -377,6 +387,39 @@ export function computeWcag(palette) {
   }
 
   return pairs.sort((a, b) => b.ratio - a.ratio);
+}
+
+/**
+ * Notations a user may select for emitted colors. `source` keeps the string as
+ * authored (only meaningful where provenance survived extraction, i.e. declared
+ * custom properties); the rest are computed from the parsed sRGB identity.
+ */
+export const COLOR_FORMATS = ['hex', 'rgb', 'oklch', 'lch', 'source'] as const;
+
+export type ColorFormat = (typeof COLOR_FORMATS)[number];
+
+export function isColorFormat(value: string): value is ColorFormat {
+  return (COLOR_FORMATS as readonly string[]).includes(value);
+}
+
+/**
+ * Render one color in the requested notation.
+ *
+ * Presentation only: the caller keeps whatever identity key it already had, so
+ * dedup, drift comparison and ML features are unaffected by the choice. An
+ * unparseable input is returned verbatim rather than dropped, matching how the
+ * formatters already degrade.
+ *
+ * @param {string} colorString - any CSS color, or an already-authored token value
+ * @param {ColorFormat} format - target notation, default 'hex'
+ * @returns {string}
+ */
+export function formatColor(colorString, format: ColorFormat = 'hex'): string {
+  const input = String(colorString);
+  if (format === 'source') return input;
+  const converted = convertColor(input);
+  if (!converted) return input;
+  return converted[format];
 }
 
 /**

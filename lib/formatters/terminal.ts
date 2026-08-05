@@ -8,7 +8,8 @@ import type { BrandingResult } from '../types.js';
 
 import chalk from 'chalk';
 import { color } from './theme.js';
-import { convertColor } from '../colors.js';
+import { convertColor, formatColor } from '../colors.js';
+import type { ColorFormat } from '../colors.js';
 
 /**
  * Creates a clickable terminal link using ANSI escape codes
@@ -26,7 +27,7 @@ export function terminalLink(url, text = url) {
  * Main display function - outputs formatted extraction results to terminal
  * @param {Object} data - Extraction results from extractBranding()
  */
-export function displayResults(data: BrandingResult) {
+export function displayResults(data: BrandingResult, options: { colorFormat?: ColorFormat } = {}) {
   console.log('\n' + chalk.bold.cyan('🎨 Brand Extraction'));
   console.log(chalk.dim('│'));
   console.log(chalk.dim('├─') + ' ' + chalk.blue(terminalLink(data.url)));
@@ -43,7 +44,7 @@ export function displayResults(data: BrandingResult) {
 
   displayLogo(data.logo);
   displayFavicons(data.favicons);
-  displayColors(data.colors);
+  displayColors(data.colors, options.colorFormat || 'hex');
   displayTypography(data.typography);
   displaySpacing(data.spacing);
   displayBorderRadius(data.borderRadius);
@@ -126,7 +127,8 @@ function normalizeColorFormat(colorString) {
   };
 }
 
-function displayColors(colors) {
+function displayColors(colors, colorFormat: ColorFormat = 'hex') {
+  if (!colors) return;
   console.log(chalk.dim('├─') + ' ' + chalk.bold('Colors'));
 
   // All colors in one list with consistent formatting
@@ -144,6 +146,8 @@ function displayColors(colors) {
           lch: formats.lch,
           oklch: formats.oklch,
           hasAlpha: formats.hasAlpha,
+          source: String(color),
+          sourceRank: 1,
           label: role,
           type: 'semantic',
           confidence: 'high'
@@ -167,6 +171,8 @@ function displayColors(colors) {
           lch: (typeof varData === 'object' && varData.lch) || formats.lch,
           oklch: (typeof varData === 'object' && varData.oklch) || formats.oklch,
           hasAlpha: formats.hasAlpha,
+          source: String(colorValue),
+          sourceRank: 2,
           label: name,
           type: 'variable',
           confidence: 'high'
@@ -190,6 +196,8 @@ function displayColors(colors) {
         lch: c.lch || formats.lch,
         oklch: c.oklch || formats.oklch,
         hasAlpha: formats.hasAlpha,
+        source: String(c.color),
+        sourceRank: 1,
         label: '',
         type: 'palette',
         confidence: c.confidence,
@@ -216,6 +224,12 @@ function displayColors(colors) {
           existing.label = `${existing.label}, ${color.label}`;
         }
       }
+      // A declared custom property is the only true authored notation, so it
+      // outranks a computed value when both collapse to the same hex.
+      if (color.source && (color.sourceRank || 0) > (existing.sourceRank || 0)) {
+        existing.source = color.source;
+        existing.sourceRank = color.sourceRank;
+      }
       // Keep highest confidence
       const confidenceOrder = { high: 3, medium: 2, low: 1 };
       if (confidenceOrder[color.confidence] > confidenceOrder[existing.confidence]) {
@@ -230,7 +244,19 @@ function displayColors(colors) {
 
   // Display each color on a single line: swatch, hex, role, rgb, oklch.
   // lch is omitted here for compactness but remains in JSON output.
-  uniqueColors.forEach(({ hex, rgb, label, confidence, role, onColor, hover }, index) => {
+  const primaryOf = (c) => {
+    const notations = { hex: c.hex, rgb: c.rgb, lch: c.lch, oklch: c.oklch, source: c.source || c.hex };
+    return notations[colorFormat] || c.hex;
+  };
+  const primaryWidth = Math.max(7, ...uniqueColors.map((c) => primaryOf(c).length));
+
+  uniqueColors.forEach((entry, index) => {
+    const { hex, rgb, label, confidence, role, onColor, hover } = entry;
+    // Primary column follows --color-format; the swatch stays on hex because
+    // chalk.bgHex needs one, and the identity column must remain stable.
+    const primary = primaryOf(entry).padEnd(primaryWidth);
+    // Secondary dim column never repeats the primary notation.
+    const secondary = colorFormat === 'rgb' ? hex : rgb;
     const isLast = index === uniqueColors.length - 1;
     const branch = isLast ? '└─' : '├─';
 
@@ -257,13 +283,16 @@ function displayColors(colors) {
     // extend and push the rgb column right rather than getting clipped.
     const rawLabel = label || (role && role !== 'palette' ? role : '');
     const labelText = chalk.dim(rawLabel.length > 15 ? rawLabel + ' ' : rawLabel.padEnd(15));
-    const rgbText = chalk.dim((rgb || '').padEnd(20));
+    const rgbText = chalk.dim((secondary || '').padEnd(20));
 
-    const hoverText = (hover && role === 'accent') ? chalk.dim(` hover:${hover}`) : '';
+    // Derived states follow the same notation as the colour they belong to.
+    const hoverText = (hover && role === 'accent')
+      ? chalk.dim(` hover:${formatColor(hover, colorFormat === 'source' ? 'hex' : colorFormat)}`)
+      : '';
 
     console.log(
       chalk.dim(`│  ${branch}`) + ' ' +
-      `${conf} ${swatch} ${hex}  ` +
+      `${conf} ${swatch} ${primary}  ` +
       labelText + ' ' +
       rgbText +
       onSwatch +
@@ -282,6 +311,7 @@ function displayColors(colors) {
 }
 
 function displayTypography(typography) {
+  if (!typography) return;
   console.log(chalk.dim('├─') + ' ' + chalk.bold('Typography'));
 
   // Font sources with font-display
@@ -364,18 +394,24 @@ function displayTypography(typography) {
 }
 
 function displaySpacing(spacing) {
+  // Sections degrade to silence rather than crashing the whole render: a payload
+  // can reach here from a merge, the MCP tools or an App round trip, not just
+  // from a fresh extraction where the extractor guarantees the shape.
+  if (!spacing) return;
+  const values = Array.isArray(spacing.commonValues) ? spacing.commonValues : [];
   console.log(chalk.dim('├─') + ' ' + chalk.bold('Spacing'));
-  console.log(chalk.dim('│  ├─') + ' ' + chalk.dim(`System: ${spacing.scaleType}`));
-  spacing.commonValues.slice(0, 15).forEach((v, index) => {
-    const isLast = index === Math.min(spacing.commonValues.length, 15) - 1;
+  console.log(chalk.dim('│  ├─') + ' ' + chalk.dim(`System: ${spacing.scaleType ?? 'unknown'}`));
+  values.slice(0, 15).forEach((v, index) => {
+    const isLast = index === Math.min(values.length, 15) - 1;
     const branch = isLast ? '└─' : '├─';
-    console.log(chalk.dim(`│  ${branch}`) + ' ' + `${v.px.padEnd(8)} ${chalk.dim(v.rem)}`);
+    // px is typed string | number; a merged payload can carry the number.
+    console.log(chalk.dim(`│  ${branch}`) + ' ' + `${String(v.px ?? '').padEnd(8)} ${chalk.dim(v.rem ?? '')}`);
   });
   console.log(chalk.dim('│'));
 }
 
 function displayBorderRadius(borderRadius) {
-  if (!borderRadius || borderRadius.values.length === 0) return;
+  if (!borderRadius || !Array.isArray(borderRadius.values) || borderRadius.values.length === 0) return;
 
   const highConfRadius = borderRadius.values.filter(r => r.confidence === 'high' || r.confidence === 'medium');
   if (highConfRadius.length === 0) return;
@@ -996,19 +1032,25 @@ function displayFrameworks(frameworks) {
 }
 
 function displayMotion(motion) {
-  if (!motion || (motion.durations.length === 0 && motion.animations.length === 0)) return;
+  if (!motion) return;
+  // Defensive: a payload can arrive from a merge, the MCP tools or an older
+  // extraction where one of these lists is absent.
+  const durations = Array.isArray(motion.durations) ? motion.durations : [];
+  const easings = Array.isArray(motion.easings) ? motion.easings : [];
+  const animations = Array.isArray(motion.animations) ? motion.animations : [];
+  if (durations.length === 0 && animations.length === 0) return;
 
   console.log(chalk.dim('├─') + ' ' + chalk.bold('Motion'));
 
   // Duration scale
-  if (motion.durations.length > 0) {
-    const vals = motion.durations.map(d => chalk.bold(d.value)).join('  ');
+  if (durations.length > 0) {
+    const vals = durations.map(d => chalk.bold(d.value ?? d)).join('  ');
     console.log(chalk.dim('│  ├─') + ' ' + chalk.dim('Scale  ') + vals);
   }
 
   // Dominant easing
-  if (motion.easings.length > 0) {
-    const top = motion.easings[0];
+  if (easings.length > 0) {
+    const top = easings[0];
     const typeLabel = top.type && top.type !== 'custom' ? chalk.dim(` (${top.type})`) : '';
     console.log(chalk.dim('│  ├─') + ' ' + chalk.dim('Easing ') + top.value + typeLabel);
   }
@@ -1018,7 +1060,7 @@ function displayMotion(motion) {
   if (ctxEntries.length > 0) {
     console.log(chalk.dim('│  ├─') + ' ' + chalk.dim('By context'));
     ctxEntries.forEach(([ctx, v], i) => {
-      const isLast = i === ctxEntries.length - 1 && (motion.interactiveDeltas || []).length === 0 && motion.animations.length === 0;
+      const isLast = i === ctxEntries.length - 1 && (motion.interactiveDeltas || []).length === 0 && animations.length === 0;
       const branch = isLast ? '└─' : '├─';
       const dur = v.durations.join(' / ');
       const easingLabel = v.easingType && v.easingType !== 'custom' ? ` · ${v.easingType}` : '';
@@ -1038,7 +1080,7 @@ function displayMotion(motion) {
     const unique = Array.from(seen.values());
     console.log(chalk.dim('│  ├─') + ' ' + chalk.dim('Hover patterns'));
     unique.slice(0, 6).forEach((d, i) => {
-      const isLast = i === Math.min(unique.length, 6) - 1 && motion.animations.length === 0;
+      const isLast = i === Math.min(unique.length, 6) - 1 && animations.length === 0;
       const branch = isLast ? '└─' : '├─';
       const label = d.text ? chalk.dim(` "${d.text}"`) : '';
       console.log(chalk.dim(`│  │  ${branch}`) + ' ' + chalk.bold(d.pattern) + chalk.dim(` ${d.tag}`) + label);
@@ -1046,10 +1088,10 @@ function displayMotion(motion) {
   }
 
   // Keyframe animations
-  if (motion.animations.length > 0) {
+  if (animations.length > 0) {
     console.log(chalk.dim('│  └─') + ' ' + chalk.dim('Keyframes'));
-    motion.animations.slice(0, 6).forEach((a, i) => {
-      const isLast = i === Math.min(motion.animations.length, 6) - 1;
+    animations.slice(0, 6).forEach((a, i) => {
+      const isLast = i === Math.min(animations.length, 6) - 1;
       const branch = isLast ? '└─' : '├─';
       const dur = a.duration ? chalk.dim(` ${a.duration}`) : '';
       const ctx = a.contexts?.length ? chalk.dim(` [${a.contexts.join(', ')}]`) : '';
@@ -1073,8 +1115,13 @@ function displayWcag(wcag) {
   const all = [...passing.slice(0, 5), ...failing.slice(0, 3)];
 
   function renderPair(pair, branch) {
-    const fgSwatch = chalk.bgHex(pair.fg)('  ');
-    const bgSwatch = chalk.bgHex(pair.bg)('  ');
+    // chalk.bgHex throws on anything that is not a hex string, and a pair can
+    // arrive from an older extraction or a hand-built payload without one.
+    const swatch = (v) => {
+      try { return chalk.bgHex(v)('  '); } catch { return '  '; }
+    };
+    const fgSwatch = swatch(pair.fg);
+    const bgSwatch = swatch(pair.bg);
     const grade = pair.aaa
       ? color.success('AAA')
       : pair.aa

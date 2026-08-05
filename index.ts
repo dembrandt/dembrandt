@@ -7,12 +7,13 @@
  * from any website using Playwright.
  */
 
-import { program, Option } from "commander";
+import { program, Option, InvalidArgumentError } from "commander";
 import chalk from "chalk";
 import ora from "ora";
 import { loadBrowserEngines, PlaywrightMissingError } from "./lib/browser.js";
 import { extractBranding } from "./lib/extractors/index.js";
 import { displayResults, terminalLink } from "./lib/formatters/terminal.js";
+import { COLOR_FORMATS, isColorFormat } from "./lib/colors.js";
 import { color } from "./lib/formatters/theme.js";
 import { toDtcgTokens } from "./lib/formatters/dtcg.js";
 import { generatePDF } from "./lib/formatters/pdf.js";
@@ -66,6 +67,18 @@ program
   .option("--approve", "With --compare <file>: accept the current extraction as the new baseline by overwriting that local file, and pass instead of failing. Ignored for App baseline ids.")
   .option("--no-sandbox", "Disable browser sandbox (needed for Docker/CI)")
   .option("--raw-colors", "Include pre-filter raw colors in JSON output")
+  .option(
+    "--color-format <format>",
+    `Notation for displayed colors: ${COLOR_FORMATS.join("|")} ('source' keeps declared tokens as authored). JSON keeps every notation regardless.`,
+    (v: string) => {
+      const value = String(v).toLowerCase();
+      if (!isColorFormat(value)) {
+        throw new InvalidArgumentError(`expected one of ${COLOR_FORMATS.join(", ")}`);
+      }
+      return value;
+    },
+    "hex",
+  )
   .option("--screenshot <path>", "Save a viewport screenshot of the page (not full-page)")
   // Internal, undocumented flag. Hidden from --help; not part of the product surface.
   .addOption(new Option("--teach").hideHelp())
@@ -98,6 +111,26 @@ program
 
     if (opts.approve && !opts.compare) {
       console.error(color.warning("! --approve has no effect without --compare <file>."));
+    }
+
+    // --color-format governs the terminal colour column only. Silently ignoring
+    // it on an export path would read as a bug, so name the paths it misses.
+    if (opts.colorFormat && opts.colorFormat !== "hex") {
+      const unaffected = [
+        opts.jsonOnly && "--json-only",
+        opts.saveOutput && "--save-output",
+        opts.dtcg && "--dtcg",
+        opts.designMd && "--design-md",
+        opts.html && "--html",
+        opts.brandGuide && "--brand-guide",
+      ].filter(Boolean);
+      if (unaffected.length) {
+        console.error(
+          color.warning(
+            `! --color-format=${opts.colorFormat} applies to terminal output only; ${unaffected.join(", ")} ${unaffected.length > 1 ? "are" : "is"} unaffected. JSON carries hex, rgb, lch and oklch for every colour.`
+          )
+        );
+      }
     }
 
     // In --json-only mode, redirect all status output to stderr so stdout is clean JSON
@@ -596,7 +629,7 @@ program
         for (const notice of savedNotices) console.error(notice);
       } else {
         console.log();
-        displayResults(result);
+        displayResults(result, { colorFormat: opts.colorFormat });
         console.log();
         console.log(summaryLine);
         if (pathsLine) console.log(pathsLine);
