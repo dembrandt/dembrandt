@@ -33,3 +33,24 @@ test('reveal is standard (no enable flag exposed)', () => {
   // Reveal runs by default; there must be no --menus/--reveal opt-in flag.
   assert.doesNotMatch(r.stdout, /--menus|--reveal\b/);
 });
+
+test('--color-format rejects an unknown notation with the valid values listed', () => {
+  const r = run(['dembrandt.com', '--color-format=hsl']);
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /--color-format/);
+  for (const f of ['hex', 'rgb', 'oklch', 'lch', 'source']) {
+    assert.ok(r.stderr.includes(f), `${f} missing from the error: ${r.stderr}`);
+  }
+});
+
+test('--color-format appears in --help with its accepted values', () => {
+  const r = run(['--help']);
+  assert.match(r.stdout, /--color-format/);
+  assert.match(r.stdout, /hex\|rgb\|oklch\|lch\|source/);
+});
+
+test('--color-format is case-insensitive', () => {
+  // Validation lowercases before the check, so OKLCH must not be a hard error.
+  const r = run(['--color-format=OKLCH', '--help']);
+  assert.equal(r.status, 0);
+});
