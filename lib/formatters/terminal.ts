@@ -128,6 +128,7 @@ function normalizeColorFormat(colorString) {
 }
 
 function displayColors(colors, colorFormat: ColorFormat = 'hex') {
+  if (!colors) return;
   console.log(chalk.dim('├─') + ' ' + chalk.bold('Colors'));
 
   // All colors in one list with consistent formatting
@@ -310,6 +311,7 @@ function displayColors(colors, colorFormat: ColorFormat = 'hex') {
 }
 
 function displayTypography(typography) {
+  if (!typography) return;
   console.log(chalk.dim('├─') + ' ' + chalk.bold('Typography'));
 
   // Font sources with font-display
@@ -392,18 +394,24 @@ function displayTypography(typography) {
 }
 
 function displaySpacing(spacing) {
+  // Sections degrade to silence rather than crashing the whole render: a payload
+  // can reach here from a merge, the MCP tools or an App round trip, not just
+  // from a fresh extraction where the extractor guarantees the shape.
+  if (!spacing) return;
+  const values = Array.isArray(spacing.commonValues) ? spacing.commonValues : [];
   console.log(chalk.dim('├─') + ' ' + chalk.bold('Spacing'));
-  console.log(chalk.dim('│  ├─') + ' ' + chalk.dim(`System: ${spacing.scaleType}`));
-  spacing.commonValues.slice(0, 15).forEach((v, index) => {
-    const isLast = index === Math.min(spacing.commonValues.length, 15) - 1;
+  console.log(chalk.dim('│  ├─') + ' ' + chalk.dim(`System: ${spacing.scaleType ?? 'unknown'}`));
+  values.slice(0, 15).forEach((v, index) => {
+    const isLast = index === Math.min(values.length, 15) - 1;
     const branch = isLast ? '└─' : '├─';
-    console.log(chalk.dim(`│  ${branch}`) + ' ' + `${v.px.padEnd(8)} ${chalk.dim(v.rem)}`);
+    // px is typed string | number; a merged payload can carry the number.
+    console.log(chalk.dim(`│  ${branch}`) + ' ' + `${String(v.px ?? '').padEnd(8)} ${chalk.dim(v.rem ?? '')}`);
   });
   console.log(chalk.dim('│'));
 }
 
 function displayBorderRadius(borderRadius) {
-  if (!borderRadius || borderRadius.values.length === 0) return;
+  if (!borderRadius || !Array.isArray(borderRadius.values) || borderRadius.values.length === 0) return;
 
   const highConfRadius = borderRadius.values.filter(r => r.confidence === 'high' || r.confidence === 'medium');
   if (highConfRadius.length === 0) return;
@@ -1024,19 +1032,25 @@ function displayFrameworks(frameworks) {
 }
 
 function displayMotion(motion) {
-  if (!motion || (motion.durations.length === 0 && motion.animations.length === 0)) return;
+  if (!motion) return;
+  // Defensive: a payload can arrive from a merge, the MCP tools or an older
+  // extraction where one of these lists is absent.
+  const durations = Array.isArray(motion.durations) ? motion.durations : [];
+  const easings = Array.isArray(motion.easings) ? motion.easings : [];
+  const animations = Array.isArray(motion.animations) ? motion.animations : [];
+  if (durations.length === 0 && animations.length === 0) return;
 
   console.log(chalk.dim('├─') + ' ' + chalk.bold('Motion'));
 
   // Duration scale
-  if (motion.durations.length > 0) {
-    const vals = motion.durations.map(d => chalk.bold(d.value)).join('  ');
+  if (durations.length > 0) {
+    const vals = durations.map(d => chalk.bold(d.value ?? d)).join('  ');
     console.log(chalk.dim('│  ├─') + ' ' + chalk.dim('Scale  ') + vals);
   }
 
   // Dominant easing
-  if (motion.easings.length > 0) {
-    const top = motion.easings[0];
+  if (easings.length > 0) {
+    const top = easings[0];
     const typeLabel = top.type && top.type !== 'custom' ? chalk.dim(` (${top.type})`) : '';
     console.log(chalk.dim('│  ├─') + ' ' + chalk.dim('Easing ') + top.value + typeLabel);
   }
@@ -1046,7 +1060,7 @@ function displayMotion(motion) {
   if (ctxEntries.length > 0) {
     console.log(chalk.dim('│  ├─') + ' ' + chalk.dim('By context'));
     ctxEntries.forEach(([ctx, v], i) => {
-      const isLast = i === ctxEntries.length - 1 && (motion.interactiveDeltas || []).length === 0 && motion.animations.length === 0;
+      const isLast = i === ctxEntries.length - 1 && (motion.interactiveDeltas || []).length === 0 && animations.length === 0;
       const branch = isLast ? '└─' : '├─';
       const dur = v.durations.join(' / ');
       const easingLabel = v.easingType && v.easingType !== 'custom' ? ` · ${v.easingType}` : '';
@@ -1066,7 +1080,7 @@ function displayMotion(motion) {
     const unique = Array.from(seen.values());
     console.log(chalk.dim('│  ├─') + ' ' + chalk.dim('Hover patterns'));
     unique.slice(0, 6).forEach((d, i) => {
-      const isLast = i === Math.min(unique.length, 6) - 1 && motion.animations.length === 0;
+      const isLast = i === Math.min(unique.length, 6) - 1 && animations.length === 0;
       const branch = isLast ? '└─' : '├─';
       const label = d.text ? chalk.dim(` "${d.text}"`) : '';
       console.log(chalk.dim(`│  │  ${branch}`) + ' ' + chalk.bold(d.pattern) + chalk.dim(` ${d.tag}`) + label);
@@ -1074,10 +1088,10 @@ function displayMotion(motion) {
   }
 
   // Keyframe animations
-  if (motion.animations.length > 0) {
+  if (animations.length > 0) {
     console.log(chalk.dim('│  └─') + ' ' + chalk.dim('Keyframes'));
-    motion.animations.slice(0, 6).forEach((a, i) => {
-      const isLast = i === Math.min(motion.animations.length, 6) - 1;
+    animations.slice(0, 6).forEach((a, i) => {
+      const isLast = i === Math.min(animations.length, 6) - 1;
       const branch = isLast ? '└─' : '├─';
       const dur = a.duration ? chalk.dim(` ${a.duration}`) : '';
       const ctx = a.contexts?.length ? chalk.dim(` [${a.contexts.join(', ')}]`) : '';
@@ -1101,8 +1115,13 @@ function displayWcag(wcag) {
   const all = [...passing.slice(0, 5), ...failing.slice(0, 3)];
 
   function renderPair(pair, branch) {
-    const fgSwatch = chalk.bgHex(pair.fg)('  ');
-    const bgSwatch = chalk.bgHex(pair.bg)('  ');
+    // chalk.bgHex throws on anything that is not a hex string, and a pair can
+    // arrive from an older extraction or a hand-built payload without one.
+    const swatch = (v) => {
+      try { return chalk.bgHex(v)('  '); } catch { return '  '; }
+    };
+    const fgSwatch = swatch(pair.fg);
+    const bgSwatch = swatch(pair.bg);
     const grade = pair.aaa
       ? color.success('AAA')
       : pair.aa
