@@ -137,3 +137,23 @@ test('rendering never mutates the extraction payload', () => {
     assert.equal(JSON.stringify(COLORS), before, `${f} mutated the payload`);
   }
 });
+
+test('derived hover states follow the selected notation', () => {
+  const withHover: Colors = {
+    ...COLORS,
+    palette: [{ ...COLORS.palette[0], role: 'accent', hover: '#6f7e89' }],
+  };
+  const original = COLORS.palette;
+  try {
+    (COLORS as Colors).palette = withHover.palette;
+    const oklch = colorLines(render('oklch')).find((l) => l.includes('hover:'));
+    assert.ok(oklch, 'no hover row rendered');
+    assert.ok(oklch.includes('hover:oklch('), oklch);
+    // 'source' has no authored form for a derived value, so it degrades to hex
+    // rather than inventing provenance.
+    const src = colorLines(render('source')).find((l) => l.includes('hover:'));
+    assert.ok(src && src.includes('hover:#6f7e89'), String(src));
+  } finally {
+    (COLORS as Colors).palette = original;
+  }
+});

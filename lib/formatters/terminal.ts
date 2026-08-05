@@ -8,7 +8,7 @@ import type { BrandingResult } from '../types.js';
 
 import chalk from 'chalk';
 import { color } from './theme.js';
-import { convertColor } from '../colors.js';
+import { convertColor, formatColor } from '../colors.js';
 import type { ColorFormat } from '../colors.js';
 
 /**
@@ -284,7 +284,10 @@ function displayColors(colors, colorFormat: ColorFormat = 'hex') {
     const labelText = chalk.dim(rawLabel.length > 15 ? rawLabel + ' ' : rawLabel.padEnd(15));
     const rgbText = chalk.dim((secondary || '').padEnd(20));
 
-    const hoverText = (hover && role === 'accent') ? chalk.dim(` hover:${hover}`) : '';
+    // Derived states follow the same notation as the colour they belong to.
+    const hoverText = (hover && role === 'accent')
+      ? chalk.dim(` hover:${formatColor(hover, colorFormat === 'source' ? 'hex' : colorFormat)}`)
+      : '';
 
     console.log(
       chalk.dim(`│  ${branch}`) + ' ' +
