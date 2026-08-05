@@ -16,16 +16,16 @@ const COLORS: Colors = {
       count: 12,
       confidence: 'high',
       role: 'accent',
-      oklch: 'oklch(87.81% 0.169 91.86)',
-      lch: 'lch(86.32% 78.47 85.7)',
+      oklch: 'oklch(87.8106% 0.16876 91.857)',
+      lch: 'lch(86.322% 78.467 85.705)',
     },
   ],
   cssVariables: {
     '--brand': {
-      value: 'oklch(57.37% 0.195 257.86)',
+      value: 'oklch(57.3697% 0.1946 257.858)',
       hex: '#1a73e8',
-      oklch: 'oklch(57.37% 0.195 257.86)',
-      lch: 'lch(48.77% 68.14 278.17)',
+      oklch: 'oklch(57.3697% 0.1946 257.858)',
+      lch: 'lch(48.773% 68.144 278.173)',
     },
   },
 };
@@ -69,14 +69,14 @@ test('default rendering is hex', () => {
 test('oklch rendering replaces the primary column, not the row set', () => {
   const lines = colorLines(render('oklch'));
   assert.equal(lines.length, 2);
-  assert.ok(lines[0].includes('oklch(57.37% 0.195 257.86)'), lines[0]);
-  assert.ok(lines[1].includes('oklch(87.81% 0.169 91.86)'), lines[1]);
+  assert.ok(lines[0].includes('oklch(57.3697% 0.1946 257.858)'), lines[0]);
+  assert.ok(lines[1].includes('oklch(87.8106% 0.16876 91.857)'), lines[1]);
 });
 
 test('lch rendering uses the precomputed lch on each entry', () => {
   const lines = colorLines(render('lch'));
-  assert.ok(lines[0].includes('lch(48.77% 68.14 278.17)'), lines[0]);
-  assert.ok(lines[1].includes('lch(86.32% 78.47 85.7)'), lines[1]);
+  assert.ok(lines[0].includes('lch(48.773% 68.144 278.173)'), lines[0]);
+  assert.ok(lines[1].includes('lch(86.322% 78.467 85.705)'), lines[1]);
 });
 
 test('rgb rendering swaps the secondary column to hex so no notation repeats', () => {
@@ -91,7 +91,7 @@ test('source rendering prefers the authored declaration over a computed value', 
   // The semantic primary and --brand collapse to the same hex, but only the
   // custom property carries the author's notation, so it must win the merge.
   const lines = colorLines(render('source'));
-  assert.ok(lines[0].includes('oklch(57.37% 0.195 257.86)'), lines[0]);
+  assert.ok(lines[0].includes('oklch(57.3697% 0.1946 257.858)'), lines[0]);
   assert.ok(lines[0].includes('primary'), lines[0]);
   assert.ok(lines[0].includes('--brand'), lines[0]);
 });

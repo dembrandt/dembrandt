@@ -113,6 +113,26 @@ program
       console.error(color.warning("! --approve has no effect without --compare <file>."));
     }
 
+    // --color-format governs the terminal colour column only. Silently ignoring
+    // it on an export path would read as a bug, so name the paths it misses.
+    if (opts.colorFormat && opts.colorFormat !== "hex") {
+      const unaffected = [
+        opts.jsonOnly && "--json-only",
+        opts.saveOutput && "--save-output",
+        opts.dtcg && "--dtcg",
+        opts.designMd && "--design-md",
+        opts.html && "--html",
+        opts.brandGuide && "--brand-guide",
+      ].filter(Boolean);
+      if (unaffected.length) {
+        console.error(
+          color.warning(
+            `! --color-format=${opts.colorFormat} applies to terminal output only; ${unaffected.join(", ")} ${unaffected.length > 1 ? "are" : "is"} unaffected. JSON carries hex, rgb, lch and oklch for every colour.`
+          )
+        );
+      }
+    }
+
     // In --json-only mode, redirect all status output to stderr so stdout is clean JSON
     const originalConsoleLog = console.log;
     if (opts.jsonOnly) {

@@ -23,31 +23,33 @@ test('rgbToOklch: white is L=1 C=0, black is all zero', () => {
   assert.deepEqual(rgbToOklch(0, 0, 0), { l: 0, c: 0, h: 0 });
 });
 
-test('rgbToOklch: mid grey is achromatic with a residual float hue', () => {
-  // Documented quirk, not a defect: atan2 on denormal a/b yields a stable but
-  // meaningless hue for neutrals. Harmless because chroma rounds to 0, so the
-  // emitted string is oklch(59.99% 0 89.88) and the hue channel is inert.
+test('rgbToOklch: mid grey is achromatic and the hue is pinned to 0', () => {
+  // atan2 on denormal a/b yields a stable but meaningless hue for neutrals, so
+  // the formatter pins hue to 0 whenever chroma rounds away. Without that, mid
+  // grey emitted oklch(59.99% 0 89.88) — a hue angle on a colourless colour.
   const grey = rgbToOklch(128, 128, 128);
   assert.ok(grey.c < 1e-6, String(grey.c));
-  assert.equal(formatOklch(grey), 'oklch(59.99% 0 89.88)');
+  assert.equal(formatOklch(grey), 'oklch(59.9871% 0 0)');
 });
 
-test('formatOklch: lightness as percent, chroma to 3dp, hue to 2dp', () => {
-  assert.equal(formatOklch({ l: 0.6279553606, c: 0.2576833077, h: 29.2338851 }), 'oklch(62.8% 0.258 29.23)');
-  assert.equal(formatOklch({ l: 0.8781060522, c: 0.1687623350, h: 91.8567430 }), 'oklch(87.81% 0.169 91.86)');
+test('formatOklch precision is set for a lossless sRGB round trip', () => {
+  // L to 4dp of a percent, C to 5dp, H to 3dp. Coarser rounding shifted a
+  // channel by up to 6/255 on re-parse; see color-roundtrip.test.ts.
+  assert.equal(formatOklch({ l: 0.6279553606, c: 0.2576833077, h: 29.2338851 }), 'oklch(62.7955% 0.25768 29.234)');
+  assert.equal(formatOklch({ l: 0.8781060522, c: 0.1687623350, h: 91.8567430 }), 'oklch(87.8106% 0.16876 91.857)');
 });
 
 test('formatOklch: alpha emitted only below 1', () => {
   const red = rgbToOklch(255, 0, 0);
-  assert.equal(formatOklch(red, 0.5), 'oklch(62.8% 0.258 29.23 / 0.5)');
-  assert.equal(formatOklch(red, 1), 'oklch(62.8% 0.258 29.23)');
-  assert.equal(formatOklch(red), 'oklch(62.8% 0.258 29.23)');
+  assert.equal(formatOklch(red, 0.5), 'oklch(62.7955% 0.25768 29.234 / 0.5)');
+  assert.equal(formatOklch(red, 1), 'oklch(62.7955% 0.25768 29.234)');
+  assert.equal(formatOklch(red), 'oklch(62.7955% 0.25768 29.234)');
 });
 
 test('formatLch: alpha emitted only below 1', () => {
   const red = rgbToLch(255, 0, 0);
-  assert.equal(formatLch(red, 0.5), 'lch(54.29% 106.85 40.86 / 0.5)');
-  assert.equal(formatLch(red, 1), 'lch(54.29% 106.85 40.86)');
+  assert.equal(formatLch(red, 0.5), 'lch(54.294% 106.852 40.855 / 0.5)');
+  assert.equal(formatLch(red, 1), 'lch(54.294% 106.852 40.855)');
 });
 
 test('rgbToLch: black and white anchor the L axis', () => {
@@ -58,7 +60,7 @@ test('rgbToLch: black and white anchor the L axis', () => {
   assert.ok(white.c < 0.05, String(white.c));
 });
 
-test('emitted oklch() re-parses to within 3 channel steps of the source', () => {
+test('emitted oklch() re-parses without drift (bound check; exact sweep lives in color-roundtrip)', () => {
   // Rounding in formatOklch (L 2dp, C 3dp) is lossy: a serialise/parse cycle can
   // shift a channel by up to 3/255. Pinned as a bound, because it is the reason
   // hex must stay the identity key even when oklch is the emitted form.
@@ -69,10 +71,10 @@ test('emitted oklch() re-parses to within 3 channel steps of the source', () => 
     assert.ok(back, `unparseable at ${r},${g},${b}`);
     worst = Math.max(worst, Math.abs(back.r - r), Math.abs(back.g - g), Math.abs(back.b - b));
   }
-  assert.ok(worst <= 3, `max channel drift ${worst}`);
+  assert.equal(worst, 0, `max channel drift ${worst}`);
 });
 
-test('emitted lch() re-parses to within 3 channel steps of the source', () => {
+test('emitted lch() re-parses without drift (bound check; exact sweep lives in color-roundtrip)', () => {
   let worst = 0;
   for (let i = 0; i < 600; i++) {
     const r = (i * 89) % 256, g = (i * 41) % 256, b = (i * 17) % 256;
@@ -80,15 +82,15 @@ test('emitted lch() re-parses to within 3 channel steps of the source', () => {
     assert.ok(back, `unparseable at ${r},${g},${b}`);
     worst = Math.max(worst, Math.abs(back.r - r), Math.abs(back.g - g), Math.abs(back.b - b));
   }
-  assert.ok(worst <= 3, `max channel drift ${worst}`);
+  assert.equal(worst, 0, `max channel drift ${worst}`);
 });
 
 test('convertColor emits all four notations for one input', () => {
   const c = convertColor('#1a73e8');
   assert.equal(c.hex, '#1a73e8');
   assert.equal(c.rgb, 'rgb(26, 115, 232)');
-  assert.equal(c.oklch, 'oklch(57.37% 0.195 257.86)');
-  assert.equal(c.lch, 'lch(48.77% 68.14 278.17)');
+  assert.equal(c.oklch, 'oklch(57.3697% 0.1946 257.858)');
+  assert.equal(c.lch, 'lch(48.773% 68.144 278.173)');
   assert.equal(c.hasAlpha, false);
 });
 
@@ -96,8 +98,8 @@ test('convertColor carries alpha into every notation', () => {
   const c = convertColor('rgba(26, 115, 232, 0.4)');
   assert.equal(c.hex, '#1a73e8');
   assert.equal(c.rgb, 'rgba(26, 115, 232, 0.4)');
-  assert.equal(c.oklch, 'oklch(57.37% 0.195 257.86 / 0.4)');
-  assert.equal(c.lch, 'lch(48.77% 68.14 278.17 / 0.4)');
+  assert.equal(c.oklch, 'oklch(57.3697% 0.1946 257.858 / 0.4)');
+  assert.equal(c.lch, 'lch(48.773% 68.144 278.173 / 0.4)');
   assert.equal(c.hasAlpha, true);
 });
 
@@ -131,8 +133,8 @@ test('convertColor returns null rather than a partial record', () => {
 test('formatColor renders each notation from one input', () => {
   assert.equal(formatColor('#1a73e8', 'hex'), '#1a73e8');
   assert.equal(formatColor('#1a73e8', 'rgb'), 'rgb(26, 115, 232)');
-  assert.equal(formatColor('#1a73e8', 'oklch'), 'oklch(57.37% 0.195 257.86)');
-  assert.equal(formatColor('#1a73e8', 'lch'), 'lch(48.77% 68.14 278.17)');
+  assert.equal(formatColor('#1a73e8', 'oklch'), 'oklch(57.3697% 0.1946 257.858)');
+  assert.equal(formatColor('#1a73e8', 'lch'), 'lch(48.773% 68.144 278.173)');
 });
 
 test('formatColor defaults to hex', () => {
@@ -154,7 +156,7 @@ test('formatColor returns unparseable input verbatim instead of dropping it', ()
 
 test('formatColor preserves alpha in every computed notation', () => {
   assert.equal(formatColor('rgba(26, 115, 232, 0.4)', 'rgb'), 'rgba(26, 115, 232, 0.4)');
-  assert.equal(formatColor('rgba(26, 115, 232, 0.4)', 'oklch'), 'oklch(57.37% 0.195 257.86 / 0.4)');
+  assert.equal(formatColor('rgba(26, 115, 232, 0.4)', 'oklch'), 'oklch(57.3697% 0.1946 257.858 / 0.4)');
   // hex is the opaque identity, so alpha is intentionally dropped there.
   assert.equal(formatColor('rgba(26, 115, 232, 0.4)', 'hex'), '#1a73e8');
 });
