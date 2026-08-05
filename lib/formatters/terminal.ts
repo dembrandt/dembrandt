@@ -9,6 +9,7 @@ import type { BrandingResult } from '../types.js';
 import chalk from 'chalk';
 import { color } from './theme.js';
 import { convertColor } from '../colors.js';
+import type { ColorFormat } from '../colors.js';
 
 /**
  * Creates a clickable terminal link using ANSI escape codes
@@ -26,7 +27,7 @@ export function terminalLink(url, text = url) {
  * Main display function - outputs formatted extraction results to terminal
  * @param {Object} data - Extraction results from extractBranding()
  */
-export function displayResults(data: BrandingResult) {
+export function displayResults(data: BrandingResult, options: { colorFormat?: ColorFormat } = {}) {
   console.log('\n' + chalk.bold.cyan('🎨 Brand Extraction'));
   console.log(chalk.dim('│'));
   console.log(chalk.dim('├─') + ' ' + chalk.blue(terminalLink(data.url)));
@@ -43,7 +44,7 @@ export function displayResults(data: BrandingResult) {
 
   displayLogo(data.logo);
   displayFavicons(data.favicons);
-  displayColors(data.colors);
+  displayColors(data.colors, options.colorFormat || 'hex');
   displayTypography(data.typography);
   displaySpacing(data.spacing);
   displayBorderRadius(data.borderRadius);
@@ -126,7 +127,7 @@ function normalizeColorFormat(colorString) {
   };
 }
 
-function displayColors(colors) {
+function displayColors(colors, colorFormat: ColorFormat = 'hex') {
   console.log(chalk.dim('├─') + ' ' + chalk.bold('Colors'));
 
   // All colors in one list with consistent formatting
@@ -144,6 +145,8 @@ function displayColors(colors) {
           lch: formats.lch,
           oklch: formats.oklch,
           hasAlpha: formats.hasAlpha,
+          source: String(color),
+          sourceRank: 1,
           label: role,
           type: 'semantic',
           confidence: 'high'
@@ -167,6 +170,8 @@ function displayColors(colors) {
           lch: (typeof varData === 'object' && varData.lch) || formats.lch,
           oklch: (typeof varData === 'object' && varData.oklch) || formats.oklch,
           hasAlpha: formats.hasAlpha,
+          source: String(colorValue),
+          sourceRank: 2,
           label: name,
           type: 'variable',
           confidence: 'high'
@@ -190,6 +195,8 @@ function displayColors(colors) {
         lch: c.lch || formats.lch,
         oklch: c.oklch || formats.oklch,
         hasAlpha: formats.hasAlpha,
+        source: String(c.color),
+        sourceRank: 1,
         label: '',
         type: 'palette',
         confidence: c.confidence,
@@ -216,6 +223,12 @@ function displayColors(colors) {
           existing.label = `${existing.label}, ${color.label}`;
         }
       }
+      // A declared custom property is the only true authored notation, so it
+      // outranks a computed value when both collapse to the same hex.
+      if (color.source && (color.sourceRank || 0) > (existing.sourceRank || 0)) {
+        existing.source = color.source;
+        existing.sourceRank = color.sourceRank;
+      }
       // Keep highest confidence
       const confidenceOrder = { high: 3, medium: 2, low: 1 };
       if (confidenceOrder[color.confidence] > confidenceOrder[existing.confidence]) {
@@ -230,7 +243,19 @@ function displayColors(colors) {
 
   // Display each color on a single line: swatch, hex, role, rgb, oklch.
   // lch is omitted here for compactness but remains in JSON output.
-  uniqueColors.forEach(({ hex, rgb, label, confidence, role, onColor, hover }, index) => {
+  const primaryOf = (c) => {
+    const notations = { hex: c.hex, rgb: c.rgb, lch: c.lch, oklch: c.oklch, source: c.source || c.hex };
+    return notations[colorFormat] || c.hex;
+  };
+  const primaryWidth = Math.max(7, ...uniqueColors.map((c) => primaryOf(c).length));
+
+  uniqueColors.forEach((entry, index) => {
+    const { hex, rgb, label, confidence, role, onColor, hover } = entry;
+    // Primary column follows --color-format; the swatch stays on hex because
+    // chalk.bgHex needs one, and the identity column must remain stable.
+    const primary = primaryOf(entry).padEnd(primaryWidth);
+    // Secondary dim column never repeats the primary notation.
+    const secondary = colorFormat === 'rgb' ? hex : rgb;
     const isLast = index === uniqueColors.length - 1;
     const branch = isLast ? '└─' : '├─';
 
@@ -257,13 +282,13 @@ function displayColors(colors) {
     // extend and push the rgb column right rather than getting clipped.
     const rawLabel = label || (role && role !== 'palette' ? role : '');
     const labelText = chalk.dim(rawLabel.length > 15 ? rawLabel + ' ' : rawLabel.padEnd(15));
-    const rgbText = chalk.dim((rgb || '').padEnd(20));
+    const rgbText = chalk.dim((secondary || '').padEnd(20));
 
     const hoverText = (hover && role === 'accent') ? chalk.dim(` hover:${hover}`) : '';
 
     console.log(
       chalk.dim(`│  ${branch}`) + ' ' +
-      `${conf} ${swatch} ${hex}  ` +
+      `${conf} ${swatch} ${primary}  ` +
       labelText + ' ' +
       rgbText +
       onSwatch +
