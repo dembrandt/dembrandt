@@ -793,7 +793,10 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       guardExtractor('frameworks', detectFrameworks(page), [], extractorErrors),
       guardExtractor('siteName', extractSiteName(page), null, extractorErrors),
       guardExtractor('gradients', extractGradients(page), [], extractorErrors),
-      guardExtractor('motion', extractMotion(page), { durations: [], easings: [], byContext: {} }, extractorErrors),
+      // The fallback must satisfy Motion in full: the terminal renderer reads
+      // motion.animations, so a short default turned an extractor failure into a
+      // crash of the whole render.
+      guardExtractor('motion', extractMotion(page), { durations: [], easings: [], animations: [], contexts: {}, interactiveDeltas: [] }, extractorErrors),
     ]);
 
     const { logo, instances: logoInstances, favicons, manifest } = logoResult;

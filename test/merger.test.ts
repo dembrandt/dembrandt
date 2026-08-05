@@ -214,3 +214,159 @@ test('mergeResults sorts merged font urls so page order never reaches the output
     'https://a.test/d.woff2',
   ]);
 });
+
+// ─── Per-category union rules ────────────────────────────────────────────────
+// Everything below was previously unexercised: the crawl merge is the least
+// visible code path in the CLI (one flag, no CI coverage) and the most trusted,
+// since its output is what --save-output writes and what drift compares.
+
+test('typography styles dedup on family|size|weight and count occurrences', () => {
+  const style = (family, size, weight) => ({ context: 'body', family, size, weight });
+  const a = page('https://a.com/', { typography: { styles: [style('Inter', '16px', '400')], sources: { googleFonts: ['Inter'] } } });
+  const b = page('https://a.com/x', {
+    typography: {
+      styles: [style('Inter', '16px', '400'), style('Inter', '48px', '700')],
+      sources: { googleFonts: ['Lora'], fontDisplay: 'swap' },
+    },
+  });
+
+  const merged = mergeResults([a, b]);
+  assert.equal(merged.typography.styles.length, 2, 'identical tuples collapse');
+  const body = merged.typography.styles.find(s => s.size === '16px');
+  assert.equal(body.count, 2, 'repeat across pages is counted');
+  assert.deepEqual(merged.typography.sources.googleFonts, ['Inter', 'Lora'], 'font source arrays union');
+  assert.equal(merged.typography.sources.fontDisplay, 'swap', 'a scalar the home page lacked is adopted');
+});
+
+test('spacing values union by px and sum counts', () => {
+  const a = page('https://a.com/', { spacing: { scaleType: '8px', commonValues: [{ px: '16px', count: 4 }] } });
+  const b = page('https://a.com/x', { spacing: { scaleType: '8px', commonValues: [{ px: '16px', count: 3 }, { px: '24px', count: 9 }] } });
+
+  const merged = mergeResults([a, b]);
+  assert.equal(merged.spacing.scaleType, '8px', 'home scale type wins');
+  const px16 = merged.spacing.commonValues.find(v => v.px === '16px');
+  assert.equal(px16.count, 7);
+  assert.equal(merged.spacing.commonValues[0].px, '24px', 'sorted by count desc');
+});
+
+test('border radius confidence is recomputed from the aggregated count', () => {
+  // A value that is low-confidence on every page can be high-confidence across
+  // the site. This promotion is the whole point of crawling.
+  const a = page('https://a.com/', { borderRadius: { values: [{ value: '8px', count: 6, confidence: 'low' }] } });
+  const b = page('https://a.com/x', { borderRadius: { values: [{ value: '8px', count: 6, confidence: 'low' }] } });
+
+  const merged = mergeResults([a, b]);
+  const r = merged.borderRadius.values[0];
+  assert.equal(r.count, 12);
+  assert.equal(r.confidence, 'high', 'count > 10 promotes to high');
+});
+
+test('borders union on width|style|color, cap elements at 5 and promote confidence', () => {
+  const combo = (count, elements) => ({ width: '1px', style: 'solid', color: '#242424', count, elements, confidence: 'low' });
+  const a = page('https://a.com/', { borders: { combinations: [combo(3, ['div', 'span', 'a'])] } });
+  const b = page('https://a.com/x', { borders: { combinations: [combo(9, ['section', 'footer', 'nav'])] } });
+
+  const merged = mergeResults([a, b]);
+  const c = merged.borders.combinations[0];
+  assert.equal(c.count, 12);
+  assert.equal(c.confidence, 'high');
+  assert.equal(c.elements.length, 5, 'element list is capped');
+});
+
+test('shadows union on the shadow string and recompute confidence', () => {
+  const a = page('https://a.com/', { shadows: [{ shadow: '0 1px 2px #000', count: 2, confidence: 'low' }] });
+  const b = page('https://a.com/x', { shadows: [{ shadow: '0 1px 2px #000', count: 3, confidence: 'low' }, { shadow: '0 0 0 red', count: 1 }] });
+
+  const merged = mergeResults([a, b]);
+  assert.equal(merged.shadows.length, 2);
+  assert.equal(merged.shadows[0].count, 5);
+  assert.equal(merged.shadows[0].confidence, 'medium', 'count > 3 but <= 10');
+});
+
+test('components dedup by fingerprint and sum counts', () => {
+  const btn = (bg) => ({ variant: 'primary', backgroundColor: bg, color: '#fff', borderRadius: '8px' });
+  const a = page('https://a.com/', { components: { buttons: [btn('#1a73e8')], inputs: {}, links: [], badges: {} } });
+  const b = page('https://a.com/x', { components: { buttons: [btn('#1a73e8'), btn('#ff0000')], inputs: {}, links: [], badges: {} } });
+
+  const merged = mergeResults([a, b]);
+  assert.equal(merged.components.buttons.length, 2, 'identical buttons collapse');
+  assert.equal(merged.components.buttons[0].count, 2, 'the repeated variant leads');
+});
+
+test('grouped components keep their grouping keys through the merge', () => {
+  const inputs = { text: [{ backgroundColor: '#fff', borderColor: '#ddd' }], checkbox: [{ backgroundColor: '#fff' }] };
+  const badges = { all: [{ backgroundColor: '#ffd230' }], byVariant: { error: [{ backgroundColor: '#ff0000' }] } };
+  const a = page('https://a.com/', { components: { buttons: [], links: [], inputs, badges } });
+  const b = page('https://a.com/x', { components: { buttons: [], links: [], inputs, badges } });
+
+  const merged = mergeResults([a, b]);
+  assert.ok(Array.isArray(merged.components.inputs.text), 'text group survives');
+  assert.ok(Array.isArray(merged.components.inputs.checkbox), 'checkbox group survives');
+  assert.equal(merged.components.inputs.text[0].count, 2);
+  assert.ok(Array.isArray(merged.components.badges.byVariant.error), 'nested byVariant group survives');
+});
+
+test('icon systems and frameworks dedup by name, first occurrence wins', () => {
+  const a = page('https://a.com/', { iconSystem: [{ name: 'Heroicons', type: 'svg' }], frameworks: [{ name: 'Tailwind', confidence: 'high' }] });
+  const b = page('https://a.com/x', { iconSystem: [{ name: 'Heroicons', type: 'font' }], frameworks: [{ name: 'Tailwind', confidence: 'low' }, { name: 'MUI' }] });
+
+  const merged = mergeResults([a, b]);
+  assert.equal(merged.iconSystem.length, 1);
+  assert.equal(merged.iconSystem[0].type, 'svg', 'home page detection is kept');
+  assert.deepEqual(merged.frameworks.map(f => f.name), ['Tailwind', 'MUI']);
+});
+
+test('motion unions durations by value, easings and animations by count', () => {
+  const a = page('https://a.com/', {
+    motion: { durations: [{ value: '150ms', ms: 150, count: 1 }], easings: [{ value: 'ease-out', count: 1 }], animations: [{ name: 'fade', count: 1 }], contexts: {}, interactiveDeltas: [] },
+  });
+  const b = page('https://a.com/x', {
+    motion: { durations: [{ value: '150ms', ms: 150, count: 2 }, { value: '80ms', ms: 80, count: 1 }], easings: [{ value: 'ease-out', count: 4 }], animations: [{ name: 'fade', count: 2 }], contexts: {}, interactiveDeltas: [] },
+  });
+
+  const merged = mergeResults([a, b]);
+  assert.deepEqual(merged.motion.durations.map(d => d.value), ['80ms', '150ms'], 'durations sort fastest first');
+  assert.equal(merged.motion.durations.find(d => d.value === '150ms').count, 3);
+  assert.equal(merged.motion.easings[0].count, 5);
+  assert.equal(merged.motion.animations[0].count, 3);
+});
+
+test('wcag pairs dedup order-insensitively and state pairs stay separate', () => {
+  const a = page('https://a.com/', { wcag: [{ fg: '#fff', bg: '#000', ratio: 21, aa: true, count: 2 }] });
+  const b = page('https://a.com/x', {
+    wcag: [
+      { fg: '#000', bg: '#fff', ratio: 21, aa: true, count: 3 },
+      { fg: '#fff', bg: '#000', ratio: 21, aa: true, count: 1, source: 'state', state: 'hover', tag: 'a' },
+    ],
+  });
+
+  const merged = mergeResults([a, b]);
+  const statics = merged.wcag.filter(p => !p.source);
+  assert.equal(statics.length, 1, 'fg/bg swapped is the same pair');
+  assert.equal(statics[0].count, 5);
+  assert.equal(merged.wcag.filter(p => p.source === 'state').length, 1, 'state pair is not folded into the static one');
+  assert.equal(merged.wcag[merged.wcag.length - 1].source, 'state', 'state pairs are appended last');
+});
+
+test('gradients union on the gradient string', () => {
+  const g = { gradient: 'linear-gradient(#000, #fff)', type: 'linear-gradient', count: 1 };
+  const merged = mergeResults([
+    page('https://a.com/', { gradients: [{ ...g }] }),
+    page('https://a.com/x', { gradients: [{ ...g }] }),
+  ]);
+  assert.equal(merged.gradients.length, 1);
+  assert.equal(merged.gradients[0].count, 2);
+});
+
+test('a page missing whole sections does not break the merge', () => {
+  // Pages fail individually during a crawl and are pushed with whatever the
+  // guarded extractors returned, so absent sections are normal input here.
+  const merged = mergeResults([
+    page('https://a.com/'),
+    { url: 'https://a.com/x', extractedAt: 't' },
+  ] as never);
+  assert.equal(merged.pages.length, 2, 'both pages are recorded');
+  assert.ok(Array.isArray(merged.shadows));
+  assert.ok(Array.isArray(merged.colors.palette));
+  assert.ok(Array.isArray(merged.components.buttons));
+});
