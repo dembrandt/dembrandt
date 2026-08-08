@@ -298,6 +298,13 @@ export interface ExtractionMeta {
    * anything pinning or deduping snapshots must use this, not a time.
    */
   snapshotId?: string;
+  /**
+   * HTTP status of the page.goto() navigation response. Null when Playwright
+   * returns no response (e.g. same-document navigation). A bot wall or WAF
+   * error page still yields a syntactically valid extraction, so this is
+   * consumers' only signal to distinguish a genuine brand from an error page.
+   */
+  httpStatus?: number | null;
   /** Provenance: the CLI release that produced this. Doubles as source.cliVersion. */
   dembrandtVersion?: string | null;
   /**

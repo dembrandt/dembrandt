@@ -442,16 +442,18 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
   try {
     let attempts = 0;
     const maxAttempts = 2;
+    let lastNavigationStatus: number | null = null;
 
     while (attempts < maxAttempts) {
       attempts++;
       spinner.text = `Navigating to ${url} (attempt ${attempts}/${maxAttempts})...`;
       try {
         const initialUrl = url;
-        await page.goto(url, {
+        const navigationResponse = await page.goto(url, {
           waitUntil: "domcontentloaded",
           timeout: (options.navigationTimeout || 20000) * timeoutMultiplier,
         });
+        lastNavigationStatus = navigationResponse ? navigationResponse.status() : null;
         const finalUrl = page.url();
 
         if (initialUrl !== finalUrl) {
@@ -1347,6 +1349,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       extractedAt: new Date().toISOString(),
       meta: {
         snapshotId: randomUUID(),
+        httpStatus: lastNavigationStatus,
         dembrandtVersion: options._version || null,
         schemaVersion: SCHEMA_VERSION,
         viewport: { width: screenW, height: screenH },

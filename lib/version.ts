@@ -36,6 +36,11 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.5.0 — meta gains httpStatus (the page.goto() navigation response status;
+ *          null when Playwright returns no response). Lets consumers reject
+ *          extractions that came from a bot-wall/WAF error page instead of
+ *          persisting a styled 403/404 as if it were the real brand.
+ *          Additive: 1.4.x consumers ignore it.
  *  1.4.0 — colors.cssVariables entries gain `hex` (parseable identity beside
  *          the authored token value, which may be a modern colour function).
  *          Additive: 1.3.x consumers ignore it. BEHAVIOR: modern CSS colour
@@ -66,7 +71,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.4.0';
+export const SCHEMA_VERSION = '1.5.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
