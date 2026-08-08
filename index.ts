@@ -173,7 +173,7 @@ program
             // browser *binary*, which only surfaces here, as raw Playwright
             // text. Translate it into our own instruction instead.
             if (/Executable doesn't exist/i.test(launchErr?.message ?? "")) {
-              throw new PlaywrightMissingError();
+              throw new PlaywrightMissingError(opts.browser === 'firefox' ? 'firefox' : 'chromium');
             }
             throw launchErr;
           }

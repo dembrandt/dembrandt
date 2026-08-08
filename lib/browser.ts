@@ -12,8 +12,13 @@
  */
 
 export class PlaywrightMissingError extends Error {
-  constructor() {
-    super('browser engine not available, run: dembrandt install-browser');
+  /**
+   * Names the engine in the recovery command. `install-browser` defaults to
+   * chromium, so a bare hint sends a `--browser firefox` user to a command that
+   * reinstalls chromium and leaves them on the identical error.
+   */
+  constructor(engine = 'chromium') {
+    super(`browser engine not available, run: dembrandt install-browser ${engine}`);
     this.name = 'PlaywrightMissingError';
   }
 }
