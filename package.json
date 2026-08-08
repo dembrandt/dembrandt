@@ -18,6 +18,18 @@
       "types": "./dist/lib/dtcg/validate.d.ts",
       "default": "./dist/lib/dtcg/validate.js"
     },
+    "./dtcg-export": {
+      "types": "./dist/lib/formatters/dtcg.d.ts",
+      "require": "./dist/lib/formatters/dtcg.js",
+      "import": "./dist/lib/formatters/dtcg.js",
+      "default": "./dist/lib/formatters/dtcg.js"
+    },
+    "./version": {
+      "types": "./dist/lib/version.d.ts",
+      "require": "./dist/lib/version.js",
+      "import": "./dist/lib/version.js",
+      "default": "./dist/lib/version.js"
+    },
     "./drift": {
       "types": "./dist/lib/drift.d.ts",
       "require": "./dist/lib/drift.js",
