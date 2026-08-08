@@ -11,13 +11,19 @@ Extract a website's design system into design tokens in a few seconds: logo, col
 
 ## Install
 
-Install globally: `npm install -g dembrandt`
-
 ```bash
+npm install -g dembrandt
+dembrandt install-browser        # one-time: fetches the matching Chromium
 dembrandt dembrandt.com
 ```
 
-Or use npx without installing: `npx dembrandt dembrandt.com`
+The browser step is required. dembrandt drives Chromium through `playwright-core`,
+which ships no browser binaries, so a fresh install has nothing to launch until you
+run it. Skipping it fails with `browser engine not available`.
+
+Or use npx without installing: `npx dembrandt dembrandt.com`. The browser step applies
+here too — run `npx dembrandt install-browser` first. Browsers land in a shared
+Playwright cache, so either route only needs it once.
 
 Requires Node.js 18+
 
@@ -62,7 +68,7 @@ Load extractions, track token drift, and compare snapshots. **[dembrandt.com/app
 * **Copy tokens.** Paste values straight into Copilot, Claude, or Cursor.
 * **No login required for local use.** Data stays in the browser. Sign in with GitHub to enable cloud sync.
 
-## Recipes
+## Recipe library
 
 **[dembrandt.com/recipes](https://www.dembrandt.com/recipes)** — ready-to-run workflows. Copy a command, paste a prompt, get a result. Covers competitor benchmarking, WCAG audits, CI/CD drift detection, Figma token push, and agentic design system builds. Filterable by role.
 
@@ -136,6 +142,9 @@ Pages are fetched sequentially with polite delays. Failed pages are skipped with
 By default, dembrandt uses Chromium. If you encounter bot detection or timeouts (especially on sites behind Cloudflare), try Firefox which is often more successful at bypassing these protections:
 
 ```bash
+# One-time: install-browser defaults to chromium, so fetch firefox explicitly
+dembrandt install-browser firefox
+
 # Use Firefox instead of Chromium
 dembrandt dembrandt.com --browser=firefox
 

@@ -28,10 +28,16 @@ classDiagram
   }
 
   class ExtractionMeta {
+    +string snapshotId
+    +number httpStatus
     +string dembrandtVersion
     +string schemaVersion
     +Record flags
+    +Viewport viewport
+    +boolean fontsReady
+    +string[] pendingFonts
     +string[] degraded
+    +ExtractorError[] errors
   }
   class Colors {
     +PaletteColor[] palette
