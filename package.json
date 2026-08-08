@@ -18,6 +18,18 @@
       "types": "./dist/lib/dtcg/validate.d.ts",
       "default": "./dist/lib/dtcg/validate.js"
     },
+    "./colors": {
+      "types": "./dist/lib/colors.d.ts",
+      "require": "./dist/lib/colors.js",
+      "import": "./dist/lib/colors.js",
+      "default": "./dist/lib/colors.js"
+    },
+    "./markdown": {
+      "types": "./dist/lib/formatters/markdown.d.ts",
+      "require": "./dist/lib/formatters/markdown.js",
+      "import": "./dist/lib/formatters/markdown.js",
+      "default": "./dist/lib/formatters/markdown.js"
+    },
     "./dtcg-export": {
       "types": "./dist/lib/formatters/dtcg.d.ts",
       "require": "./dist/lib/formatters/dtcg.js",
