@@ -4,10 +4,14 @@
 
 ### Added
 - `typography.sources.urls` lists the resolved http(s) font asset and webfont-provider stylesheet URLs seen during extraction, sorted and deduped, so a consumer can re-fetch or verify the real font files (#147)
+- `--tailwind [path]` writes a Tailwind v4 `@theme` CSS file. Observed values only: no shade ramps, no interpolated scale steps, no derived states. Colors keep their semantic role or the page's own custom property name; spacing collapses to v4's `--spacing` multiplier when the page has a base-N rhythm
+- `npm run tailwind:check` and a weekly `Tailwind Watch` workflow open an issue when a new Tailwind major is published, which is the only event that can invalidate the emitted theme namespaces
 
 ### Changed
 - Output contract bumped to schema 1.6.0 for that field. Additive: 1.5.x consumers ignore it, and the drift engine does not read it, so no baseline churn
 - Merged multi-page runs sort the font URL union, so page order cannot reach the output
+
+## [0.25.1] - 2026-07-28
 
 ### Fixed
 - The main entry and the `./dtcg` and `./normalize` subpaths now declare their type definitions. `dist` already shipped the `.d.ts` files, but without a `types` condition consumers importing `dembrandt` resolved no types at all

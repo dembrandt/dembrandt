@@ -1,0 +1,68 @@
+name: Tailwind Watch
+
+# The --tailwind export writes text, so a Tailwind release cannot break the
+# build. Only a new major can invalidate the theme namespaces it emits. This
+# checks weekly and opens an issue when that happens.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Check published Tailwind major
+        id: check
+        run: |
+          set +e
+          out=$(node tools/tailwind-check.mjs 2>&1)
+          code=$?
+          echo "$out"
+          {
+            echo "report<<EOF"
+            echo "$out"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Open issue on new major
+        if: steps.check.outputs.code == '1'
+        uses: actions/github-script@v8
+        env:
+          REPORT: ${{ steps.check.outputs.report }}
+        with:
+          script: |
+            const title = 'Tailwind: new major published, review --tailwind export';
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'tailwind-watch',
+            });
+            if (existing.data.some(i => i.title === title)) return;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              labels: ['tailwind-watch'],
+              body: '```\n' + process.env.REPORT + '\n```',
+            });
+
+      - name: Fail on check error
+        if: steps.check.outputs.code == '2'
+        run: exit 1

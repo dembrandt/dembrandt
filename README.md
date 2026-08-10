@@ -97,6 +97,7 @@ dembrandt dembrandt.com --mobile        # Use mobile viewport (390x844) for resp
 dembrandt dembrandt.com --slow          # 3x longer timeouts (24s hydration) for JavaScript-heavy sites
 dembrandt dembrandt.com --brand-guide   # Generate a brand guide PDF
 dembrandt dembrandt.com --design-md     # Generate a DESIGN.md file for AI agents
+dembrandt dembrandt.com --tailwind      # Write a Tailwind v4 @theme CSS file (observed values only)
 dembrandt dembrandt.com /pricing /docs  # Extract specific paths and merge results into one output
 dembrandt dembrandt.com --crawl 5       # Analyze 5 pages (homepage + 4 discovered pages), merges results
 dembrandt dembrandt.com --sitemap       # Discover pages from sitemap.xml instead of DOM links
@@ -207,6 +208,36 @@ dembrandt dembrandt.com --design-md
 ```
 
 DESIGN.md reports only what Dembrandt observed on the source site. Exact values (colors, typography, spacing, radii, shadows) live in the YAML front matter when available, and the Markdown body adds human-readable context. Sections with no extracted evidence are omitted rather than filled with invented defaults. For example, the elevation section is dropped when the site uses no box-shadow tokens.
+
+### Tailwind theme
+
+Use `--tailwind` to write a Tailwind v4 `@theme` block you can drop into a new project's CSS entry point.
+
+```bash
+dembrandt dembrandt.com --tailwind
+# Saves to: output/dembrandt.com/theme.css
+
+dembrandt dembrandt.com --tailwind src/app.css   # or write it straight into a project
+```
+
+```css
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #ea580c;
+  --text-display: 96px;
+  --text-display--line-height: 1;
+  --spacing: 8px;
+  --radius-lg: 8px;
+  --breakpoint-md: 700px;
+}
+```
+
+The file contains **only values observed on the page**. No 50–950 shade ramps, no interpolated scale steps, no derived hover or on-color variants: an invented shade is indistinguishable from a measured one once it is in the file, and this export is meant as the starting point you extend by hand. Colors keep their semantic role name (`--color-primary`), or the author's own custom property name where the page declares one; the rest are numbered `--color-brand-N`. Tailwind's defaults still apply to everything not listed, so the block extends the theme rather than replacing it.
+
+Spacing is emitted as v4's `--spacing` multiplier when the page has a recognizable base-N rhythm, and as named steps otherwise. Values with a usage count (spacing, radii) are selected by how often they appear, not by size, so sub-pixel one-offs stay out of the scale.
+
+v4 only. The output is plain CSS custom properties, so nothing here depends on or pins Tailwind; a v3 `tailwind.config.js` emitter would be a second serialization of the same data and is not written until someone needs it. A scheduled `Tailwind Watch` workflow runs `npm run tailwind:check` weekly and opens an issue if a new Tailwind major lands, since that is the only event that can invalidate the theme namespaces used here.
 
 ### WCAG Contrast Analysis
 

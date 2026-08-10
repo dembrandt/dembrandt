@@ -94,7 +94,8 @@
     "build": "rm -rf dist && tsc && cp package.json dist/package.json && mkdir -p dist/lib/ml && cp lib/ml/model.onnx lib/ml/meta.json dist/lib/ml/",
     "lint": "eslint . --max-warnings 0",
     "liveness": "npm run build && node test/liveness.mjs sites-smoke.json",
-    "release:churn": "npm run build && node tools/release-churn.mjs"
+    "release:churn": "npm run build && node tools/release-churn.mjs",
+    "tailwind:check": "node tools/tailwind-check.mjs"
   },
   "keywords": [
     "design-tokens",
