@@ -298,6 +298,15 @@ test('generateTailwindTheme drops no-op shadow layers and orders by depth', () =
   assert.equal(css.includes('rgba(0, 0, 0, 0)'), false);
 });
 
+test('generateTailwindTheme carries the evidence for the manual check', () => {
+  const css = generateTailwindTheme(sample);
+
+  // The file is a draft to verify, so a token states what it is standing on.
+  assert.match(css, /--color-brand-orange: #e8590c;\s+\/\* css variable, 40x, high confidence \*\//);
+  assert.match(css, /--radius-sm: 8px;\s+\/\* 10x \*\//);
+  assert.match(css, /draft to check, not a source of truth/);
+});
+
 test('generateTailwindTheme degrades to a valid file on an empty extraction', () => {
   const css = generateTailwindTheme({ url: 'https://example.com' });
 

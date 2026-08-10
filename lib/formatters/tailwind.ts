@@ -161,6 +161,10 @@ function buildHeader(result: TailwindThemeInput): string {
     ' * Observed values only. Every token below was measured on the page; no',
     ' * shades, states or scale steps were generated. Tailwind defaults still',
     ' * apply for anything not listed here, so extend rather than replace.',
+    ' *',
+    ' * This is a draft to check, not a source of truth. Each token carries the',
+    ' * evidence behind it; read down the counts and drop what the page only did',
+    ' * once before you build on this file.',
     ' */',
   ]
     .filter((line): line is string => line !== null)
@@ -209,7 +213,8 @@ function buildColors(result: TailwindThemeInput): ThemeEntry[] {
 
     const authoredName = authored.get(hex);
     const before = entries.length;
-    add(authoredName ?? `brand-${counter + 1}`, hex, authoredName ? 'css variable' : 'palette');
+    const source = authoredName ? 'css variable' : 'palette';
+    add(authoredName ?? `brand-${counter + 1}`, hex, `${source}, ${evidenceOf(entry)}`);
     if (entries.length > before && !authoredName) counter++;
   }
 
@@ -374,8 +379,15 @@ function buildSpacing(result: TailwindThemeInput): ThemeEntry[] {
   if (base) return [{ name: '--spacing', value: `${base[1]}px`, note: `${scaleType} scale` }];
 
   const names = ['xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl'];
-  return mostUsed(result.spacing?.commonValues ?? [], entry => entry?.display ?? entry?.px, names.length)
-    .map((value, i) => ({ name: `--spacing-${names[i]}`, value }));
+  return mostUsed(
+    result.spacing?.commonValues ?? [],
+    entry => entry?.display ?? entry?.px,
+    names.length
+  ).map((observed, i) => ({
+    name: `--spacing-${names[i]}`,
+    value: observed.value,
+    note: evidenceOf(observed),
+  }));
 }
 
 function buildRadius(result: TailwindThemeInput): ThemeEntry[] {
@@ -386,16 +398,19 @@ function buildRadius(result: TailwindThemeInput): ThemeEntry[] {
   // 0 and the pill radius are shapes, not scale steps: they keep Tailwind's own
   // names and stay out of the sm..xl ordering.
   const isShape = (value: string): boolean => value === '0px' || parseFloat(value) >= 999;
-  const shapes = mostUsed(observed, entry => entry?.value, Infinity).filter(isShape);
-  const pill = shapes.find(value => value !== '0px');
+  const shapes = mostUsed(observed, entry => entry?.value, Infinity).filter(shape =>
+    isShape(shape.value)
+  );
+  const square = shapes.find(shape => shape.value === '0px');
+  const pill = shapes.find(shape => shape.value !== '0px');
 
-  if (shapes.includes('0px')) entries.push({ name: '--radius-none', value: '0px' });
+  if (square) entries.push({ name: '--radius-none', value: '0px', note: evidenceOf(square) });
 
-  mostUsed(observed, entry => entry?.value, names.length, isShape).forEach((value, i) =>
-    entries.push({ name: `--radius-${names[i]}`, value })
+  mostUsed(observed, entry => entry?.value, names.length, isShape).forEach((radius, i) =>
+    entries.push({ name: `--radius-${names[i]}`, value: radius.value, note: evidenceOf(radius) })
   );
 
-  if (pill) entries.push({ name: '--radius-full', value: pill });
+  if (pill) entries.push({ name: '--radius-full', value: pill.value, note: evidenceOf(pill) });
 
   return entries;
 }
@@ -436,6 +451,24 @@ function buildBreakpoints(result: TailwindThemeInput): ThemeEntry[] {
 /** An observed value carrying how often it was seen on the page. */
 interface CountedValue {
   count?: number;
+  confidence?: string;
+}
+
+/**
+ * The evidence behind a value, rendered as its trailing comment.
+ *
+ * This export is a draft to check, not a source of truth: a token sitting on
+ * one element and a token sitting on two hundred look identical once they are
+ * both a hex in a CSS file. Carrying the count and confidence into the file is
+ * what makes the manual pass cheap.
+ */
+function evidenceOf(entry: CountedValue): string {
+  const parts = [
+    Number(entry?.count) > 0 ? `${entry.count}x` : null,
+    entry?.confidence ? `${entry.confidence} confidence` : null,
+  ].filter((part): part is string => part !== null);
+
+  return parts.length ? parts.join(', ') : 'observed';
 }
 
 /**
@@ -459,7 +492,7 @@ function mostUsed<T extends CountedValue>(
   read: (entry: T) => string | number | null | undefined,
   limit: number,
   exclude: (value: string) => boolean = () => false
-): string[] {
+): { value: string; count: number }[] {
   const counts = new Map<string, number>();
 
   for (const entry of observed) {
@@ -474,8 +507,8 @@ function mostUsed<T extends CountedValue>(
     .filter(([, count]) => count >= leader * MIN_USAGE_SHARE)
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
-    .map(([value]) => value)
-    .sort(byNumericValue);
+    .map(([value, count]) => ({ value, count }))
+    .sort((a, b) => byNumericValue(a.value, b.value));
 }
 
 /** Fallback families as a list, from either the joined string or an array. */
