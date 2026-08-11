@@ -88,12 +88,19 @@ jobs:
                config to `@theme`) is the shape of break to look for.
             3. Apply whatever the answer requires. If nothing moved, the only
                change is bumping `TAILWIND_TARGET_MAJOR`. If a namespace was
-               renamed or re-scoped, update the emitter and the tests in
-               `test/tailwind.test.ts` that pin the old spelling.
-            4. Run `npm run build` and `npm test`. Both must pass. Do not
-               weaken an assertion to make a test pass; if a test now fails
-               for a real reason, fix the emitter.
-            5. Open a PR on a branch named `dem-tailwind-v<major>`.
+               renamed or re-scoped, update the emitter, the tests in
+               `test/tailwind.test.ts` that pin the old spelling, and the
+               `UTILITY_FOR` mapping in `test/tailwind-compile.test.ts`.
+            4. Bump the `tailwindcss` and `@tailwindcss/cli` devDependencies to
+               the new major, pinned exactly, both on the same version. They
+               exist only so `test/tailwind-compile.test.ts` can run the real
+               compiler over the emitted theme; that test is the one that
+               actually proves the namespaces work, so it must pass on the new
+               major before you open the PR.
+            5. Run `npm run build`, `npm test` and `npm run lint`. All must
+               pass. Do not weaken an assertion to make a test pass; if a test
+               now fails for a real reason, fix the emitter.
+            6. Open a PR on a branch named `dem-tailwind-v<major>`.
 
             In the PR body, state plainly which namespaces you verified,
             which changed, and cite the doc page you checked each against. If
@@ -104,7 +111,7 @@ jobs:
             Repo conventions: no em dashes, no Co-Authored-By trailer, terse
             commit messages.
           claude_args: |
-            --allowed-tools Read,Edit,Write,WebFetch,WebSearch,Bash(npm run build),Bash(npm test),Bash(git *),Bash(gh pr create*)
+            --allowed-tools Read,Edit,Write,WebFetch,WebSearch,Bash(npm run build),Bash(npm test),Bash(npm run lint),Bash(npm i *),Bash(npm view *),Bash(git *),Bash(gh pr create*)
 
       # No agent credential, or the agent run failed: fall back to the issue so
       # the signal is never silently dropped.

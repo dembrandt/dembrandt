@@ -27,6 +27,14 @@ test('--help exits 0 and shows the extraction usage', () => {
   assert.match(r.stdout, /--dtcg/);
 });
 
+test('--tailwind is documented with its optional path', () => {
+  const r = run(['--help']);
+  assert.equal(r.status, 0);
+  // The path is optional: bare --tailwind writes output/<domain>/theme.css.
+  // Documenting it as required would send users to a nonexistent default.
+  assert.match(r.stdout, /--tailwind \[path\]/);
+});
+
 test('reveal is standard (no enable flag exposed)', () => {
   const r = run(['--help']);
   assert.equal(r.status, 0);

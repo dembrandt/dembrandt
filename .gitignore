@@ -39,3 +39,6 @@ npm-debug.log*
 
 # OS
 .DS_Store
+
+# scratch projects from test/tailwind-compile.test.ts
+.tailwind-compile-*
