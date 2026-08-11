@@ -57,20 +57,42 @@ jobs:
         run: echo "::warning::tailwind-check could not reach the registry; retrying next run."
 
       - name: Install dependencies
-        if: steps.check.outputs.code == '1' && env.HAS_AGENT == 'true'
         run: npm ci
 
-      - name: Update the emitter for the new major
+      # The compile tests pin tailwindcss exactly, so they only ever exercise
+      # the version we froze. A minor that changes what a namespace means would
+      # otherwise be seen by nothing: tailwind-check watches majors, and the
+      # export pins nothing at runtime. This runs the same tests against the
+      # published latest without moving the pin, so the pin stays a deliberate
+      # choice rather than a blind spot.
+      - name: Compile the emitted theme against the latest Tailwind
+        id: latest
+        continue-on-error: true
+        run: |
+          npm i --no-save tailwindcss@latest @tailwindcss/cli@latest
+          npm run build
+          node --test dist/test/tailwind-compile.test.js dist/test/tailwind-fixtures.test.js
+
+      - name: Update the emitter
         id: agent
-        if: steps.check.outputs.code == '1' && env.HAS_AGENT == 'true'
+        if: (steps.check.outputs.code == '1' || steps.latest.outcome == 'failure') && env.HAS_AGENT == 'true'
         uses: anthropics/claude-code-action@v1
         continue-on-error: true
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            A new major of tailwindcss has been published. The watcher reported:
+            One of two things happened: tailwindcss published a new major, or
+            the emitted theme stopped compiling cleanly against the latest
+            published Tailwind. Check which before assuming.
+
+            Major check (exit 1 means a new major, 0 means still in sync):
 
             ${{ steps.check.outputs.report }}
+
+            Compile against latest: ${{ steps.latest.outcome }}. If that says
+            `failure`, read the job log for the assertion that broke. A minor
+            can change what a namespace means without renaming it, and that
+            failure is the only signal we get for it.
 
             The `--tailwind` export in `lib/formatters/tailwind.ts` emits a v4
             `@theme` block. Your job is to find out whether the new major
@@ -115,14 +137,15 @@ jobs:
 
       # No agent credential, or the agent run failed: fall back to the issue so
       # the signal is never silently dropped.
-      - name: Open issue on new major
-        if: steps.check.outputs.code == '1' && (env.HAS_AGENT != 'true' || steps.agent.outcome == 'failure')
+      - name: Open issue
+        if: (steps.check.outputs.code == '1' || steps.latest.outcome == 'failure') && (env.HAS_AGENT != 'true' || steps.agent.outcome == 'failure')
         env:
           REPORT: ${{ steps.check.outputs.report }}
+          LATEST: ${{ steps.latest.outcome }}
         uses: actions/github-script@v8
         with:
           script: |
-            const title = 'Tailwind: new major published, review --tailwind export';
+            const title = 'Tailwind: upstream moved, review the --tailwind export';
             const existing = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -135,5 +158,11 @@ jobs:
               repo: context.repo.repo,
               title,
               labels: ['tailwind-watch'],
-              body: '```\n' + process.env.REPORT + '\n```',
+              body: [
+                '```',
+                process.env.REPORT,
+                '```',
+                '',
+                `Compile against the latest published Tailwind: **${process.env.LATEST}**.`,
+              ].join('\n'),
             });

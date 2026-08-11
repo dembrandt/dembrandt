@@ -239,7 +239,7 @@ Spacing is emitted as v4's `--spacing` multiplier when the page has a recognizab
 
 v4 only. The output is plain CSS custom properties, so nothing you install depends on or pins Tailwind; a v3 `tailwind.config.js` emitter would be a second serialization of the same data and is not written until someone needs it. Tailwind is a devDependency here purely so the test suite can run the real compiler over the emitted theme and assert that every token produces the utility it claims to, which is the only check that catches a namespace spelled plausibly but wrongly.
 
-A scheduled `Tailwind Watch` workflow runs `npm run tailwind:check` weekly, since a new major is the only event that can invalidate the theme namespaces used here. When one lands it hands the update to an agent, which verifies each namespace against the new docs and opens a PR; it falls back to opening an issue if no agent credential is configured.
+A scheduled `Tailwind Watch` workflow runs weekly. It checks for a new major, which is the event that can invalidate the theme namespaces used here, and separately recompiles the emitted theme against the latest published Tailwind so a minor that changes what a namespace means cannot pass unnoticed behind the pinned devDependency. Either signal hands the update to an agent, which verifies each namespace against the current docs and opens a PR; it falls back to opening an issue if no agent credential is configured.
 
 ### WCAG Contrast Analysis
 
