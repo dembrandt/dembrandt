@@ -149,7 +149,7 @@ function renderSection(section: ThemeSection): string {
 }
 
 function buildHeader(result: TailwindThemeInput): string {
-  const source = result.url ?? domainOf(result.url);
+  const source = result.url ?? 'an unknown page';
   const version = result.meta?.dembrandtVersion;
   const stamp = result.extractedAt ? ` on ${result.extractedAt}` : '';
 
@@ -562,15 +562,6 @@ function isTransparentLayer(layer: string): boolean {
   const color = /[a-z]+\([^)]*\)/i.exec(layer)?.[0];
   if (!color) return false;
   return /[,/]\s*0(\.0+)?\s*\)$/.test(color);
-}
-
-function domainOf(url: string | undefined): string {
-  if (!url) return 'unknown';
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return url;
-  }
 }
 
 /** Any CSS colour to lowercase hex, or null when it carries no visible colour. */
