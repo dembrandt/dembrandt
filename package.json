@@ -91,7 +91,7 @@
     "test": "npm run build && node --test dist/test/*.test.js",
     "install-browser": "node tools/install-browser.mjs",
     "dev": "tsc --watch",
-    "build": "rm -rf dist && tsc && cp package.json dist/package.json && mkdir -p dist/lib/ml && cp lib/ml/model.onnx lib/ml/meta.json dist/lib/ml/",
+    "build": "rm -rf dist && tsc && cp package.json dist/package.json && mkdir -p dist/lib/ml && cp lib/ml/model.onnx lib/ml/meta.json dist/lib/ml/ && mkdir -p dist/test/fixtures/extractions && cp test/fixtures/extractions/*.json dist/test/fixtures/extractions/",
     "lint": "eslint . --max-warnings 0",
     "liveness": "npm run build && node test/liveness.mjs sites-smoke.json",
     "release:churn": "npm run build && node tools/release-churn.mjs",

@@ -1,0 +1,1177 @@
+{
+  "url": "https://www.bmw.de/de/index.html",
+  "extractedAt": "2026-07-03T18:21:57.867Z",
+  "meta": {
+    "dembrandtVersion": "0.22.0",
+    "schemaVersion": "1.2.0",
+    "flags": {}
+  },
+  "siteName": "Offizielle BMW DE Website: Premium Fahrzeuge & Innovation",
+  "logo": {
+    "source": "img",
+    "context": "header",
+    "url": "https://www.bmw.de/content/dam/bmw/common/images/logo-icons/BMW/BMW_White_Logo.svg.asset.1670245093434.svg",
+    "width": 53,
+    "height": 53,
+    "alt": "",
+    "type": "logomark",
+    "reversed": false,
+    "background": null,
+    "safeZone": {
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "left": 0
+    },
+    "position": {
+      "top": -88,
+      "left": 96
+    }
+  },
+  "logoInstances": [
+    {
+      "source": "img",
+      "context": "header",
+      "url": "https://www.bmw.de/content/dam/bmw/common/images/logo-icons/BMW/BMW_White_Logo.svg.asset.1670245093434.svg",
+      "width": 53,
+      "height": 53,
+      "alt": "",
+      "type": "logomark",
+      "reversed": false,
+      "background": null,
+      "safeZone": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0,
+        "left": 0
+      },
+      "position": {
+        "top": -88,
+        "left": 96
+      }
+    }
+  ],
+  "favicons": [
+    {
+      "type": "og:image",
+      "url": "https://www.bmw.de/",
+      "sizes": null
+    },
+    {
+      "type": "favicon.ico",
+      "url": "https://bmw.de/favicon.ico",
+      "sizes": null
+    }
+  ],
+  "colors": {
+    "semantic": {
+      "primary": "rgb(28, 105, 212)",
+      "background": "rgb(255, 255, 255)",
+      "text": "rgb(38, 38, 38)"
+    },
+    "palette": [
+      {
+        "color": "rgb(38, 38, 38)",
+        "normalized": "#262626",
+        "count": 1090,
+        "confidence": "high",
+        "sources": [
+          "buttongroup",
+          "button",
+          "title"
+        ],
+        "lch": "lch(15.16% 0 158.2)",
+        "oklch": "oklch(26.86% 0 89.88)",
+        "role": "neutral",
+        "onColor": "#ffffff",
+        "hover": "#2e2e2e"
+      },
+      {
+        "color": "rgb(255, 255, 255)",
+        "normalized": "#ffffff",
+        "count": 92,
+        "confidence": "high",
+        "sources": [
+          "logo",
+          "cmp-progressiveplaybutton",
+          "cmp-button"
+        ],
+        "lch": "lch(100% 0 158.2)",
+        "oklch": "oklch(100% 0 89.88)",
+        "role": "surface",
+        "onColor": "#000000",
+        "hover": "#d9d9d9"
+      },
+      {
+        "color": "rgb(0, 0, 0)",
+        "normalized": "#000000",
+        "count": 17,
+        "confidence": "high",
+        "sources": [
+          "cmp-progressiveplaybutton"
+        ],
+        "lch": "lch(0% 0 0)",
+        "oklch": "oklch(0% 0 0)",
+        "role": "surface",
+        "onColor": "#ffffff",
+        "hover": "#000000"
+      },
+      {
+        "color": "rgb(0, 0, 238)",
+        "normalized": "#0000ee",
+        "count": 6,
+        "confidence": "high",
+        "sources": [],
+        "lch": "lch(29.84% 127 306.28)",
+        "oklch": "oklch(42.9% 0.297 264.05)",
+        "role": "accent",
+        "onColor": "#ffffff",
+        "hover": "#0000ff",
+        "variantOf": "primary"
+      },
+      {
+        "color": "rgb(28, 105, 212)",
+        "normalized": "#1c69d4",
+        "count": 2,
+        "confidence": "high",
+        "sources": [
+          "cmp-button"
+        ],
+        "lch": "lch(45.77% 63.77 286.11)",
+        "oklch": "oklch(53.81% 0.18 258.3)",
+        "role": "accent",
+        "onColor": "#ffffff",
+        "hover": "#227efe",
+        "variantOf": "primary"
+      },
+      {
+        "color": "#0066b1",
+        "normalized": "#0066b1",
+        "count": 10,
+        "confidence": "high",
+        "sources": [
+          "logo"
+        ],
+        "lch": "lch(42.27% 46.88 275.32)",
+        "oklch": "oklch(50.27% 0.142 250.05)"
+      },
+      {
+        "color": "rgb(102, 102, 102)",
+        "normalized": "#666666",
+        "count": 22,
+        "confidence": "medium",
+        "sources": [],
+        "lch": "lch(43.19% 0 158.2)",
+        "oklch": "oklch(51.03% 0 89.88)",
+        "role": "neutral",
+        "onColor": "#ffffff",
+        "hover": "#7a7a7a",
+        "source": "menu"
+      },
+      {
+        "color": "rgb(6, 83, 182)",
+        "normalized": "#0653b6",
+        "count": 16,
+        "confidence": "medium",
+        "sources": [],
+        "lch": "lch(37.12% 61.01 288.27)",
+        "oklch": "oklch(46.41% 0.171 258.49)",
+        "role": "accent",
+        "onColor": "#ffffff",
+        "hover": "#0764da",
+        "variantOf": "primary",
+        "source": "menu"
+      }
+    ],
+    "cssVariables": {
+      "--compare-dropdown-label-color": {
+        "value": "#666",
+        "lch": "lch(43.19% 0 158.2)",
+        "oklch": "oklch(51.03% 0 89.88)"
+      },
+      "--focus-visible-color-input": {
+        "value": "#4d4d4d",
+        "lch": "lch(32.75% 0 158.2)",
+        "oklch": "oklch(42.02% 0 89.88)"
+      },
+      "--input-border-color": {
+        "value": "#8e8e8e",
+        "lch": "lch(59.02% 0 158.2)",
+        "oklch": "oklch(64.67% 0 89.88)"
+      }
+    },
+    "detected": [
+      {
+        "color": "rgb(38, 38, 38)",
+        "normalized": "#262626",
+        "count": 1090,
+        "usageFrac": 0.8912510220768601,
+        "confidence": "high",
+        "sources": [
+          "buttongroup",
+          "button",
+          "title",
+          "cmp-title",
+          "cmp-button"
+        ],
+        "isToken": true
+      },
+      {
+        "color": "rgb(255, 255, 255)",
+        "normalized": "#ffffff",
+        "count": 92,
+        "usageFrac": 0.07522485690923958,
+        "confidence": "high",
+        "sources": [
+          "cmp-progressiveplaybutton",
+          "cmp-button"
+        ],
+        "isToken": true
+      },
+      {
+        "color": "rgb(0, 0, 0)",
+        "normalized": "#000000",
+        "count": 17,
+        "usageFrac": 0.013900245298446443,
+        "confidence": "high",
+        "sources": [
+          "cmp-progressiveplaybutton"
+        ],
+        "isToken": true
+      },
+      {
+        "color": "rgb(242, 242, 242)",
+        "normalized": "#f2f2f2",
+        "count": 16,
+        "usageFrac": 0.013082583810302535,
+        "confidence": "high",
+        "sources": [
+          "cmp-button"
+        ],
+        "isToken": false
+      },
+      {
+        "color": "rgb(0, 0, 238)",
+        "normalized": "#0000ee",
+        "count": 6,
+        "usageFrac": 0.004905968928863451,
+        "confidence": "high",
+        "sources": [],
+        "isToken": false
+      },
+      {
+        "color": "rgb(28, 105, 212)",
+        "normalized": "#1c69d4",
+        "count": 2,
+        "usageFrac": 0.001635322976287817,
+        "confidence": "high",
+        "sources": [
+          "cmp-button"
+        ],
+        "isToken": true
+      }
+    ],
+    "_raw": [
+      {
+        "color": "rgb(38, 38, 38)",
+        "normalized": "#262626",
+        "count": 1090
+      },
+      {
+        "color": "rgb(255, 255, 255)",
+        "normalized": "#ffffff",
+        "count": 92
+      },
+      {
+        "color": "rgb(0, 0, 0)",
+        "normalized": "#000000",
+        "count": 17
+      },
+      {
+        "color": "rgb(242, 242, 242)",
+        "normalized": "#f2f2f2",
+        "count": 16
+      }
+    ]
+  },
+  "typography": {
+    "styles": [
+      {
+        "context": "display",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "80px (5.00rem)",
+        "weight": 500,
+        "lineHeight": "1.02",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "heading-2",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "80px (5.00rem)",
+        "weight": 500,
+        "lineHeight": "1.02",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "display",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "60px (3.75rem)",
+        "weight": 300,
+        "lineHeight": "1.40",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "body",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "45px (2.81rem)",
+        "weight": 300,
+        "lineHeight": "1.38",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "heading-2",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "45px (2.81rem)",
+        "weight": 300,
+        "lineHeight": "1.38",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "body",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "34px (2.13rem)",
+        "weight": 300,
+        "lineHeight": "1.41",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "heading-2",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "34px (2.13rem)",
+        "weight": 300,
+        "lineHeight": "1.41",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "heading-3",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "25px (1.56rem)",
+        "weight": 300,
+        "lineHeight": "1.52",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "body",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "25px (1.56rem)",
+        "weight": 300,
+        "lineHeight": "1.52",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "heading-2",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "25px (1.56rem)",
+        "weight": 300,
+        "lineHeight": "1.52",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "ui",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "22px (1.38rem)",
+        "weight": 300,
+        "lineHeight": "1.55",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "link",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "22px (1.38rem)",
+        "weight": 300,
+        "lineHeight": "1.55",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "ui",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "22px (1.38rem)",
+        "weight": 500,
+        "lineHeight": "1.15",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "body",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "22px (1.38rem)",
+        "weight": 300,
+        "lineHeight": "1.55",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "body",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "22px (1.38rem)",
+        "weight": 500,
+        "lineHeight": "1.18",
+        "spacing": null,
+        "transform": "uppercase"
+      },
+      {
+        "context": "body",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "19px (1.19rem)",
+        "weight": 300,
+        "lineHeight": "1.58",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "ui",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "19px (1.19rem)",
+        "weight": 500,
+        "lineHeight": "1.15",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "ui",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "19px (1.19rem)",
+        "weight": 300,
+        "lineHeight": "1.58",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "link",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "16px (1.00rem)",
+        "weight": 500,
+        "lineHeight": "1.63",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "ui",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "16px (1.00rem)",
+        "weight": 500,
+        "lineHeight": "1.15",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "body",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "16px (1.00rem)",
+        "weight": 300,
+        "lineHeight": "1.63",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "link",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "16px (1.00rem)",
+        "weight": 300,
+        "lineHeight": "1.63",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "body",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "16px (1.00rem)",
+        "weight": 500,
+        "lineHeight": "1.63",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "caption",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "12px (0.75rem)",
+        "weight": 500,
+        "lineHeight": "1.50",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "caption",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "12px (0.75rem)",
+        "weight": 300,
+        "lineHeight": "1.33",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "ui",
+        "family": "bmwTypeNextWeb",
+        "fallbacks": "Arial, Helvetica, Roboto",
+        "size": "12px (0.75rem)",
+        "weight": 500,
+        "lineHeight": "1.33",
+        "spacing": null,
+        "transform": null
+      }
+    ],
+    "sources": {
+      "googleFonts": [],
+      "adobeFonts": false,
+      "variableFonts": false,
+      "selfHostedFonts": [
+        "BMWTypeNext-Bold.woff2",
+        "BMWTypeNext-Light.woff2",
+        "BMWTypeNext-Medium.woff2",
+        "bmw_next_icons_light.woff2",
+        "bmw_next_icons_regular.woff2"
+      ],
+      "customFonts": [
+        "BMWTypeNext-Bold.woff2",
+        "BMWTypeNext-Light.woff2",
+        "BMWTypeNext-Medium.woff2",
+        "bmw_next_icons_light.woff2",
+        "bmw_next_icons_regular.woff2"
+      ]
+    }
+  },
+  "spacing": {
+    "scaleType": "8px",
+    "commonValues": [
+      {
+        "px": "1px",
+        "display": "1px",
+        "rem": "0.06rem",
+        "count": 8,
+        "numericValue": 1
+      },
+      {
+        "px": "4px",
+        "display": "4px",
+        "rem": "0.25rem",
+        "count": 22,
+        "numericValue": 4
+      },
+      {
+        "px": "8px",
+        "display": "8px",
+        "rem": "0.50rem",
+        "count": 6,
+        "numericValue": 8
+      },
+      {
+        "px": "10px",
+        "display": "10px",
+        "rem": "0.63rem",
+        "count": 2,
+        "numericValue": 10
+      },
+      {
+        "px": "12px",
+        "display": "12px",
+        "rem": "0.75rem",
+        "count": 142,
+        "numericValue": 12
+      },
+      {
+        "px": "15px",
+        "display": "15px",
+        "rem": "0.94rem",
+        "count": 1,
+        "numericValue": 15
+      },
+      {
+        "px": "16px",
+        "display": "16px",
+        "rem": "1.00rem",
+        "count": 47,
+        "numericValue": 16
+      },
+      {
+        "px": "20px",
+        "display": "20px",
+        "rem": "1.25rem",
+        "count": 11,
+        "numericValue": 20
+      },
+      {
+        "px": "24px",
+        "display": "24px",
+        "rem": "1.50rem",
+        "count": 10,
+        "numericValue": 24
+      },
+      {
+        "px": "30px",
+        "display": "30px",
+        "rem": "1.88rem",
+        "count": 1,
+        "numericValue": 30
+      },
+      {
+        "px": "32px",
+        "display": "32px",
+        "rem": "2.00rem",
+        "count": 65,
+        "numericValue": 32
+      },
+      {
+        "px": "40px",
+        "display": "40px",
+        "rem": "2.50rem",
+        "count": 5,
+        "numericValue": 40
+      },
+      {
+        "px": "48px",
+        "display": "48px",
+        "rem": "3.00rem",
+        "count": 27,
+        "numericValue": 48
+      },
+      {
+        "px": "64px",
+        "display": "64px",
+        "rem": "4.00rem",
+        "count": 12,
+        "numericValue": 64
+      },
+      {
+        "px": "80px",
+        "display": "80px",
+        "rem": "5.00rem",
+        "count": 8,
+        "numericValue": 80
+      },
+      {
+        "px": "385px",
+        "display": "385px",
+        "rem": "24.06rem",
+        "count": 1,
+        "numericValue": 385
+      }
+    ]
+  },
+  "borderRadius": {
+    "values": [
+      {
+        "value": "3px",
+        "count": 14,
+        "elements": [
+          "option",
+          "button",
+          " Konfigurieren & Preise BMW X5 Konfigurator & Preise",
+          " Jetzt entdecken ",
+          " Neuwagen suchen "
+        ],
+        "confidence": "high",
+        "numericValue": 3
+      },
+      {
+        "value": "8px 8px 0px",
+        "count": 1,
+        "elements": [
+          "div"
+        ],
+        "confidence": "low",
+        "numericValue": 8
+      },
+      {
+        "value": "10px 10px 0px",
+        "count": 1,
+        "elements": [
+          "div"
+        ],
+        "confidence": "low",
+        "numericValue": 10
+      },
+      {
+        "value": "50%",
+        "count": 4,
+        "elements": [
+          "combobox",
+          "Play Button",
+          "Information"
+        ],
+        "confidence": "medium",
+        "numericValue": 50
+      }
+    ]
+  },
+  "borders": {
+    "combinations": [
+      {
+        "width": "0px 0px 1px",
+        "style": "none none solid",
+        "color": "rgb(38, 38, 38)",
+        "count": 17,
+        "elements": [
+          "nav",
+          "div"
+        ],
+        "confidence": "high"
+      },
+      {
+        "width": "2px",
+        "style": "outset",
+        "color": "rgb(0, 0, 0)",
+        "count": 1,
+        "elements": [
+          "button"
+        ],
+        "confidence": "low"
+      },
+      {
+        "width": "1px",
+        "style": "solid",
+        "color": "rgba(255, 255, 255, 0.46)",
+        "count": 1,
+        "elements": [
+          "button"
+        ],
+        "confidence": "low"
+      }
+    ]
+  },
+  "shadows": [
+    {
+      "shadow": "rgb(242, 242, 242) 0px 0px 0px 1px inset",
+      "count": 4,
+      "confidence": "medium"
+    },
+    {
+      "shadow": "rgb(38, 38, 38) 0px 0px 0px 1px inset",
+      "count": 4,
+      "confidence": "medium"
+    },
+    {
+      "shadow": "rgba(0, 0, 0, 0.16) 0px 5px 40px 0px",
+      "count": 2,
+      "confidence": "low"
+    },
+    {
+      "shadow": "rgba(0, 0, 0, 0.16) 0px 6px 20px 0px, rgba(0, 0, 0, 0.24) 0px 0px 1px 0px",
+      "count": 1,
+      "confidence": "low"
+    },
+    {
+      "shadow": "rgba(0, 0, 0, 0.5) 0px -1px 8px 0px",
+      "count": 1,
+      "confidence": "low"
+    },
+    {
+      "shadow": "rgb(255, 255, 255) 0px 0px 0px 1px, rgb(28, 105, 212) 0px 0px 0px 5px",
+      "count": 1,
+      "confidence": "low"
+    }
+  ],
+  "gradients": [
+    {
+      "gradient": "linear-gradient(110deg, rgba(38, 38, 38, 0.8), rgba(38, 38, 38, 0) 50%)",
+      "type": "linear",
+      "stopColors": [
+        "rgba(38, 38, 38, 0.8)",
+        "rgba(38, 38, 38, 0)"
+      ],
+      "count": 3
+    }
+  ],
+  "motion": {
+    "durations": [
+      {
+        "value": "0.001s",
+        "ms": 1,
+        "count": 699
+      },
+      {
+        "value": "0.3s",
+        "ms": 300,
+        "count": 1
+      }
+    ],
+    "easings": [
+      {
+        "value": "ease",
+        "type": "ease",
+        "count": 686
+      },
+      {
+        "value": "ease-out",
+        "type": "ease-out",
+        "count": 9
+      },
+      {
+        "value": "ease-in-out",
+        "type": "ease-in-out",
+        "count": 3
+      },
+      {
+        "value": "ease-in",
+        "type": "ease-in",
+        "count": 2
+      },
+      {
+        "value": "cubic-bezier(0, 0.5, 0.5, 1)",
+        "type": "ease-out",
+        "count": 1
+      }
+    ],
+    "animations": [
+      {
+        "name": "grow-icon",
+        "duration": "0.001s",
+        "easing": "linear",
+        "count": 3,
+        "contexts": [
+          "other"
+        ]
+      },
+      {
+        "name": "fade-icon",
+        "duration": "0.001s",
+        "easing": "linear",
+        "count": 3,
+        "contexts": [
+          "other"
+        ]
+      },
+      {
+        "name": "spin-icon",
+        "duration": "0.001s",
+        "easing": "linear",
+        "count": 3,
+        "contexts": [
+          "other"
+        ]
+      },
+      {
+        "name": "effect-enter",
+        "duration": "0.001s",
+        "easing": "ease-out",
+        "count": 2,
+        "contexts": [
+          "other"
+        ]
+      },
+      {
+        "name": "zoomInOut",
+        "duration": "0.001s",
+        "easing": "linear",
+        "count": 1,
+        "contexts": [
+          "other"
+        ]
+      },
+      {
+        "name": "spin",
+        "duration": "0.001s",
+        "easing": "linear",
+        "count": 1,
+        "contexts": [
+          "other"
+        ]
+      },
+      {
+        "name": "effect-grow",
+        "duration": "0.001s",
+        "easing": "ease-out",
+        "count": 1,
+        "contexts": [
+          "other"
+        ]
+      }
+    ],
+    "contexts": {
+      "nav": {
+        "count": 30,
+        "durations": [
+          "0.001s"
+        ],
+        "easing": "ease",
+        "easingType": "ease",
+        "props": [
+          "background",
+          "transform",
+          "left"
+        ]
+      },
+      "link": {
+        "count": 81,
+        "durations": [
+          "0.001s"
+        ],
+        "easing": "ease",
+        "easingType": "ease",
+        "props": []
+      },
+      "button": {
+        "count": 11,
+        "durations": [
+          "0.001s",
+          "0.3s"
+        ],
+        "easing": "ease",
+        "easingType": "ease",
+        "props": [
+          "transform",
+          "background-color",
+          "bottom"
+        ]
+      },
+      "overlay": {
+        "count": 1,
+        "durations": [
+          "0.001s"
+        ],
+        "easing": "ease",
+        "easingType": "ease",
+        "props": []
+      },
+      "card": {
+        "count": 141,
+        "durations": [
+          "0.001s"
+        ],
+        "easing": "ease",
+        "easingType": "ease",
+        "props": []
+      },
+      "modal": {
+        "count": 8,
+        "durations": [
+          "0.001s"
+        ],
+        "easing": "ease",
+        "easingType": "ease",
+        "props": [
+          "bottom"
+        ]
+      },
+      "media": {
+        "count": 22,
+        "durations": [
+          "0.001s"
+        ],
+        "easing": "ease",
+        "easingType": "ease",
+        "props": []
+      }
+    },
+    "interactiveDeltas": []
+  },
+  "components": {
+    "buttons": [
+      {
+        "states": {
+          "default": {
+            "backgroundColor": "rgb(28, 105, 212)",
+            "color": "rgb(255, 255, 255)",
+            "padding": "4px 24px",
+            "borderRadius": "3px",
+            "border": "0px none rgb(255, 255, 255)",
+            "fontSize": "16px",
+            "fontWeight": "500"
+          }
+        },
+        "fontWeight": "500",
+        "fontSize": "16px",
+        "text": "Konfigurieren & Preise",
+        "confidence": "medium"
+      }
+    ],
+    "inputs": {
+      "text": [
+        {
+          "specificType": "submit",
+          "states": {
+            "default": {
+              "backgroundColor": "rgb(255, 255, 255)",
+              "color": "rgb(38, 38, 38)",
+              "border": "0px none rgb(38, 38, 38)",
+              "borderRadius": "50%",
+              "padding": "0px",
+              "boxShadow": "rgba(0, 0, 0, 0.16) 0px 6px 20px 0px, rgba(0, 0, 0, 0.24) 0px 0px 1px 0px",
+              "outline": "rgb(38, 38, 38) none 3px"
+            },
+            "focus": {
+              "backgroundColor": "rgba(0, 0, 0, 0)",
+              "color": "var(--link,#262626)",
+              "outline": "none",
+              "boxShadow": "rgb(255, 255, 255) 0px 0px 0px 0.125rem, rgb(28, 105, 212) 0px 0px 0px 0.25rem",
+              "border": "0.125rem solid rgb(77, 77, 77)",
+              "borderColor": "rgb(77, 77, 77)"
+            }
+          }
+        }
+      ],
+      "checkbox": [],
+      "radio": [],
+      "select": []
+    },
+    "links": [
+      {
+        "color": "rgb(0, 0, 238)",
+        "textDecoration": "underline",
+        "fontWeight": "500",
+        "states": {
+          "default": {
+            "color": "rgb(0, 0, 238)",
+            "textDecoration": "underline"
+          },
+          "hover": {
+            "color": "rgb(28, 105, 212)",
+            "textDecoration": "underline"
+          }
+        }
+      },
+      {
+        "color": "rgb(255, 255, 255)",
+        "textDecoration": "none",
+        "fontWeight": "500",
+        "states": {
+          "default": {
+            "color": "rgb(255, 255, 255)",
+            "textDecoration": "none"
+          },
+          "hover": {
+            "color": "rgb(28, 105, 212)",
+            "textDecoration": "underline"
+          }
+        }
+      },
+      {
+        "color": "rgb(242, 242, 242)",
+        "textDecoration": "none",
+        "fontWeight": "500",
+        "states": {
+          "default": {
+            "color": "rgb(242, 242, 242)",
+            "textDecoration": "none"
+          },
+          "hover": {
+            "color": "rgb(28, 105, 212)",
+            "textDecoration": "underline"
+          }
+        }
+      },
+      {
+        "color": "rgb(38, 38, 38)",
+        "textDecoration": "none",
+        "fontWeight": "500",
+        "states": {
+          "default": {
+            "color": "rgb(38, 38, 38)",
+            "textDecoration": "none"
+          },
+          "hover": {
+            "color": "rgb(28, 105, 212)",
+            "textDecoration": "underline"
+          }
+        }
+      }
+    ],
+    "badges": {
+      "all": [],
+      "byVariant": {
+        "error": [],
+        "warning": [],
+        "success": [],
+        "info": [],
+        "neutral": []
+      }
+    }
+  },
+  "breakpoints": [
+    {
+      "px": "480px"
+    },
+    {
+      "px": "550px"
+    },
+    {
+      "px": "599px"
+    },
+    {
+      "px": "767px"
+    },
+    {
+      "px": "768px"
+    },
+    {
+      "px": "992px"
+    },
+    {
+      "px": "1023px"
+    },
+    {
+      "px": "1024px"
+    },
+    {
+      "px": "1279px"
+    },
+    {
+      "px": "1280px"
+    },
+    {
+      "px": "1919px"
+    },
+    {
+      "px": "1920px"
+    }
+  ],
+  "iconSystem": [
+    {
+      "name": "SVG Icons",
+      "type": "svg"
+    }
+  ],
+  "frameworks": [
+    {
+      "name": "PrimeReact/Vue/NG",
+      "confidence": "high",
+      "evidence": "1112 Prime components"
+    }
+  ]
+}
