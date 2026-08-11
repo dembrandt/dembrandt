@@ -237,7 +237,9 @@ The file contains **only values observed on the page**. No 50–950 shade ramps,
 
 Spacing is emitted as v4's `--spacing` multiplier when the page has a recognizable base-N rhythm, and as named steps otherwise. Values with a usage count (spacing, radii) are selected by how often they appear, not by size, so sub-pixel one-offs stay out of the scale.
 
-v4 only. The output is plain CSS custom properties, so nothing here depends on or pins Tailwind; a v3 `tailwind.config.js` emitter would be a second serialization of the same data and is not written until someone needs it. A scheduled `Tailwind Watch` workflow runs `npm run tailwind:check` weekly and opens an issue if a new Tailwind major lands, since that is the only event that can invalidate the theme namespaces used here.
+v4 only. The output is plain CSS custom properties, so nothing you install depends on or pins Tailwind; a v3 `tailwind.config.js` emitter would be a second serialization of the same data and is not written until someone needs it. Tailwind is a devDependency here purely so the test suite can run the real compiler over the emitted theme and assert that every token produces the utility it claims to, which is the only check that catches a namespace spelled plausibly but wrongly.
+
+A scheduled `Tailwind Watch` workflow runs `npm run tailwind:check` weekly, since a new major is the only event that can invalidate the theme namespaces used here. When one lands it hands the update to an agent, which verifies each namespace against the new docs and opens a PR; it falls back to opening an issue if no agent credential is configured.
 
 ### WCAG Contrast Analysis
 
