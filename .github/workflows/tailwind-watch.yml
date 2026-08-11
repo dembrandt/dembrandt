@@ -2,21 +2,29 @@ name: Tailwind Watch
 
 # The --tailwind export writes text, so a Tailwind release cannot break the
 # build. Only a new major can invalidate the theme namespaces it emits. This
-# checks weekly and opens an issue when that happens.
+# checks weekly. On a new major it hands the update to an agent, which opens a
+# PR against the emitter. Falls back to an issue when no agent credential is
+# configured.
 
 on:
   schedule:
     - cron: "0 6 * * 1"
   workflow_dispatch:
 
+env:
+  # Job-level so every step's `if` can read it. A step cannot reliably read env
+  # it defines on itself from its own `if` expression.
+  HAS_AGENT: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+
 permissions:
-  contents: read
+  contents: write
   issues: write
+  pull-requests: write
 
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v7
@@ -24,6 +32,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+          cache: npm
 
       - name: Check published Tailwind major
         id: check
@@ -40,11 +49,70 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
           exit 0
 
+      # Exit 2 is "npm was unreachable", not "something is wrong with the
+      # emitter". Next Monday retries; a red scheduled job every time npm
+      # hiccups only teaches you to ignore this workflow.
+      - name: Note check failure
+        if: steps.check.outputs.code == '2'
+        run: echo "::warning::tailwind-check could not reach the registry; retrying next run."
+
+      - name: Install dependencies
+        if: steps.check.outputs.code == '1' && env.HAS_AGENT == 'true'
+        run: npm ci
+
+      - name: Update the emitter for the new major
+        id: agent
+        if: steps.check.outputs.code == '1' && env.HAS_AGENT == 'true'
+        uses: anthropics/claude-code-action@v1
+        continue-on-error: true
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            A new major of tailwindcss has been published. The watcher reported:
+
+            ${{ steps.check.outputs.report }}
+
+            The `--tailwind` export in `lib/formatters/tailwind.ts` emits a v4
+            `@theme` block. Your job is to find out whether the new major
+            changed anything it depends on, and to update it if so.
+
+            Do this:
+
+            1. Read `lib/formatters/tailwind.ts`, in particular
+               `TAILWIND_TARGET_MAJOR`, `TAILWIND_NAMESPACES`, and every
+               `build*` function that writes a namespaced variable.
+            2. Find the new major's theme-variable documentation and its
+               upgrade guide. For each namespace in `TAILWIND_NAMESPACES`,
+               determine: does it still exist, is it still spelled the same,
+               and does it still mean the same thing? The v3 -> v4 change (JS
+               config to `@theme`) is the shape of break to look for.
+            3. Apply whatever the answer requires. If nothing moved, the only
+               change is bumping `TAILWIND_TARGET_MAJOR`. If a namespace was
+               renamed or re-scoped, update the emitter and the tests in
+               `test/tailwind.test.ts` that pin the old spelling.
+            4. Run `npm run build` and `npm test`. Both must pass. Do not
+               weaken an assertion to make a test pass; if a test now fails
+               for a real reason, fix the emitter.
+            5. Open a PR on a branch named `dem-tailwind-v<major>`.
+
+            In the PR body, state plainly which namespaces you verified,
+            which changed, and cite the doc page you checked each against. If
+            you could not verify a namespace, say so rather than assuming it
+            is unchanged. Keep the PR description terse: no marketing, no
+            summary of what the export is for.
+
+            Repo conventions: no em dashes, no Co-Authored-By trailer, terse
+            commit messages.
+          claude_args: |
+            --allowed-tools Read,Edit,Write,WebFetch,WebSearch,Bash(npm run build),Bash(npm test),Bash(git *),Bash(gh pr create*)
+
+      # No agent credential, or the agent run failed: fall back to the issue so
+      # the signal is never silently dropped.
       - name: Open issue on new major
-        if: steps.check.outputs.code == '1'
-        uses: actions/github-script@v8
+        if: steps.check.outputs.code == '1' && (env.HAS_AGENT != 'true' || steps.agent.outcome == 'failure')
         env:
           REPORT: ${{ steps.check.outputs.report }}
+        uses: actions/github-script@v8
         with:
           script: |
             const title = 'Tailwind: new major published, review --tailwind export';
@@ -62,7 +130,3 @@ jobs:
               labels: ['tailwind-watch'],
               body: '```\n' + process.env.REPORT + '\n```',
             });
-
-      - name: Fail on check error
-        if: steps.check.outputs.code == '2'
-        run: exit 1
