@@ -36,6 +36,13 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.6.0 — typography.sources gains urls: the resolved http(s) font asset and
+ *          webfont-provider stylesheet URLs seen during extraction, sorted and
+ *          deduped. Lets a consumer re-fetch, cache or verify the actual font
+ *          files instead of guessing from family names. Additive: 1.5.x
+ *          consumers ignore it. Not read by the drift engine, so it introduces
+ *          no baseline churn — which matters, because cache-busting query
+ *          strings make these URLs change on every deploy of a site.
  *  1.5.0 — meta gains httpStatus (the page.goto() navigation response status;
  *          null when Playwright returns no response). Lets consumers reject
  *          extractions that came from a bot-wall/WAF error page instead of
@@ -71,7 +78,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.5.0';
+export const SCHEMA_VERSION = '1.6.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';

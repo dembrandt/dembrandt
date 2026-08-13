@@ -75,7 +75,7 @@ Load extractions, track token drift, and compare snapshots. **[dembrandt.com/app
 ## What to expect from extraction?
 
 - Colors (semantic, palette, CSS variables, gradients)
-- Typography (fonts, sizes, weights, sources)
+- Typography (fonts, sizes, weights, sources, font file URLs)
 - Spacing (margin/padding scales)
 - Borders (radius, widths, styles, colors)
 - Shadows

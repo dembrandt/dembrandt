@@ -198,3 +198,19 @@ test('mergeResults keeps rawColors per page in the pages array', () => {
   const plain = mergeResults([page('https://a.test'), page('https://a.test/x')]);
   assert.equal('rawColors' in plain.pages[0], false);
 });
+
+test('mergeResults sorts merged font urls so page order never reaches the output', () => {
+  const home = page('https://a.test', {
+    typography: { styles: [], sources: { urls: ['https://a.test/b.woff2', 'https://a.test/d.woff2'] } },
+  });
+  const second = page('https://a.test/pricing', {
+    typography: { styles: [], sources: { urls: ['https://a.test/a.woff2', 'https://a.test/b.woff2'] } },
+  });
+
+  const forward = mergeResults([home, second]).typography.sources.urls;
+  assert.deepEqual(forward, [
+    'https://a.test/a.woff2',
+    'https://a.test/b.woff2',
+    'https://a.test/d.woff2',
+  ]);
+});

@@ -130,7 +130,11 @@ function mergeTypography(results) {
     for (const [k, v] of Object.entries(s)) {
       if (k === 'variableAxes') continue; // merged separately, by axis
       if (Array.isArray(v)) {
-        sources[k] = [...new Set([...(sources[k] || []), ...v])];
+        const union = [...new Set([...(sources[k] || []), ...v])];
+        // Font URLs are sorted per page. Sorting the union too keeps a merged
+        // multi-page run byte-identical regardless of which page contributed
+        // which asset; page order must not show up in the output.
+        sources[k] = k === 'urls' ? union.sort() : union;
       } else if (v && !sources[k]) {
         sources[k] = v;
       }

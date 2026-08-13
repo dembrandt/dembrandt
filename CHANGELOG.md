@@ -1,6 +1,13 @@
 # Changelog
 
-## [0.25.1] - 2026-07-28
+## Unreleased
+
+### Added
+- `typography.sources.urls` lists the resolved http(s) font asset and webfont-provider stylesheet URLs seen during extraction, sorted and deduped, so a consumer can re-fetch or verify the real font files (#147)
+
+### Changed
+- Output contract bumped to schema 1.6.0 for that field. Additive: 1.5.x consumers ignore it, and the drift engine does not read it, so no baseline churn
+- Merged multi-page runs sort the font URL union, so page order cannot reach the output
 
 ### Fixed
 - The main entry and the `./dtcg` and `./normalize` subpaths now declare their type definitions. `dist` already shipped the `.d.ts` files, but without a `types` condition consumers importing `dembrandt` resolved no types at all
