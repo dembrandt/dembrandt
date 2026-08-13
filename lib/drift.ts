@@ -166,7 +166,7 @@ function colorWeight(e: ColorEntry): number {
  * The palette pass cannot see this. It matches colours to their nearest
  * neighbour by delta-E, so a rebrand that promotes an existing palette colour to
  * primary leaves the palette set identical and scores zero — the roles moved,
- * the colours did not. Until v0.28.0 the semantic map was read only to attach
+ * the colours did not. The semantic map used to be read only to attach
  * role labels to palette entries, so changing the brand primary produced no
  * drift at all (DEM-208).
  *
@@ -186,6 +186,39 @@ function semanticHex(value: string): string {
   return `#${h(parsed.r)}${h(parsed.g)}${h(parsed.b)}`;
 }
 
+/** A role is present only if it names a colour that actually paints. An empty
+ * string is not a value, and a fully transparent one is a role the page does
+ * not render — treating rgba(0,0,0,0) as a colour made two different "nothing
+ * painted" values compare as a delta-100 change, and hid a brand colour being
+ * turned invisible (alpha 1 -> 0) as no change at all. */
+function present(value: string | undefined): string | undefined {
+  if (!value || !String(value).trim()) return undefined;
+  const parsed = parseCssColor(value);
+  if (parsed && parsed.a === 0) return undefined;
+  return value;
+}
+
+/**
+ * A role appearing or disappearing is reported but never scored.
+ *
+ * Semantic presence is a derived claim, not evidence. `accent` is emitted only
+ * when confidence, chroma and hue-distance predicates all pass, and those flip
+ * between runs of an unchanged page — scoring that alone produced 11 against a
+ * threshold of 10, a red gate with zero design change. The colour evidence
+ * underneath already sits in the palette, which is scored: if the colour truly
+ * left the page, the palette charges for it there. Charging again here is
+ * double-counting the detector's opinion on top of the fact.
+ *
+ * So a vanished role shows up in the report, where a human can read it, and
+ * moves no score. Only a role whose value actually changed is scored.
+ */
+
+/** Spec-parser fallback for the notations parseColor cannot read. */
+function rgbFromCss(value: string): [number, number, number] | null {
+  const parsed = parseCssColor(value);
+  return parsed ? [parsed.r, parsed.g, parsed.b] : null;
+}
+
 function compareSemantic(
   base: Record<string, string> | undefined,
   cand: Record<string, string> | undefined,
@@ -203,36 +236,40 @@ function compareSemantic(
   const roles = [...new Set([...Object.keys(b), ...Object.keys(c)])].sort();
 
   for (const role of roles) {
-    const before = b[role];
-    const after = c[role];
+    const before = present(b[role]);
+    const after = present(c[role]);
     // Role weight only; there is no usage count on a semantic entry, and the
     // sqrt(count) dampening the palette applies would understate it anyway.
     const w = ROLE_WEIGHT[role.toLowerCase()] ?? 1;
 
     if (before && after) {
-      weight += w;
       const d = deltaE(semanticHex(before), semanticHex(after));
+      // An unchanged role contributes NOTHING — not penalty, and not weight.
+      // Adding its weight to the denominator would let a stable semantic map
+      // dilute real palette drift, which turned a measured score of 11 (drift)
+      // into 9 (stable) and could flip an existing gate from red to green.
+      // Only roles that actually moved take part in the score.
       if (d <= cfg.colorSame) continue;
+      weight += w;
       changes.push({
         category: "color",
         kind: "changed",
         label: `semantic.${role}`,
         before,
         after,
-        delta: round(d),
+        // deltaE returns Infinity for two different unparseable values
+        // (var(--a) vs var(--b)); Infinity serialises to null and renders as
+        // "delta Infinity" in CI annotations, so omit it rather than emit it.
+        ...(Number.isFinite(d) ? { delta: round(d) } : {}),
       });
       // Beyond colorShift the role did not shift, it was replaced: full weight.
       penalty += d <= cfg.colorShift ? clamp01(d / cfg.colorShift) * w : w;
       changed++;
     } else if (before) {
-      weight += w;
       changes.push({ category: "color", kind: "removed", label: `semantic.${role}`, before });
-      penalty += w;
       removed++;
     } else if (after) {
-      weight += w;
       changes.push({ category: "color", kind: "added", label: `semantic.${role}`, after });
-      penalty += w;
       added++;
     }
   }
@@ -509,7 +546,11 @@ function compareShadows(base: string[], cand: string[]): { changes: DriftChange[
 function paletteEntries(e: ExtractionResult): ColorEntry[] {
   const roleByRgb = new Map<string, string>();
   for (const [role, hex] of Object.entries(e.colors?.semantic ?? {})) {
-    const rgb = parseColor(hex);
+    // parseColor reads hex and legacy rgb() only. A page that authors its
+    // semantic colours in oklch/lch — what --color-format emits, and what
+    // modern token pipelines write — attached no role at all, so the same
+    // palette shift scored 30 in hex and 19 in oklch. Use the spec parser.
+    const rgb = parseColor(hex) ?? rgbFromCss(hex);
     if (rgb) roleByRgb.set(rgb.join(","), role);
   }
   return (e.colors?.palette ?? [])

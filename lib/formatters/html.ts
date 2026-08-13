@@ -177,6 +177,7 @@ details.card>summary:has(button.copyall)::after{margin-left:12px}
 .dold{text-decoration:line-through;color:var(--muted)}
 .dnew{color:var(--good)}
 .ddelta{margin-left:auto;color:var(--muted);font-family:var(--mono)}
+.dlabel{color:var(--muted)}
 .dlegend{color:var(--muted);font-size:var(--t-sm);margin-top:16px}
 .dempty{color:var(--good);margin-top:12px;font-size:var(--t-sm)}
 tr.tgrouph td{color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:var(--t-sm);border-bottom:1px solid var(--line);padding:14px 12px 6px}
@@ -594,10 +595,16 @@ function driftRow(ch: DriftChange, roleByHex: Map<string, string>): string {
   if (ch.category === "color") {
     const sw = (v: unknown) => (v && isColorish(v) ? `<span class="dsw" style="background:${safeCss(v) || "transparent"}"></span>` : "");
     const role = roleByHex.get(String(ch.after ?? ch.before ?? "").toLowerCase());
+    // A labelled colour change (semantic.primary) is a different event from a
+    // palette entry moving, and rendering only the two swatches made them
+    // indistinguishable in the report.
+    const named = ch.label && ch.label !== ch.before && ch.label !== ch.after
+      ? `<span class="mono dlabel">${esc(ch.label)}</span> `
+      : "";
     const detail =
       ch.before && ch.after
-        ? `${sw(ch.before)}${sw(ch.after)}<span class="mono">${esc(ch.before)} → ${esc(ch.after)}</span>`
-        : `${sw(ch.before ?? ch.after)}<span class="mono">${esc(ch.before ?? ch.after ?? ch.label)}</span>`;
+        ? `${named}${sw(ch.before)}${sw(ch.after)}<span class="mono">${esc(ch.before)} → ${esc(ch.after)}</span>`
+        : `${named}${sw(ch.before ?? ch.after)}<span class="mono">${esc(ch.before ?? ch.after ?? ch.label)}</span>`;
     return `<div class="drow">${glyph}${detail}${role ? `<span class="dpill">${esc(role)}</span>` : ""}${delta}</div>`;
   }
   if (ch.category === "typography") {
