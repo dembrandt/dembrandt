@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Drift compares `colors.semantic` role by role. The engine read that map only to attach role labels to palette entries, so a changed brand primary produced no drift at all: a rebrand that promotes a colour the page already used leaves the palette set identical and reported stable (DEM-208). Changes now appear as `semantic.<role>`, and `docs/FLAGS.md` no longer describes `--ai` primary drift the engine could not see
+
+### Changed
+- Output contract at schema 1.8.0. No shape change; colour scores rise wherever a semantic role moved, so a baseline whose primary differs from the candidate's starts reporting it on upgrade
+
 ## [0.28.0] - 2026-08-13
 
 ### Added

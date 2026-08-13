@@ -36,6 +36,13 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.8.0 — no shape change. BEHAVIOR: the drift engine compares colors.semantic
+ *          role by role. It previously read that map only to attach role labels
+ *          to palette entries, so a changed brand primary produced no drift at
+ *          all (DEM-208). DriftReport.changes can now carry entries labelled
+ *          `semantic.<role>`, and colour scores rise wherever a role moved.
+ *          A baseline whose primary differs from the candidate's starts
+ *          reporting that difference on upgrade, which is the point.
  *  1.7.0 — typography.styles entries gain count (elements rendering that exact
  *          style) and typography.sources gains filteredFamilies. Additive: 1.6.x
  *          consumers ignore both. BEHAVIOR, and it moves existing values:
@@ -88,7 +95,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.7.0';
+export const SCHEMA_VERSION = '1.8.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
