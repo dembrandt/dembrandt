@@ -16,6 +16,7 @@ Source is TypeScript. Build first, then run the compiled entry point.
 npm run build
 node dist/index.js <url>
 node dist/index.js dembrandt.com --json-only
+node dist/index.js dembrandt.com --color-format=oklch
 node dist/index.js dembrandt.com --dark-mode
 node dist/index.js dembrandt.com --mobile
 node dist/index.js dembrandt.com --slow

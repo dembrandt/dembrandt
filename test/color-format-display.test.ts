@@ -157,3 +157,97 @@ test('derived hover states follow the selected notation', () => {
     (COLORS as Colors).palette = original;
   }
 });
+
+// The palette was not the only place a colour is printed. Borders and the
+// component sections render the same swatch + notation pair, and a flag that
+// governed one list and not the others reads as a bug.
+
+const COMPONENT_DATA: BrandingResult = {
+  url: 'https://example.test',
+  extractedAt: '2026-08-05T00:00:00.000Z',
+  colors: { semantic: {}, palette: [], cssVariables: {} },
+  typography: { styles: [], sources: {} },
+  spacing: { scaleType: 'unknown', commonValues: [] },
+  borderRadius: { values: [] },
+  borders: {
+    combinations: [
+      { width: '1px', style: 'solid', color: 'rgb(26, 115, 232)', confidence: 'high', elements: ['card'] },
+    ],
+  },
+  shadows: [],
+  components: {
+    buttons: [
+      {
+        confidence: 'high',
+        states: {
+          default: { backgroundColor: 'rgb(26, 115, 232)', color: 'rgb(255, 255, 255)' },
+        },
+      },
+    ],
+    badges: {
+      all: [
+        { confidence: 'high', variant: 'info', backgroundColor: 'rgb(26, 115, 232)', color: 'rgb(255, 255, 255)' },
+      ],
+    },
+    inputs: {
+      text: [
+        {
+          specificType: 'text',
+          states: { default: { backgroundColor: 'rgb(26, 115, 232)', color: 'rgb(255, 255, 255)' } },
+        },
+      ],
+    },
+    links: [
+      { color: 'rgb(26, 115, 232)', states: { default: {}, hover: { color: 'rgb(26, 115, 232)' } } },
+    ],
+  },
+  breakpoints: [],
+  iconSystem: [],
+  frameworks: [],
+} as unknown as BrandingResult;
+
+function renderComponents(colorFormat?: ColorFormat): string[] {
+  const lines: string[] = [];
+  const original = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(' ')); };
+  try {
+    displayResults(COMPONENT_DATA, colorFormat ? { colorFormat } : {});
+  } finally {
+    console.log = original;
+  }
+  return lines.map((l) => l.replace(/\[[0-9;]*m/g, ''));
+}
+
+test('borders and component sections default to hex like the palette', () => {
+  const out = renderComponents().join('\n');
+  assert.ok(out.includes('#1a73e8'), out);
+  assert.ok(!out.includes('oklch('), out);
+});
+
+test('borders and component sections follow the selected notation', () => {
+  const out = renderComponents('oklch');
+  // Every section that prints a colour must show the chosen notation.
+  for (const section of ['Borders', 'Buttons', 'Badges', 'Inputs', 'Links']) {
+    const at = out.findIndex((l) => l.includes(section));
+    assert.ok(at >= 0, `${section} section missing`);
+    const body = out.slice(at + 1, at + 12).join('\n');
+    assert.ok(body.includes('oklch('), `${section} still prints hex:\n${body}`);
+  }
+});
+
+test('component colours never repeat one notation in both columns', () => {
+  const rgb = renderComponents('rgb').filter((l) => l.includes('rgb('));
+  assert.ok(rgb.length > 0);
+  for (const line of rgb) {
+    assert.ok(/#[0-9a-f]{6}/.test(line), `secondary column should fall back to hex: ${line}`);
+  }
+});
+
+test('rendering components never mutates the extraction payload', () => {
+  const formats: ColorFormat[] = ['hex', 'rgb', 'oklch', 'lch', 'source'];
+  const before = JSON.stringify(COMPONENT_DATA);
+  for (const f of formats) {
+    renderComponents(f);
+    assert.equal(JSON.stringify(COMPONENT_DATA), before, `${f} mutated the payload`);
+  }
+});

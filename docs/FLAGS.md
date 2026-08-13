@@ -24,6 +24,7 @@ The tables below list the only exceptions: combinations that change each other's
 |---|---|
 | `--approve` without `--compare` | No effect. A warning is printed. |
 | Explicit `[paths...]` arguments + `--crawl` or `--sitemap` | Explicit paths win; link and sitemap discovery are skipped entirely. |
+| `--color-format` + `--json-only` / `--save-output` / `--dtcg` / `--design-md` / `--html` / `--brand-guide` | Ignored by those paths. The flag is presentational and covers terminal output only; the payload carries hex, rgb, lch and oklch for every color. A warning names the paths it misses. |
 | `--no-sandbox` + `--browser firefox` | Ignored. Sandbox flags are Chromium-only. |
 | `BROWSER_CDP_ENDPOINT` (env) + `--browser firefox` | Error. CDP connect is Chromium-only. CDP mode also disables the visible-browser retry on navigation failure. |
 

@@ -28,6 +28,8 @@ export function terminalLink(url, text = url) {
  * @param {Object} data - Extraction results from extractBranding()
  */
 export function displayResults(data: BrandingResult, options: { colorFormat?: ColorFormat } = {}) {
+  const colorFormat: ColorFormat = options.colorFormat || 'hex';
+
   console.log('\n' + chalk.bold.cyan('🎨 Brand Extraction'));
   console.log(chalk.dim('│'));
   console.log(chalk.dim('├─') + ' ' + chalk.blue(terminalLink(data.url)));
@@ -44,17 +46,17 @@ export function displayResults(data: BrandingResult, options: { colorFormat?: Co
 
   displayLogo(data.logo);
   displayFavicons(data.favicons);
-  displayColors(data.colors, options.colorFormat || 'hex');
+  displayColors(data.colors, colorFormat);
   displayTypography(data.typography);
   displaySpacing(data.spacing);
   displayBorderRadius(data.borderRadius);
-  displayBorders(data.borders);
+  displayBorders(data.borders, colorFormat);
   displayShadows(data.shadows);
   displayGradients(data.gradients);
-  displayButtons(data.components?.buttons);
-  displayBadges(data.components?.badges);
-  displayInputs(data.components?.inputs);
-  displayLinks(data.components?.links);
+  displayButtons(data.components?.buttons, colorFormat);
+  displayBadges(data.components?.badges, colorFormat);
+  displayInputs(data.components?.inputs, colorFormat);
+  displayLinks(data.components?.links, colorFormat);
   displayBreakpoints(data.breakpoints);
   displayIconSystem(data.iconSystem);
   displayFrameworks(data.frameworks);
@@ -125,6 +127,26 @@ function normalizeColorFormat(colorString) {
     oklch: colorString,
     hasAlpha: false
   };
+}
+
+// Swatch plus notation pair, as the component sections print a colour.
+// Same rules as the palette: the primary column follows --color-format, the
+// dim secondary never repeats it, and the swatch stays on hex because
+// chalk.bgHex needs one and the identity column must not move.
+function colorCell(colorString, colorFormat: ColorFormat = 'hex'): string {
+  const raw = String(colorString);
+  const formats = normalizeColorFormat(raw);
+  const primary = colorFormat === 'source' ? raw : (formats[colorFormat] || formats.hex);
+  const secondary = colorFormat === 'rgb' ? formats.hex : formats.rgb;
+
+  let swatch;
+  try {
+    swatch = chalk.bgHex(formats.hex)('  ');
+  } catch {
+    swatch = '  ';
+  }
+
+  return `${swatch} ${primary.padEnd(9)} ${secondary}`;
 }
 
 function displayColors(colors, colorFormat: ColorFormat = 'hex') {
@@ -440,7 +462,7 @@ function displayBorderRadius(borderRadius) {
   console.log(chalk.dim('│'));
 }
 
-function displayBorders(borders) {
+function displayBorders(borders, colorFormat: ColorFormat = 'hex') {
   if (!borders) return;
 
   const hasCombinations = borders.combinations && borders.combinations.length > 0;
@@ -456,30 +478,15 @@ function displayBorders(borders) {
     const branch = isLast ? '└─' : '├─';
     const conf = combo.confidence === 'high' ? color.success('●') : color.warning('●');
 
-    try {
-      const formats = normalizeColorFormat(combo.color);
-      const colorBlock = chalk.bgHex(formats.hex)('  ');
+    const elementsText = combo.elements && combo.elements.length > 0
+      ? chalk.dim(` (${combo.elements.join(', ')})`)
+      : '';
 
-      const elementsText = combo.elements && combo.elements.length > 0
-        ? chalk.dim(` (${combo.elements.join(', ')})`)
-        : '';
-
-      console.log(
-        chalk.dim(`│  ${branch}`) + ' ' +
-        `${conf} ${colorBlock} ${combo.width} ${combo.style} ${formats.hex.padEnd(9)} ${formats.rgb}` +
-        elementsText
-      );
-    } catch {
-      const elementsText = combo.elements && combo.elements.length > 0
-        ? chalk.dim(` (${combo.elements.join(', ')})`)
-        : '';
-
-      console.log(
-        chalk.dim(`│  ${branch}`) + ' ' +
-        `${conf} ${combo.width} ${combo.style} ${combo.color}` +
-        elementsText
-      );
-    }
+    console.log(
+      chalk.dim(`│  ${branch}`) + ' ' +
+      `${conf} ${combo.width} ${combo.style} ${colorCell(combo.color, colorFormat)}` +
+      elementsText
+    );
   });
 
   if (highConfCombos.length > 10) {
@@ -535,7 +542,7 @@ function displayGradients(gradients) {
   console.log(chalk.dim('│'));
 }
 
-function displayButtons(buttons) {
+function displayButtons(buttons, colorFormat: ColorFormat = 'hex') {
   if (!buttons || buttons.length === 0) return;
 
   const highConfButtons = buttons.filter(b => b.confidence === 'high');
@@ -556,9 +563,7 @@ function displayButtons(buttons) {
       if (isTransparent) {
         console.log(chalk.dim(`│  ${btnBranch}`) + ' ' + chalk.bold('Variant: transparent'));
       } else {
-        const formats = normalizeColorFormat(defaultBg);
-        const colorBlock = chalk.bgHex(formats.hex)('  ');
-        console.log(chalk.dim(`│  ${btnBranch}`) + ' ' + chalk.bold(`Variant: ${colorBlock} ${formats.hex.padEnd(9)} ${formats.rgb}`));
+        console.log(chalk.dim(`│  ${btnBranch}`) + ' ' + chalk.bold(`Variant: ${colorCell(defaultBg, colorFormat)}`));
       }
     } catch {
       console.log(chalk.dim(`│  ${btnBranch}`) + ' ' + chalk.bold(`Variant: ${btn.states.default.backgroundColor}`));
@@ -586,23 +591,11 @@ function displayButtons(buttons) {
 
       // Only show properties that exist and are meaningful
       if (state.backgroundColor && state.backgroundColor !== 'rgba(0, 0, 0, 0)' && state.backgroundColor !== 'transparent') {
-        try {
-          const formats = normalizeColorFormat(state.backgroundColor);
-          const colorBlock = chalk.bgHex(formats.hex)('  ');
-          props.push({ key: 'bg', value: `${colorBlock} ${formats.hex.padEnd(9)} ${formats.rgb}` });
-        } catch {
-          props.push({ key: 'bg', value: state.backgroundColor });
-        }
+        props.push({ key: 'bg', value: colorCell(state.backgroundColor, colorFormat) });
       }
 
       if (state.color) {
-        try {
-          const formats = normalizeColorFormat(state.color);
-          const colorBlock = chalk.bgHex(formats.hex)('  ');
-          props.push({ key: 'text', value: `${colorBlock} ${formats.hex.padEnd(9)} ${formats.rgb}` });
-        } catch {
-          props.push({ key: 'text', value: state.color });
-        }
+        props.push({ key: 'text', value: colorCell(state.color, colorFormat) });
       }
 
       if (stateInfo.key === 'default') {
@@ -655,7 +648,7 @@ function displayButtons(buttons) {
   console.log(chalk.dim('│'));
 }
 
-function displayBadges(badges) {
+function displayBadges(badges, colorFormat: ColorFormat = 'hex') {
   if (!badges || !badges.all || badges.all.length === 0) return;
 
   const highConfBadges = badges.all.filter(b => b.confidence === 'high');
@@ -705,24 +698,12 @@ function displayBadges(badges) {
 
       // Background color
       if (badge.backgroundColor && badge.backgroundColor !== 'rgba(0, 0, 0, 0)' && badge.backgroundColor !== 'transparent') {
-        try {
-          const formats = normalizeColorFormat(badge.backgroundColor);
-          const colorBlock = chalk.bgHex(formats.hex)('  ');
-          props.push({ key: 'bg', value: `${colorBlock} ${formats.hex.padEnd(9)} ${formats.rgb}` });
-        } catch {
-          props.push({ key: 'bg', value: badge.backgroundColor });
-        }
+        props.push({ key: 'bg', value: colorCell(badge.backgroundColor, colorFormat) });
       }
 
       // Text color
       if (badge.color) {
-        try {
-          const formats = normalizeColorFormat(badge.color);
-          const colorBlock = chalk.bgHex(formats.hex)('  ');
-          props.push({ key: 'text', value: `${colorBlock} ${formats.hex.padEnd(9)} ${formats.rgb}` });
-        } catch {
-          props.push({ key: 'text', value: badge.color });
-        }
+        props.push({ key: 'text', value: colorCell(badge.color, colorFormat) });
       }
 
       // Other properties
@@ -762,7 +743,7 @@ function displayBadges(badges) {
   console.log(chalk.dim('│'));
 }
 
-function displayInputs(inputs) {
+function displayInputs(inputs, colorFormat: ColorFormat = 'hex') {
   if (!inputs) return;
 
   const hasText = inputs.text && inputs.text.length > 0;
@@ -796,23 +777,11 @@ function displayInputs(inputs) {
       const defaultProps = [];
 
       if (defaultState.backgroundColor && defaultState.backgroundColor !== 'rgba(0, 0, 0, 0)' && defaultState.backgroundColor !== 'transparent') {
-        try {
-          const formats = normalizeColorFormat(defaultState.backgroundColor);
-          const colorBlock = chalk.bgHex(formats.hex)('  ');
-          defaultProps.push({ key: 'bg', value: `${colorBlock} ${formats.hex.padEnd(9)} ${formats.rgb}` });
-        } catch {
-          defaultProps.push({ key: 'bg', value: defaultState.backgroundColor });
-        }
+        defaultProps.push({ key: 'bg', value: colorCell(defaultState.backgroundColor, colorFormat) });
       }
 
       if (defaultState.color) {
-        try {
-          const formats = normalizeColorFormat(defaultState.color);
-          const colorBlock = chalk.bgHex(formats.hex)('  ');
-          defaultProps.push({ key: 'text', value: `${colorBlock} ${formats.hex.padEnd(9)} ${formats.rgb}` });
-        } catch {
-          defaultProps.push({ key: 'text', value: defaultState.color });
-        }
+        defaultProps.push({ key: 'text', value: colorCell(defaultState.color, colorFormat) });
       }
 
       if (defaultState.border && defaultState.border !== 'none' && !defaultState.border.includes('0px')) {
@@ -844,13 +813,7 @@ function displayInputs(inputs) {
         const focusProps = [];
 
         if (focusState.backgroundColor) {
-          try {
-            const formats = normalizeColorFormat(focusState.backgroundColor);
-            const colorBlock = chalk.bgHex(formats.hex)('  ');
-            focusProps.push({ key: 'bg', value: `${colorBlock} ${formats.hex.padEnd(9)} ${formats.rgb}` });
-          } catch {
-            focusProps.push({ key: 'bg', value: focusState.backgroundColor });
-          }
+          focusProps.push({ key: 'bg', value: colorCell(focusState.backgroundColor, colorFormat) });
         }
 
         if (focusState.border) {
@@ -858,13 +821,7 @@ function displayInputs(inputs) {
         }
 
         if (focusState.borderColor) {
-          try {
-            const formats = normalizeColorFormat(focusState.borderColor);
-            const colorBlock = chalk.bgHex(formats.hex)('  ');
-            focusProps.push({ key: 'border-color', value: `${colorBlock} ${formats.hex.padEnd(9)} ${formats.rgb}` });
-          } catch {
-            focusProps.push({ key: 'border-color', value: focusState.borderColor });
-          }
+          focusProps.push({ key: 'border-color', value: colorCell(focusState.borderColor, colorFormat) });
         }
 
         if (focusState.boxShadow && focusState.boxShadow !== 'none') {
@@ -935,7 +892,7 @@ function displayBreakpoints(breakpoints) {
   console.log(chalk.dim('│'));
 }
 
-function displayLinks(links) {
+function displayLinks(links, colorFormat: ColorFormat = 'hex') {
   if (!links || links.length === 0) return;
 
   console.log(chalk.dim('├─') + ' ' + chalk.bold('Links'));
@@ -946,13 +903,7 @@ function displayLinks(links) {
     const linkIndent = isLastLink ? '   ' : '│  ';
 
     // Show link variant header with color
-    try {
-      const formats = normalizeColorFormat(link.color);
-      const colorBlock = chalk.bgHex(formats.hex)('  ');
-      console.log(chalk.dim(`│  ${linkBranch}`) + ' ' + `${colorBlock} ${formats.hex.padEnd(9)} ${formats.rgb}`);
-    } catch {
-      console.log(chalk.dim(`│  ${linkBranch}`) + ' ' + `${link.color}`);
-    }
+    console.log(chalk.dim(`│  ${linkBranch}`) + ' ' + colorCell(link.color, colorFormat));
 
     // Display default state
     if (link.states && link.states.default) {
@@ -978,13 +929,7 @@ function displayLinks(links) {
         const hoverProps = [];
 
         if (hoverState.color) {
-          try {
-            const formats = normalizeColorFormat(hoverState.color);
-            const colorBlock = chalk.bgHex(formats.hex)('  ');
-            hoverProps.push({ key: 'color', value: `${colorBlock} ${formats.hex.padEnd(9)} ${formats.rgb}` });
-          } catch {
-            hoverProps.push({ key: 'color', value: hoverState.color });
-          }
+          hoverProps.push({ key: 'color', value: colorCell(hoverState.color, colorFormat) });
         }
 
         if (hoverState.textDecoration) {

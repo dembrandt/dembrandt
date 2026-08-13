@@ -91,6 +91,7 @@ dembrandt <url>                        # Basic extraction (terminal display only
 dembrandt dembrandt.com --json-only     # Output raw JSON to terminal (no formatted display, no file save)
 dembrandt dembrandt.com --save-output   # Save JSON to output/dembrandt.com/YYYY-MM-DDTHH-MM-SS.json
 dembrandt dembrandt.com --dtcg          # Export in W3C Design Tokens (DTCG) format (auto-saves as .tokens.json)
+dembrandt dembrandt.com --color-format=oklch # Notation for displayed colors: hex|rgb|lch|oklch|source (default: hex)
 dembrandt dembrandt.com --dark-mode     # Extract colors from dark mode variant
 dembrandt dembrandt.com --mobile        # Use mobile viewport (390x844) for responsive analysis
 dembrandt dembrandt.com --slow          # 3x longer timeouts (24s hydration) for JavaScript-heavy sites
@@ -113,6 +114,8 @@ dembrandt dembrandt.com --screen-size 2560x1440                  # Physical scre
 ```
 
 Default: formatted terminal display only. Use `--save-output` to persist results as JSON files. Browser automatically retries in visible mode if headless extraction fails.
+
+`--color-format` is presentational and covers terminal output only: the palette, borders and every component section print the notation you pick. `source` shows a declared token as it was authored. The JSON payload is unaffected — it carries hex, rgb, lch and oklch for every color regardless — so `--json-only`, `--save-output`, `--dtcg`, `--design-md`, `--html` and `--brand-guide` are untouched, and drift comparisons stay stable across notations. The CLI warns when you combine it with one of those.
 
 All flags combine unless noted otherwise: see [docs/FLAGS.md](docs/FLAGS.md) for the flag compatibility tables (interactions, ignored combinations, multi-page propagation).
 
