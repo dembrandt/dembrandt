@@ -36,6 +36,16 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.7.0 — typography.styles entries gain count (elements rendering that exact
+ *          style) and typography.sources gains filteredFamilies. Additive: 1.6.x
+ *          consumers ignore both. BEHAVIOR, and it moves existing values:
+ *          a palette colour seen once can no longer be "high" confidence and a
+ *          colour seen once at all caps at "low"; non-heading text above the
+ *          reading range (>24px) is labelled "text" instead of "body", so the
+ *          body token stops inheriting hero copy; and a family covering under
+ *          2% of counted text (minimum 3 elements) is dropped from styles and
+ *          listed in filteredFamilies instead. Baselines from 1.6.x will show
+ *          typography and colour drift once on upgrade.
  *  1.6.0 — typography.sources gains urls: the resolved http(s) font asset and
  *          webfont-provider stylesheet URLs seen during extraction, sorted and
  *          deduped. Lets a consumer re-fetch, cache or verify the actual font
@@ -78,7 +88,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.6.0';
+export const SCHEMA_VERSION = '1.7.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';

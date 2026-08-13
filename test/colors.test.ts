@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { hexToRgb, relativeLuminance, computeWcag, convertColor, deltaE, deltaE2000 } from '../lib/colors.js';
+import { capConfidenceByUsage } from '../lib/extractors/colors.js';
 
 test('hexToRgb parses 6, 3, and 8 digit hex', () => {
   assert.deepEqual(hexToRgb('#ff0000'), { r: 255, g: 0, b: 0 });
@@ -92,4 +93,25 @@ test('emitted lch() is D50 as the CSS spec requires (GitHub #149)', () => {
   assert.ok(Math.abs(parseFloat(m[1]) - 14.03) < 0.05, c.lch);
   assert.ok(Math.abs(parseFloat(m[2]) - 7.44) < 0.05, c.lch);
   assert.ok(Math.abs(parseFloat(m[3]) - 268.93) < 0.1, c.lch);
+});
+
+// Confidence is a claim about brand identity. The palette scored context only,
+// so one hero element could present as a brand colour; spacing and radii have
+// gated on usage from the start.
+
+test('capConfidenceByUsage refuses high confidence to a colour seen once', () => {
+  assert.equal(capConfidenceByUsage('high', 1), 'low');
+  assert.equal(capConfidenceByUsage('high', 2), 'medium');
+  assert.equal(capConfidenceByUsage('high', 3), 'high');
+  assert.equal(capConfidenceByUsage('high', 900), 'high');
+});
+
+test('capConfidenceByUsage demotes a single-occurrence medium', () => {
+  assert.equal(capConfidenceByUsage('medium', 1), 'low');
+  assert.equal(capConfidenceByUsage('medium', 2), 'medium');
+});
+
+test('capConfidenceByUsage never promotes, and never throws on a missing count', () => {
+  assert.equal(capConfidenceByUsage('low', 900), 'low');
+  assert.equal(capConfidenceByUsage('high', undefined), 'low');
 });

@@ -69,6 +69,8 @@ export interface TypographyStyle {
   textTransform?: string;
   isVariable?: boolean;
   isFluid?: boolean;
+  /** How many elements on the page render this exact style. */
+  count?: number;
 }
 
 /** A variable-font axis (e.g. "wght") with the value range seen across the page. */
@@ -94,6 +96,8 @@ export interface Typography {
     openTypeFeatures?: string[];
     /** Resolved font asset/stylesheet URLs discovered during extraction. */
     urls?: string[];
+    /** Families dropped by the usage floor, usually third-party embed faces. */
+    filteredFamilies?: string[];
   };
 }
 

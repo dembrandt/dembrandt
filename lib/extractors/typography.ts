@@ -19,6 +19,47 @@ import type { VariableFontAxis } from '../types.js';
 // trusted as the body font over actual coverage.
 const UA_DEFAULT_FAMILIES = new Set(['times', 'times new roman', 'serif']);
 
+/**
+ * A page's type system is the families it actually sets text in. Third-party
+ * embeds (a widget, a badge, an embedded gallery) drag their own faces onto the
+ * page for a handful of elements, and those arrived in the output looking exactly
+ * like a brand token: dembrandt.com reported six families, four of which covered
+ * under 1% of counted text between them.
+ *
+ * So a family must carry real usage to stay: at least MIN_FAMILY_SHARE of counted
+ * elements, and at least MIN_FAMILY_COUNT of them. The share is what does the
+ * work — an absolute floor alone would either strip a small page bare or let a
+ * widget through on a large one. Nothing is deleted silently: the dropped
+ * families are reported so a caller can see what the floor removed.
+ *
+ * Pure and exported so the floor is unit-testable without a browser.
+ */
+const MIN_FAMILY_SHARE = 0.02;
+const MIN_FAMILY_COUNT = 3;
+
+export function applyFamilyUsageFloor<T extends { family: string; count?: number }>(
+  styles: T[],
+): { styles: T[]; filteredFamilies: string[] } {
+  const totals: Record<string, number> = {};
+  for (const s of styles) totals[s.family] = (totals[s.family] || 0) + (s.count || 1);
+  const counted = Object.values(totals).reduce((a, b) => a + b, 0);
+  if (!counted) return { styles, filteredFamilies: [] };
+
+  const keep = new Set(
+    Object.keys(totals).filter(
+      (f) => totals[f] >= MIN_FAMILY_COUNT && totals[f] / counted >= MIN_FAMILY_SHARE,
+    ),
+  );
+  // Never strip the page down to nothing: if no family clears the floor, the
+  // page is small enough that every family it uses is part of its type system.
+  if (keep.size === 0) return { styles, filteredFamilies: [] };
+
+  return {
+    styles: styles.filter((s) => keep.has(s.family)),
+    filteredFamilies: Object.keys(totals).filter((f) => !keep.has(f)).sort(),
+  };
+}
+
 export function pickBodyFamily(bodyComputedFamily: string | null, weights: Record<string, number>): string | null {
   const base = (bodyComputedFamily || '').trim();
   const w = weights || {};
@@ -255,6 +296,12 @@ export async function extractTypography(page) {
         context = "display";  // non-heading super-sized text (hero, marketing)
       } else if (size <= 12) {
         context = "caption";
+      } else if (size > 24) {
+        // Body means reading copy. Non-heading text between the caption ceiling
+        // and the display floor is marketing or sub-hero copy: still text, but
+        // labelling it "body" put 48px on dembrandt.com's body token. Demote to
+        // the generic text role rather than inventing a level it does not have.
+        context = "text";
       } else if (el.tagName === "LABEL" || el.tagName === "SMALL" ||
                  className.includes("label") || className.includes("caption") || className.includes("badge")) {
         context = "ui";
@@ -274,7 +321,13 @@ export async function extractTypography(page) {
       }
 
       const key = `${family}|${size}|${weight}|${context}|${letterSpacing}|${textTransform}`;
-      if (seen.has(key)) return;
+      if (seen.has(key)) {
+        // First occurrence still defines the style, but how often it recurs is
+        // the only evidence that separates a real type token from one element
+        // that a third-party embed dropped on the page.
+        seen.get(key).count++;
+        return;
+      }
 
       let lineHeightValue = null;
       if (lineHeight !== 'normal') {
@@ -288,6 +341,7 @@ export async function extractTypography(page) {
 
       seen.set(key, {
         context,
+        count: 1,
         family,
         fallbacks: fallbacks.length > 0 ? fallbacks.join(', ') : null,
         size: `${size}px (${(size / 16).toFixed(2)}rem)`,
@@ -347,13 +401,16 @@ export async function extractTypography(page) {
     }
   }
 
+  const { styles, filteredFamilies } = applyFamilyUsageFloor(data.styles);
+
   return {
-    styles: data.styles,
+    styles,
     sources: {
       ...data.sources,
       ...(variableAxes.length ? { variableAxes } : {}),
       ...(openTypeFeatures.length ? { openTypeFeatures } : {}),
       urls,
+      ...(filteredFamilies.length ? { filteredFamilies } : {}),
     },
   };
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseVariableAxes, parseOpenTypeFeatures, pickBodyFamily, filterFontUrls } from '../lib/extractors/typography.js';
+import { parseVariableAxes, parseOpenTypeFeatures, pickBodyFamily, filterFontUrls, applyFamilyUsageFloor } from '../lib/extractors/typography.js';
 
 /**
  * The typography extractor reads computed styles in the browser, but the
@@ -138,4 +138,54 @@ test('filterFontUrls rejects non-http(s) schemes even with a font-like path', ()
     'file:///etc/passwd.woff2',
   ]);
   assert.deepEqual(urls, []);
+});
+
+// A page's type system is the families it sets text in. Third-party embeds drag
+// their own faces onto a handful of elements, and those arrived looking exactly
+// like a brand token: dembrandt.com reported six families, four of which covered
+// under 1% of counted text between them.
+
+const style = (family: string, count: number) => ({ family, count, size: '16px', weight: 400 });
+
+test('applyFamilyUsageFloor drops an embed face that covers a sliver of the page', () => {
+  const { styles, filteredFamilies } = applyFamilyUsageFloor([
+    style('ui-sans-serif', 313),
+    style('JetBrains Mono', 73),
+    style('Inter', 4),
+    style('Montserrat', 2),
+    style('Nohemi', 1),
+  ]);
+  assert.deepEqual(styles.map((s) => s.family), ['ui-sans-serif', 'JetBrains Mono']);
+  assert.deepEqual(filteredFamilies, ['Inter', 'Montserrat', 'Nohemi']);
+});
+
+test('applyFamilyUsageFloor keeps a genuine second family on a small page', () => {
+  const { styles, filteredFamilies } = applyFamilyUsageFloor([
+    style('Inter', 30),
+    style('Playfair Display', 8),
+  ]);
+  assert.equal(styles.length, 2);
+  assert.deepEqual(filteredFamilies, []);
+});
+
+test('applyFamilyUsageFloor never strips a page bare when nothing clears the floor', () => {
+  const input = [style('Inter', 1), style('Georgia', 1)];
+  const { styles, filteredFamilies } = applyFamilyUsageFloor(input);
+  assert.equal(styles.length, 2);
+  assert.deepEqual(filteredFamilies, []);
+});
+
+test('applyFamilyUsageFloor treats a missing count as one element', () => {
+  const { styles } = applyFamilyUsageFloor([
+    { family: 'Inter', size: '16px', weight: 400 },
+    ...Array.from({ length: 60 }, () => style('Inter', 1)),
+    { family: 'Widget Sans', size: '16px', weight: 400 },
+  ]);
+  assert.ok(styles.every((s) => s.family === 'Inter'));
+});
+
+test('applyFamilyUsageFloor is a no-op on empty input', () => {
+  const { styles, filteredFamilies } = applyFamilyUsageFloor([]);
+  assert.deepEqual(styles, []);
+  assert.deepEqual(filteredFamilies, []);
 });

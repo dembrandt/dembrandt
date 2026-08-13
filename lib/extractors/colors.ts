@@ -639,7 +639,14 @@ export async function extractColors(page) {
           variantOf = 'primary';
         }
       }
-      return { ...colorItem, role, onColor, hover, ...(variantOf ? { variantOf } : {}) };
+      return {
+        ...colorItem,
+        confidence: capConfidenceByUsage(colorItem.confidence, colorItem.count),
+        role,
+        onColor,
+        hover,
+        ...(variantOf ? { variantOf } : {}),
+      };
     });
   }
 
@@ -659,6 +666,28 @@ export async function extractColors(page) {
   }
 
   return result;
+}
+
+/**
+ * Confidence is a claim about brand identity, and semantic context alone cannot
+ * carry it. The palette scored context only, so a single hero element — or a
+ * declared token the page never actually paints — came out "high" off one
+ * occurrence. Spacing and radii have gated on usage from the start; this gives
+ * colour the same floor. A colour seen once is medium at best, whatever its
+ * score says, and two occurrences are the least that can support "high".
+ *
+ * Pure and exported so the floor is unit-testable without a browser.
+ */
+const MIN_COUNT_FOR_HIGH = 3;
+const MIN_COUNT_FOR_MEDIUM = 2;
+
+export function capConfidenceByUsage(confidence, count) {
+  const seen = typeof count === 'number' ? count : 0;
+  if (confidence === 'high' && seen < MIN_COUNT_FOR_HIGH) {
+    return seen >= MIN_COUNT_FOR_MEDIUM ? 'medium' : 'low';
+  }
+  if (confidence === 'medium' && seen < MIN_COUNT_FOR_MEDIUM) return 'low';
+  return confidence;
 }
 
 function hexToRgb(hex) {
