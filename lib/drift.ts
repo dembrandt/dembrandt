@@ -159,22 +159,6 @@ function colorWeight(e: ColorEntry): number {
   return roleW * Math.sqrt(Math.max(1, e.count));
 }
 
-/**
- * Compare the semantic map role by role: primary against primary, not against
- * whatever else is on the page.
- *
- * The palette pass cannot see this. It matches colours to their nearest
- * neighbour by delta-E, so a rebrand that promotes an existing palette colour to
- * primary leaves the palette set identical and scores zero — the roles moved,
- * the colours did not. The semantic map used to be read only to attach
- * role labels to palette entries, so changing the brand primary produced no
- * drift at all (DEM-208).
- *
- * A role that moves is the most severe colour event there is, so these use the
- * same ROLE_WEIGHT ladder as the palette and are folded into the colour
- * category. A role appearing or disappearing is scored as a full change: going
- * from "no detected primary" to a primary is not a neutral event.
- */
 /** Semantic values are authored strings, so normalise to hex identity before
  * comparing. Falls back to the raw string when the parser cannot read it, which
  * keeps an unparseable value comparing equal to itself rather than fabricating
@@ -198,27 +182,38 @@ function present(value: string | undefined): string | undefined {
   return value;
 }
 
-/**
- * A role appearing or disappearing is reported but never scored.
- *
- * Semantic presence is a derived claim, not evidence. `accent` is emitted only
- * when confidence, chroma and hue-distance predicates all pass, and those flip
- * between runs of an unchanged page — scoring that alone produced 11 against a
- * threshold of 10, a red gate with zero design change. The colour evidence
- * underneath already sits in the palette, which is scored: if the colour truly
- * left the page, the palette charges for it there. Charging again here is
- * double-counting the detector's opinion on top of the fact.
- *
- * So a vanished role shows up in the report, where a human can read it, and
- * moves no score. Only a role whose value actually changed is scored.
- */
-
 /** Spec-parser fallback for the notations parseColor cannot read. */
 function rgbFromCss(value: string): [number, number, number] | null {
   const parsed = parseCssColor(value);
   return parsed ? [parsed.r, parsed.g, parsed.b] : null;
 }
 
+/**
+ * Compare the semantic map role by role: primary against primary, not against
+ * whatever else is on the page.
+ *
+ * The palette pass cannot see this. It matches colours to their nearest
+ * neighbour by delta-E, so a rebrand that promotes an existing palette colour to
+ * primary leaves the palette set identical and scores zero — the roles moved,
+ * the colours did not. The semantic map used to be read only to attach
+ * role labels to palette entries, so changing the brand primary produced no
+ * drift at all (DEM-208).
+ *
+ * A role that moves is the most severe colour event there is, so these use the
+ * same ROLE_WEIGHT ladder as the palette and are folded into the colour
+ * category.
+ *
+ * A role appearing or disappearing is reported but never scored. Semantic
+ * presence is a derived claim, not evidence. `accent` is emitted only when
+ * confidence, chroma and hue-distance predicates all pass, and those flip
+ * between runs of an unchanged page — scoring that alone produced 11 against a
+ * threshold of 10, a red gate with zero design change. The colour evidence
+ * underneath already sits in the palette, which is scored: if the colour truly
+ * left the page, the palette charges for it there. Charging again here is
+ * double-counting the detector's opinion on top of the fact. So a vanished role
+ * shows up in the report, where a human can read it, and moves no score. Only a
+ * role whose value actually changed is scored.
+ */
 function compareSemantic(
   base: Record<string, string> | undefined,
   cand: Record<string, string> | undefined,

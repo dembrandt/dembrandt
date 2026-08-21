@@ -6,7 +6,7 @@
 - Drift compares `colors.semantic` role by role. The engine read that map only to attach role labels to palette entries, so a changed brand primary produced no drift at all: a rebrand that promotes a colour the page already used leaves the palette set identical and reported stable (DEM-208). Changes now appear as `semantic.<role>`, and `docs/FLAGS.md` no longer describes `--ai` primary drift the engine could not see
 
 ### Changed
-- Output contract at schema 1.8.0. No shape change; colour scores rise wherever a semantic role moved, so a baseline whose primary differs from the candidate's starts reporting it on upgrade
+- Output contract at schema 1.8.0. No shape change; colour scores rise wherever a semantic role moved, so a baseline whose primary differs from the candidate's starts reporting it on upgrade. Measured churn on upgrade is 0 for dembrandt.com and stripe.com (threshold 10): a site whose roles did not move scores exactly as before, and only a genuinely moved role costs anything. If an existing baseline does flip your gate red, the role really did change: read it in the report and re-approve once with `--compare <baseline> --approve`
 
 ## [0.28.0] - 2026-08-13
 
