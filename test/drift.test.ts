@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeDrift } from '../lib/drift.js';
+import { deltaE } from '../lib/colors.js';
 
 /**
  * Low-confidence tokens are single-use, margin-of-detection elements the
@@ -283,4 +284,35 @@ test('a high-confidence radius change is still real drift', () => {
 
   const report = computeDrift(base, changed);
   assert.ok(report.changes.some((c) => c.category === 'radius'), 'high-confidence radius change must be reported');
+});
+
+/**
+ * DEM-211. drift.ts used to carry its own Lab conversion with truncated matrix
+ * coefficients, so the same CIE76 metric disagreed with lib/colors.ts by up to
+ * 0.03. Both now share one conversion. These pin the property that made the
+ * duplicate dangerous: the shared deltaE decides drift's colour classification,
+ * so a pair colors.ts calls closer than the just-noticeable difference must be
+ * stable here, and a pair it calls further must not be.
+ */
+test('drift classification agrees with the shared deltaE across the colorSame boundary', () => {
+  const base = '#133174';
+  // Below JND (colorSame 2.3) and above it, measured with the shared metric.
+  const imperceptible = '#143276';
+  const perceptible = '#1a3a80';
+
+  assert.ok(deltaE(base, imperceptible) < 2.3, 'fixture drifted: expected a sub-JND pair');
+  assert.ok(deltaE(base, perceptible) > 2.3, 'fixture drifted: expected a supra-JND pair');
+
+  const paletteOf = (hex: string) => ({
+    colors: { palette: [{ normalized: hex, count: 40, confidence: 'high' }], semantic: {}, cssVariables: {} },
+  });
+
+  const same = computeDrift(fixture(paletteOf(base)), fixture(paletteOf(imperceptible)));
+  const moved = computeDrift(fixture(paletteOf(base)), fixture(paletteOf(perceptible)));
+
+  const colorOf = (r: ReturnType<typeof computeDrift>) =>
+    r.categories.find((c) => c.category === 'color');
+
+  assert.equal(colorOf(same)?.changed, 0, 'a sub-JND colour was reported as changed');
+  assert.equal(colorOf(moved)?.changed, 1, 'a supra-JND colour was not reported as changed');
 });

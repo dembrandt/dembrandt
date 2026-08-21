@@ -185,6 +185,21 @@ export function formatOklch(oklch, alpha?: number) {
 }
 
 /**
+ * Convert 0-255 sRGB to CIE Lab against D65. Exported because the drift engine
+ * needs Lab from parsed rgb triples rather than from hex, and a second hand-
+ * rolled copy of this maths is how the same metric ends up disagreeing with
+ * itself (DEM-211).
+ * @param {number} r
+ * @param {number} g
+ * @param {number} b
+ * @returns {{ l: number, a: number, b: number }}
+ */
+export function rgbToLab(r, g, b) {
+  const xyz = linearRgbToXyz(srgbToLinear(r), srgbToLinear(g), srgbToLinear(b));
+  return xyzToLab(xyz.x, xyz.y, xyz.z);
+}
+
+/**
  * Compute CIE76 delta-E perceptual distance between two hex colors.
  * Returns 0 for identical colors, ~100 for maximally different.
  * @param {string} hex1 - Hex color string (e.g. "#ff0000")
@@ -192,15 +207,10 @@ export function formatOklch(oklch, alpha?: number) {
  * @returns {number}
  */
 export function deltaE(hex1, hex2) {
-  function toLab(hex) {
+  const toLab = (hex) => {
     const rgb = hexToRgb(hex);
-    if (!rgb) return null;
-    const lr = srgbToLinear(rgb.r);
-    const lg = srgbToLinear(rgb.g);
-    const lb = srgbToLinear(rgb.b);
-    const xyz = linearRgbToXyz(lr, lg, lb);
-    return xyzToLab(xyz.x, xyz.y, xyz.z);
-  }
+    return rgb ? rgbToLab(rgb.r, rgb.g, rgb.b) : null;
+  };
   const lab1 = toLab(hex1);
   const lab2 = toLab(hex2);
   if (!lab1 || !lab2) return 999;

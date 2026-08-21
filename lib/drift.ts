@@ -17,6 +17,8 @@ import type { BrandingResult as ExtractionResult, TypographyStyle, Confidence } 
 // drift against the same colour written as hex. One spec parser, not a second
 // copy of one living here.
 import { parseCssColor } from "./color-parse.js";
+// One Lab conversion for the whole tree; see the note on deltaE below (DEM-211).
+import { rgbToLab } from "./colors.js";
 
 export interface DriftConfig {
   /** ΔE at or below this: colors treated as identical. */
@@ -95,31 +97,27 @@ function parseColor(input: string): [number, number, number] | null {
   return null;
 }
 
-function rgbToLab([r, g, b]: [number, number, number]): [number, number, number] {
-  const lin = (c: number) => {
-    const v = c / 255;
-    return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-  };
-  const R = lin(r);
-  const G = lin(g);
-  const B = lin(b);
-  const X = (R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047;
-  const Y = R * 0.2126 + G * 0.7152 + B * 0.0722;
-  const Z = (R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883;
-  const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
-  const fx = f(X);
-  const fy = f(Y);
-  const fz = f(Z);
-  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
-}
-
+/**
+ * CIE76 distance between two colour strings.
+ *
+ * The Lab conversion is imported, not rewritten: this file used to carry its
+ * own copy with truncated matrix coefficients, so the same metric computed here
+ * and in lib/colors.ts disagreed by up to 0.03 (DEM-211).
+ *
+ * The failure convention is this file's own and deliberately differs from
+ * colors.ts, which returns 999 so a dedup threshold treats unparseable colours
+ * as distinct. Drift needs the stronger claim: two values it cannot read are
+ * incomparable, not far apart. Identical unreadable strings (`var(--brand)`
+ * against itself) are 0 because nothing changed; different ones are Infinity,
+ * which callers must handle rather than report as a distance.
+ */
 function deltaE(a: string, b: string): number {
   const ra = parseColor(a);
   const rb = parseColor(b);
   if (!ra || !rb) return a.trim() === b.trim() ? 0 : Infinity;
-  const [l1, a1, b1] = rgbToLab(ra);
-  const [l2, a2, b2] = rgbToLab(rb);
-  return Math.sqrt((l1 - l2) ** 2 + (a1 - a2) ** 2 + (b1 - b2) ** 2);
+  const la = rgbToLab(ra[0], ra[1], ra[2]);
+  const lb = rgbToLab(rb[0], rb[1], rb[2]);
+  return Math.sqrt((la.l - lb.l) ** 2 + (la.a - lb.a) ** 2 + (la.b - lb.b) ** 2);
 }
 
 /* ------------------------------ helpers ------------------------------- */
