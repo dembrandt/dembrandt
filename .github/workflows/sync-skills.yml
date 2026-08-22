@@ -1,7 +1,16 @@
 name: Sync downstream repos
 
 on:
+  # Secrets are declared rather than inherited. `secrets: inherit` hands a
+  # reusable workflow every secret the caller holds, including the ones it has
+  # no business seeing; naming them keeps the blast radius of this file to the
+  # two cross-repo tokens it actually uses.
   workflow_call:
+    secrets:
+      SKILLS_REPO_PAT:
+        required: true
+      NEXT_REPO_PAT:
+        required: true
   workflow_dispatch:
     inputs:
       tag:
@@ -20,13 +29,13 @@ jobs:
 
     steps:
       - name: Checkout dembrandt-skills
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: dembrandt/dembrandt-skills
           token: ${{ secrets.SKILLS_REPO_PAT }}
           path: dembrandt-skills
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
 
@@ -41,7 +50,7 @@ jobs:
             sed -i "s/dembrandt@[0-9][0-9.]*/dembrandt@${VERSION}/g" {} \;
 
       - name: Create PR in dembrandt-skills
-        uses: peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ secrets.SKILLS_REPO_PAT }}
           path: dembrandt-skills
@@ -67,13 +76,13 @@ jobs:
 
     steps:
       - name: Checkout dembrandt-next
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: dembrandt/dembrandt-next
           token: ${{ secrets.NEXT_REPO_PAT }}
           path: dembrandt-next
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
 
@@ -92,7 +101,7 @@ jobs:
           sed -i "s/\"softwareVersion\": \"[0-9][0-9.]*\"/\"softwareVersion\": \"${VERSION}\"/" app/layout.tsx
 
       - name: Create PR in dembrandt-next
-        uses: peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ secrets.NEXT_REPO_PAT }}
           path: dembrandt-next
