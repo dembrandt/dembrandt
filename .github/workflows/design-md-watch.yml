@@ -1,0 +1,177 @@
+name: DESIGN.md Watch
+
+# DESIGN.md is a format owned by google-labs-code/design.md, not by us. Our
+# `--design-md` export has to satisfy a spec we do not control, and the spec is
+# pre-1.0, so a minor release is allowed to break it. Nothing here fails when
+# that happens: the export keeps writing a file, and the first person to notice
+# is a user piping it into `npx @google/design.md lint`.
+#
+# This checks weekly, and also lints the emitted document against the latest
+# published release without moving our pin, so the pin stays a deliberate
+# choice rather than a blind spot. On a break it hands the update to an agent,
+# which opens a PR. Falls back to an issue when no agent credential is set.
+#
+# Mirrors tailwind-watch.yml deliberately: same failure class, same shape.
+
+on:
+  schedule:
+    - cron: "0 6 * * 2"
+  workflow_dispatch:
+
+env:
+  # Job-level so every step's `if` can read it. A step cannot reliably read env
+  # it defines on itself from its own `if` expression.
+  HAS_AGENT: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Check published DESIGN.md spec release
+        id: check
+        run: |
+          set +e
+          out=$(node tools/design-md-check.mjs 2>&1)
+          code=$?
+          echo "$out"
+          {
+            echo "report<<EOF"
+            echo "$out"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      # Exit 2 is "npm was unreachable", not "the emitter is wrong". Next week
+      # retries; a red scheduled job every time npm hiccups only teaches you to
+      # ignore this workflow.
+      - name: Note check failure
+        if: steps.check.outputs.code == '2'
+        run: echo "::warning::design-md-check could not reach the registry; retrying next run."
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The lint test pins @google/design.md exactly, so it only ever exercises
+      # the release we froze. A patch that tightens an existing rule would
+      # otherwise be seen by nothing: design-md-check watches the version
+      # number, and the export pins nothing at runtime. This runs the same test
+      # against the published latest without moving the pin.
+      - name: Lint the emitted DESIGN.md against the latest spec release
+        id: latest
+        continue-on-error: true
+        run: |
+          npm i --no-save @google/design.md@latest
+          npm run build
+          node --test dist/test/design-md-lint.test.js
+
+      - name: Update the emitter
+        id: agent
+        if: (steps.check.outputs.code == '1' || steps.latest.outcome == 'failure') && env.HAS_AGENT == 'true'
+        uses: anthropics/claude-code-action@v1
+        continue-on-error: true
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            One of two things happened: @google/design.md published a new
+            release, or our emitted DESIGN.md stopped linting cleanly against
+            the latest published one. Check which before assuming.
+
+            Version check (exit 1 means a new release, 0 means still in sync):
+
+            ${{ steps.check.outputs.report }}
+
+            Lint against latest: ${{ steps.latest.outcome }}. If that says
+            `failure`, read the job log for the finding that broke. A patch can
+            tighten an existing rule without changing the version series, and
+            that failure is the only signal we get for it.
+
+            The `--design-md` export in `lib/formatters/markdown.ts` emits a
+            document conforming to the DESIGN.md spec. Your job is to find out
+            whether the new release changed anything it depends on, and to
+            update it if so.
+
+            Do this:
+
+            1. Read `lib/formatters/markdown.ts`, in particular
+               `DESIGN_MD_TARGET_SPEC` and every `build*` function that writes
+               front matter or a section heading.
+            2. Read `docs/spec.md` in github.com/google-labs-code/design.md at
+               the new release tag, and its changelog. Determine what moved in:
+               section order and allowed headings, token types (Color,
+               Dimension, Typography), the `{token.reference}` syntax, the list
+               of valid component properties, and which findings are errors
+               rather than warnings. The spec is pre-1.0, so treat a minor bump
+               as potentially breaking.
+            3. Apply whatever the answer requires. If nothing moved, the only
+               change is bumping `DESIGN_MD_TARGET_SPEC`. If the format
+               changed, update the emitter and the assertions in
+               `test/markdown.test.ts` that pin the old shape.
+            4. Bump the `@google/design.md` devDependency to the new release,
+               pinned exactly. It exists only so `test/design-md-lint.test.ts`
+               can run the real linter over emitted output; that test is what
+               actually proves conformance, so it must pass before you open the
+               PR. Do not adopt a version published less than 30 days ago:
+               check `npm view @google/design.md time --json` and say so in the
+               PR if the newest release is too recent to pin.
+            5. Run `npm run build`, `npm test` and `npm run lint`. All must
+               pass. Do not weaken an assertion to make a test pass; if a test
+               now fails for a real reason, fix the emitter.
+            6. Open a PR on a branch named `dem-design-md-<version>`.
+
+            In the PR body, state plainly which parts of the spec you verified,
+            which changed, and cite the section of the spec you checked each
+            against. If you could not verify something, say so rather than
+            assuming it is unchanged. Keep the PR description terse: no
+            marketing, no summary of what the export is for.
+
+            Repo conventions: no em dashes, no Co-Authored-By trailer, terse
+            commit messages.
+          claude_args: |
+            --allowed-tools Read,Edit,Write,WebFetch,WebSearch,Bash(npm run build),Bash(npm test),Bash(npm run lint),Bash(npm i *),Bash(npm view *),Bash(git *),Bash(gh pr create*)
+
+      # No agent credential, or the agent run failed: fall back to the issue so
+      # the signal is never silently dropped.
+      - name: Open issue
+        if: (steps.check.outputs.code == '1' || steps.latest.outcome == 'failure') && (env.HAS_AGENT != 'true' || steps.agent.outcome == 'failure')
+        env:
+          REPORT: ${{ steps.check.outputs.report }}
+          LATEST: ${{ steps.latest.outcome }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const title = 'DESIGN.md: upstream spec moved, review the --design-md export';
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'design-md-watch',
+            });
+            if (existing.data.some(i => i.title === title)) return;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              labels: ['design-md-watch'],
+              body: [
+                '```',
+                process.env.REPORT,
+                '```',
+                '',
+                `Lint against the latest published spec release: **${process.env.LATEST}**.`,
+              ].join('\n'),
+            });
