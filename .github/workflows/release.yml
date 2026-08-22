@@ -42,16 +42,45 @@ jobs:
       - name: Run unit tests
         run: npm test
 
-      - name: Publish to npm (skip if already published manually)
+      # Trusted publishing (OIDC). npm mints a short-lived credential from the
+      # `id-token: write` permission above, so there is no long-lived token in
+      # repo secrets and nothing to leak or rotate. It also attaches provenance,
+      # which lets anyone verify that this tarball was built from this commit in
+      # this workflow rather than uploaded from a laptop.
+      #
+      # Requires the package to have a trusted publisher configured on
+      # npmjs.com pointing at this repository and this workflow file. Without
+      # that, publish fails closed with an auth error, which is the correct
+      # failure: a release that cannot prove where it came from should not ship.
+      - name: Publish to npm
         run: |
-          PKG=$(node -p "require('./package.json').name + '@' + require('./package.json').version")
-          if npm view "$PKG" version --json 2>/dev/null | grep -q '"'; then
-            echo "$PKG is already on npm, skipping publish (published manually)."
-          else
-            npm publish --access public
+          set -euo pipefail
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+
+          # Distinguish the three outcomes npm view collapses into one. Exit 0
+          # with a version means it is published; exit non-zero containing E404
+          # means it is not; anything else is the registry being unreachable,
+          # which must not be read as "already published". The previous guard
+          # grepped for a quote character, and npm prints its JSON *errors* with
+          # quotes too, so a registry hiccup silently skipped the publish while
+          # the run still reported success.
+          set +e
+          PUBLISHED=$(npm view "$NAME@$VERSION" version 2>&1)
+          CODE=$?
+          set -e
+
+          if [ $CODE -eq 0 ] && [ -n "$PUBLISHED" ]; then
+            echo "$NAME@$VERSION is already on npm, nothing to do."
+            exit 0
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          if ! printf '%s' "$PUBLISHED" | grep -q 'E404'; then
+            echo "Could not determine whether $NAME@$VERSION is published:"
+            printf '%s\n' "$PUBLISHED"
+            exit 1
+          fi
+
+          npm publish --access public --provenance
 
   sync-downstream:
     needs: publish-npm
