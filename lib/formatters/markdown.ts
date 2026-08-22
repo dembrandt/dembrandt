@@ -7,6 +7,26 @@
 import { convertColor, deltaE } from '../colors.js';
 
 /**
+ * The @google/design.md release this emitter is known to satisfy.
+ *
+ * DESIGN.md is a format owned upstream, not by us, so conformance is something
+ * we verify rather than define. The spec is pre-1.0, which means a minor bump
+ * is where it is allowed to break: sections can be reordered, token types
+ * narrowed, component properties dropped. `npm run design-md:check` compares
+ * this against the published latest, and `test/design-md-lint.test.ts` runs the
+ * real linter over real emitter output, so a spec change surfaces as a failing
+ * gate rather than as a user discovering our export no longer validates.
+ *
+ * This records conformance, which is a different decision from which version we
+ * install. Verified against 0.4.0 by linting emitted output; the devDependency
+ * stays at 0.3.0 because 0.4.0 was published 2026-07-27 and the 30-day
+ * dependency cooldown had not elapsed. Move the devDependency once it has.
+ *
+ * Bump this only after the lint test passes against the new release.
+ */
+export const DESIGN_MD_TARGET_SPEC = '0.4';
+
+/**
  * @param {object} result - dembrandt extraction result
  * @returns {string} DESIGN.md content
  */
