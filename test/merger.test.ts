@@ -372,19 +372,6 @@ test('a page missing whole sections does not break the merge', () => {
 });
 
 
-/**
- * mergeResults() is an untyped holdover from the JS migration, so its inferred
- * return does not carry the voice keys. This states what the merge is expected
- * to produce rather than reaching for `any`.
- */
-interface MergedVoiceShape {
-  voice?: { pageType: string; metrics: { structural: { meanSentenceLength: number } } } | null;
-  pages: Array<{ voice?: MergedVoiceShape['voice']; voiceSkipped?: string }>;
-}
-
-const merge = (results: unknown[]): MergedVoiceShape =>
-  mergeResults(results) as unknown as MergedVoiceShape;
-
 test('voice is preserved per page and never merged across them', () => {
   // Colours and type are tokens, so the same value on three pages is stronger
   // evidence of one thing. Copy is not: averaging a marketing page's sentence
@@ -392,24 +379,24 @@ test('voice is preserved per page and never merged across them', () => {
   const home = page('https://a.com/', { voice: {"fragments": [{"role": "hero-h1", "text": "Heading", "order": 0}], "metrics": {"structural": {"wordCount": 200, "sentenceCount": 4, "meanSentenceLength": 11, "sentenceLengthStdev": 2, "exclamationRatio": 0, "questionRatio": 0, "longWordRatio": 0, "avgSyllablesPerWord": 1.5, "lowSample": true}, "lexical": null, "lang": "en"}, "pageType": "landing"} });
   const docs = page('https://a.com/docs', { voice: {"fragments": [{"role": "hero-h1", "text": "Heading", "order": 0}], "metrics": {"structural": {"wordCount": 400, "sentenceCount": 4, "meanSentenceLength": 24, "sentenceLengthStdev": 2, "exclamationRatio": 0, "questionRatio": 0, "longWordRatio": 0, "avgSyllablesPerWord": 1.5, "lowSample": true}, "lexical": null, "lang": "en"}, "pageType": "docs"} });
 
-  const merged = merge([home, docs]);
+  const merged = mergeResults([home, docs]);
 
   // Root keeps the homepage's, as with logo and colors.rawColors.
-  assert.equal(merged.voice?.pageType, 'landing');
-  assert.equal(merged.voice?.metrics.structural.meanSentenceLength, 11);
+  assert.equal(merged.voice.pageType, 'landing');
+  assert.equal(merged.voice.metrics.structural.meanSentenceLength, 11);
 
   // Both pages survive intact, so the variation between them stays readable.
   assert.equal(merged.pages.length, 2);
-  assert.equal(merged.pages[0].voice?.pageType, 'landing');
-  assert.equal(merged.pages[1].voice?.pageType, 'docs');
-  assert.equal(merged.pages[1].voice?.metrics.structural.meanSentenceLength, 24);
+  assert.equal(merged.pages[0].voice.pageType, 'landing');
+  assert.equal(merged.pages[1].voice.pageType, 'docs');
+  assert.equal(merged.pages[1].voice.metrics.structural.meanSentenceLength, 24);
 });
 
 test('a page that yielded no voice carries its reason instead of a gap', () => {
   const home = page('https://a.com/', { voice: {"fragments": [{"role": "hero-h1", "text": "Heading", "order": 0}], "metrics": {"structural": {"wordCount": 200, "sentenceCount": 4, "meanSentenceLength": 11, "sentenceLengthStdev": 2, "exclamationRatio": 0, "questionRatio": 0, "longWordRatio": 0, "avgSyllablesPerWord": 1.5, "lowSample": true}, "lexical": null, "lang": "en"}, "pageType": "landing"} });
   const thin = page('https://a.com/contact', { voice: null, voiceSkipped: 'below-word-floor' });
 
-  const merged = merge([home, thin]);
+  const merged = mergeResults([home, thin]);
 
   assert.equal(merged.pages[1].voice, null);
   assert.equal(merged.pages[1].voiceSkipped, 'below-word-floor');
@@ -418,7 +405,7 @@ test('a page that yielded no voice carries its reason instead of a gap', () => {
 });
 
 test('a run without --voice gains no voice keys', () => {
-  const merged = merge([page('https://a.com/'), page('https://a.com/b')]);
+  const merged = mergeResults([page('https://a.com/'), page('https://a.com/b')]);
   assert.equal('voice' in merged, false);
   assert.equal('voice' in merged.pages[0], false);
 });
