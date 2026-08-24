@@ -440,6 +440,14 @@ export function mergeResults(results) {
     iconSystem: mergeByName(results, r => r.iconSystem),
     frameworks: mergeByName(results, r => r.frameworks),
     ...(results.some(r => r.wcag) ? { wcag: mergeWcag(results) } : {}),
+    // Voice is deliberately NOT merged. Colours and type are tokens, so the same
+    // value on three pages is stronger evidence of one thing. Copy is not: the
+    // same CTA on three pages is one button seen three times, and averaging a
+    // marketing page's sentence length with a docs page's yields a number that
+    // describes neither. The variation between pages is the finding, so it is
+    // preserved per page and the root keeps the homepage's, as with rawColors.
+    ...(home.voice !== undefined ? { voice: home.voice } : {}),
+    ...(home.voiceSkipped ? { voiceSkipped: home.voiceSkipped } : {}),
     // rawColors are per-page filter diagnostics: merging them would destroy the
     // page provenance they exist for, so each page keeps its own set here.
     // colors.rawColors stays the first page's (via mergeColors) for back-compat.
@@ -447,6 +455,8 @@ export function mergeResults(results) {
       url: r.url,
       extractedAt: r.extractedAt,
       ...(r.colors?.rawColors ? { rawColors: r.colors.rawColors } : {}),
+      ...(r.voice !== undefined ? { voice: r.voice } : {}),
+      ...(r.voiceSkipped ? { voiceSkipped: r.voiceSkipped } : {}),
     })),
   };
 }

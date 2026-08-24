@@ -411,7 +411,17 @@ export interface BrandingResult {
   /** Null rather than partial when the page yields too little text to measure. */
   voice?: Voice | null;
   voiceSkipped?: VoiceSkipReason;
-  pages?: { url: string; extractedAt?: string; rawColors?: PaletteColor[] }[];
+  /**
+   * Per-page results in a multi-page run. Voice sits here rather than being
+   * merged: the variation between pages is the finding, not noise to average.
+   */
+  pages?: {
+    url: string;
+    extractedAt?: string;
+    rawColors?: PaletteColor[];
+    voice?: Voice | null;
+    voiceSkipped?: VoiceSkipReason;
+  }[];
   /**
    * CLI-emitted note about the extraction itself (e.g. canvas-only sites). This is
    * NOT a user annotation — a user note belongs in the storage envelope around the

@@ -370,3 +370,42 @@ test('a page missing whole sections does not break the merge', () => {
   assert.ok(Array.isArray(merged.colors.palette));
   assert.ok(Array.isArray(merged.components.buttons));
 });
+
+
+test('voice is preserved per page and never merged across them', () => {
+  // Colours and type are tokens, so the same value on three pages is stronger
+  // evidence of one thing. Copy is not: averaging a marketing page's sentence
+  // length with a docs page's yields a number describing neither page.
+  const home = page('https://a.com/', { voice: {"fragments": [{"role": "hero-h1", "text": "Heading", "order": 0}], "metrics": {"structural": {"wordCount": 200, "sentenceCount": 4, "meanSentenceLength": 11, "sentenceLengthStdev": 2, "exclamationRatio": 0, "questionRatio": 0, "longWordRatio": 0, "avgSyllablesPerWord": 1.5, "lowSample": true}, "lexical": null, "lang": "en"}, "pageType": "landing"} });
+  const docs = page('https://a.com/docs', { voice: {"fragments": [{"role": "hero-h1", "text": "Heading", "order": 0}], "metrics": {"structural": {"wordCount": 400, "sentenceCount": 4, "meanSentenceLength": 24, "sentenceLengthStdev": 2, "exclamationRatio": 0, "questionRatio": 0, "longWordRatio": 0, "avgSyllablesPerWord": 1.5, "lowSample": true}, "lexical": null, "lang": "en"}, "pageType": "docs"} });
+
+  const merged = mergeResults([home, docs]) as any;
+
+  // Root keeps the homepage's, as with logo and colors.rawColors.
+  assert.equal(merged.voice.pageType, 'landing');
+  assert.equal(merged.voice.metrics.structural.meanSentenceLength, 11);
+
+  // Both pages survive intact, so the variation between them stays readable.
+  assert.equal(merged.pages.length, 2);
+  assert.equal(merged.pages[0].voice.pageType, 'landing');
+  assert.equal(merged.pages[1].voice.pageType, 'docs');
+  assert.equal(merged.pages[1].voice.metrics.structural.meanSentenceLength, 24);
+});
+
+test('a page that yielded no voice carries its reason instead of a gap', () => {
+  const home = page('https://a.com/', { voice: {"fragments": [{"role": "hero-h1", "text": "Heading", "order": 0}], "metrics": {"structural": {"wordCount": 200, "sentenceCount": 4, "meanSentenceLength": 11, "sentenceLengthStdev": 2, "exclamationRatio": 0, "questionRatio": 0, "longWordRatio": 0, "avgSyllablesPerWord": 1.5, "lowSample": true}, "lexical": null, "lang": "en"}, "pageType": "landing"} });
+  const thin = page('https://a.com/contact', { voice: null, voiceSkipped: 'below-word-floor' });
+
+  const merged = mergeResults([home, thin]) as any;
+
+  assert.equal(merged.pages[1].voice, null);
+  assert.equal(merged.pages[1].voiceSkipped, 'below-word-floor');
+  // The root still reports the homepage's voice rather than being dragged down.
+  assert.ok(merged.voice);
+});
+
+test('a run without --voice gains no voice keys', () => {
+  const merged = mergeResults([page('https://a.com/'), page('https://a.com/b')]) as any;
+  assert.equal('voice' in merged, false);
+  assert.equal('voice' in merged.pages[0], false);
+});
