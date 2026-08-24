@@ -110,4 +110,8 @@ A pipeline can branch on the exit code; "design drifted" and "extraction broke" 
 
 With `--json-only`, a failure also prints a machine-readable `{ "error": { "code", "message" } }` to stdout.
 
-`3` exists so a pipeline can tell "this run was not recorded" apart from "the extractor is broken". Passing `--key` states an intent, and a run that could not meet it has not done what was asked, even though its output is valid: the payload was over the size limit, the key was rejected, or the API was unreachable. Reporting success there means drift tracking stops recording and nothing ever says so. Drift (`1`) takes precedence when both apply, since drift is the more actionable signal and the sync failure is printed regardless.
+`3` exists so a pipeline can tell "this run was not recorded" apart from "the extractor is broken". Passing `--key` states an intent, and a run that could not meet it has not done what was asked, even though its output is valid: the payload was over the size limit, the key was rejected, or the API was unreachable. Reporting success there means drift tracking stops recording and nothing ever says so.
+
+**Rate limiting is not a sync failure.** Exceeding the account quota (20/hour, 200/day, 500/week) still warns and exits `0`, because hitting a quota is the system working as designed rather than a fault to fix, and a snapshot job should not turn a deploy pipeline red for it. A rejected key, an oversized payload or an unreachable API are the opposite: they need someone to act, and nobody acts on what nobody sees.
+
+Drift (`1`) takes precedence when both apply, since drift is the more actionable signal and the sync failure is printed regardless.
