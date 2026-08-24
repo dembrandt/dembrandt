@@ -408,6 +408,9 @@ export interface BrandingResult {
   iconSystem: IconSystem[];
   frameworks: Framework[];
   wcag?: WcagPair[];
+  /** Null rather than partial when the page yields too little text to measure. */
+  voice?: Voice | null;
+  voiceSkipped?: VoiceSkipReason;
   pages?: { url: string; extractedAt?: string; rawColors?: PaletteColor[] }[];
   /**
    * CLI-emitted note about the extraction itself (e.g. canvas-only sites). This is
@@ -461,6 +464,100 @@ export interface Spinner {
   info(text?: string): Spinner;
 }
 
+/**
+ * Role-labelled page copy plus deterministic metrics over it. Consumers read
+ * `fragments` + `metrics`; the CLI itself does not interpret them.
+ */
+
+/** Where a piece of copy sits on the page. */
+export type VoiceRole =
+  | 'meta-title'
+  | 'meta-description'
+  | 'hero-h1'
+  | 'hero-body'
+  | 'cta'
+  | 'nav-label'
+  | 'section-h2'
+  | 'section-body-lede'
+  | 'value-prop'
+  | 'claim'
+  | 'social-proof'
+  | 'differentiator'
+  | 'form-label'
+  | 'form-placeholder'
+  | 'error-404-h1'
+  | 'error-404-body'
+  | 'footer-legal';
+
+export interface VoiceFragment {
+  role: VoiceRole;
+  /** Normalized copy: trimmed, whitespace collapsed. Never truncated mid-word. */
+  text: string;
+  /** Document order within the role, 0-based. */
+  order: number;
+  /** Debug provenance for the source element. Only emitted with `debug`. */
+  selectorHint?: string;
+}
+
+/** Coarse page classification. Sets the word budget and role weights only. */
+export type VoicePageType = 'landing' | 'product' | 'docs' | 'contact' | 'news' | 'other';
+
+/** Why voice extraction produced nothing. Emitted instead of a partial object. */
+export type VoiceSkipReason = 'below-word-floor' | 'no-text' | 'probe-failed' | 'error';
+
+export interface PronounRatios {
+  /** "we", "our", "us" */
+  first: number;
+  /** "you", "your" */
+  second: number;
+  /** "they", "customers", "clients" */
+  third: number;
+}
+
+/**
+ * Derived from sentence and punctuation structure, not from word lists. Valid
+ * for any language that separates words with whitespace.
+ */
+export interface VoiceStructuralMetrics {
+  wordCount: number;
+  sentenceCount: number;
+  meanSentenceLength: number;
+  /** Sample standard deviation of sentence length. */
+  sentenceLengthStdev: number;
+  exclamationRatio: number;
+  questionRatio: number;
+  /** Words over three syllables, over all words. Latin-script approximation. */
+  longWordRatio: number;
+  avgSyllablesPerWord: number;
+  /** Too few words for stable sentence statistics; treat stdev as indicative. */
+  lowSample: boolean;
+}
+
+/**
+ * Language-dependent signals. Null in full outside supported languages: a zero
+ * would read as a measured "no first-person voice" rather than "not measured".
+ */
+export interface VoiceLexicalMetrics {
+  /** Pronoun stance. A closed word class, so this is counted, not guessed. */
+  personPronounRatio: PronounRatios;
+  /** Flesch reading ease, or null when the formula does not model `lang`. */
+  readability: number | null;
+}
+
+export interface VoiceMetrics {
+  structural: VoiceStructuralMetrics;
+  /** Null when `lang` is outside the supported lexicons. */
+  lexical: VoiceLexicalMetrics | null;
+  /** BCP 47 tag from html[lang], falling back to detection. */
+  lang: string;
+}
+
+export interface Voice {
+  fragments: VoiceFragment[];
+  metrics: VoiceMetrics;
+  pageType: VoicePageType;
+}
+
 /** CLI / programmatic options accepted by extractBranding(). */
 export interface ExtractOptions {
   slow?: boolean;
@@ -472,6 +569,8 @@ export interface ExtractOptions {
   reveal?: boolean;
   stealth?: boolean;
   wcag?: boolean;
+  /** Collect page copy + voice metrics. Opt-in: costs one extra navigation. */
+  voice?: boolean;
   keepAnimations?: boolean;
   verbose?: boolean;
   navigationTimeout?: number;
