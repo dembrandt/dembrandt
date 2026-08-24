@@ -389,6 +389,8 @@ program
 
       // Collect "saved to" notices and print them after the results below
       const savedNotices = [];
+      // Set when --key was given but the snapshot did not reach the cloud.
+      let syncFailed = false;
 
       // Save JSON output if --save-output or --dtcg is specified
       if (opts.saveOutput || opts.dtcg) {
@@ -598,14 +600,33 @@ program
         }
       }
 
-      // Sync to cloud if --key / DEMBRANDT_KEY is set
+      // Sync to cloud if --key / DEMBRANDT_KEY is set.
+      //
+      // A skipped sync used to print a warning and exit 0. In CI that warning
+      // scrolls past in a log nobody reads, the run reports success, and drift
+      // tracking silently never starts — the failure mode is invisible exactly
+      // where it matters. Passing --key states an intent, so failing to meet it
+      // is a failure of the run, reported on its own exit code (the extraction
+      // itself succeeded, so RUNTIME would be the wrong signal).
       if (apiKey) {
+        const syncFailure = (reason: string, remedy: string): void => {
+          console.error(color.error(`✖ Cloud sync failed: ${reason}`));
+          console.error(chalk.dim(`  ${remedy}`));
+          console.error(chalk.dim(`  The extraction itself succeeded. Drift tracking did NOT record this run.`));
+          syncFailed = true;
+        };
+
         try {
           const payload = JSON.stringify(result);
           const byteSize = Buffer.byteLength(payload, "utf8");
-          const MAX_BYTES = 150_000;
+          const MAX_BYTES = 300_000;
           if (byteSize > MAX_BYTES) {
-            console.error(color.warning(`! Extraction too large to sync (${byteSize} bytes > ${MAX_BYTES}). Skipping cloud upload.`));
+            syncFailure(
+              `extraction is ${Math.round(byteSize / 1024)} KB, over the ${Math.round(MAX_BYTES / 1024)} KB limit`,
+              result.pages?.length
+                ? `Extract fewer pages (--crawl ${Math.max(1, Math.floor((result.pages.length * MAX_BYTES) / byteSize))} or lower), or drop --raw-colors.`
+                : `Drop --raw-colors, or open an issue if a single page really is this large.`,
+            );
           } else {
             const apiBase = process.env.DEMBRANDT_API_URL ?? "https://www.dembrandt.com";
             const syncRes = await fetch(`${apiBase}/api/extractions`, {
@@ -620,11 +641,16 @@ program
               savedNotices.push(chalk.dim(`☁  Synced to your account (--key)`));
             } else {
               const err = await syncRes.json().catch(() => ({ error: syncRes.statusText }));
-              console.error(color.warning(`! Cloud sync failed: ${err.error ?? syncRes.statusText}`));
+              syncFailure(
+                `${err.error ?? syncRes.statusText} (HTTP ${syncRes.status})`,
+                syncRes.status === 401
+                  ? `Check the API key at dembrandt.com/app/api-keys.`
+                  : `Retry, or check dembrandt.com/app for service status.`,
+              );
             }
           }
         } catch (syncErr) {
-          console.error(color.warning(`! Cloud sync error: ${syncErr.message}`));
+          syncFailure(syncErr.message, `Check network access to the API host and retry.`);
         }
       }
 
@@ -675,6 +701,10 @@ program
           console.log(chalk.dim("💡 --key <token> snapshots each run to your account and catches design drift over time: ") + chalk.dim(terminalLink("https://www.dembrandt.com/recipes/cloud-drift-ci", "dembrandt.com/recipes/cloud-drift-ci")));
         }
       }
+
+      // Drift (1) outranks this: a detected drift is the more actionable signal,
+      // and the sync failure is already printed above either way.
+      if (syncFailed && process.exitCode === undefined) process.exitCode = EXIT.SYNC_FAILED;
     } catch (err) {
       const { code, exit } = classifyError(err);
       spinner.fail("Failed");

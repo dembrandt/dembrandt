@@ -105,6 +105,9 @@ A pipeline can branch on the exit code; "design drifted" and "extraction broke" 
 | `0` | Success, or stable (no drift) under `--compare` |
 | `1` | Drift detected (`--compare`) |
 | `2` | Extraction failure (`EXTRACTION_FAILED`, `BROWSER_UNAVAILABLE`) |
+| `3` | Cloud sync failed under `--key`; the extraction itself succeeded |
 | `67` | Navigation/connection timeout (`NAVIGATION_TIMEOUT`), retryable, try `--slow` |
 
 With `--json-only`, a failure also prints a machine-readable `{ "error": { "code", "message" } }` to stdout.
+
+`3` exists so a pipeline can tell "this run was not recorded" apart from "the extractor is broken". Passing `--key` states an intent, and a run that could not meet it has not done what was asked, even though its output is valid: the payload was over the size limit, the key was rejected, or the API was unreachable. Reporting success there means drift tracking stops recording and nothing ever says so. Drift (`1`) takes precedence when both apply, since drift is the more actionable signal and the sync failure is printed regardless.

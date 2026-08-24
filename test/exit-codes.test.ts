@@ -10,7 +10,7 @@ import { EXIT, classifyError } from '../lib/exit-codes.js';
  */
 
 test('EXIT codes hold their documented values', () => {
-  assert.deepEqual(EXIT, { OK: 0, DRIFT: 1, RUNTIME: 2, TIMEOUT: 67 });
+  assert.deepEqual(EXIT, { OK: 0, DRIFT: 1, RUNTIME: 2, SYNC_FAILED: 3, TIMEOUT: 67 });
 });
 
 test('drift exit is distinct from every failure exit', () => {
@@ -19,6 +19,15 @@ test('drift exit is distinct from every failure exit', () => {
   assert.notEqual(EXIT.DRIFT, EXIT.RUNTIME);
   assert.notEqual(EXIT.DRIFT, EXIT.TIMEOUT);
   assert.notEqual(EXIT.DRIFT, EXIT.OK);
+  assert.notEqual(EXIT.DRIFT, EXIT.SYNC_FAILED);
+});
+
+test('a failed sync is distinguishable from a failed extraction', () => {
+  // The extraction succeeded and its output is valid; only the upload did not
+  // happen. Reporting RUNTIME would send a pipeline chasing a broken extractor.
+  assert.notEqual(EXIT.SYNC_FAILED, EXIT.RUNTIME);
+  assert.notEqual(EXIT.SYNC_FAILED, EXIT.TIMEOUT);
+  assert.notEqual(EXIT.SYNC_FAILED, EXIT.OK);
 });
 
 const TIMEOUT_CASES: Array<[string, string]> = [
