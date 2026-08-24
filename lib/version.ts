@@ -36,6 +36,11 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  (unversioned) — `voice` / `voiceSkipped` ship behind a hidden, opt-in
+ *          `--voice` flag and deliberately do NOT bump the contract. An
+ *          undocumented flag has no consumers, so the role set can still be cut
+ *          after the 15-site validation sweep without that being a breaking
+ *          removal. Bump to 1.9.0 when the flag is documented, not before.
  *  1.8.0 — no shape change. BEHAVIOR: the drift engine compares colors.semantic
  *          role by role. It previously read that map only to attach role labels
  *          to palette entries, so a changed brand primary produced no drift at

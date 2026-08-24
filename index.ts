@@ -84,6 +84,9 @@ program
   .option("--screenshot <path>", "Save a viewport screenshot of the page (not full-page)")
   // Internal, undocumented flag. Hidden from --help; not part of the product surface.
   .addOption(new Option("--teach").hideHelp())
+  // Hidden until the role set is validated: an undocumented opt-in flag has no
+  // consumers, so roles can still be cut without a breaking contract change.
+  .addOption(new Option("--voice").hideHelp())
   .option("--ai", "Use ML model to predict brand primary color (experimental)")
   .option("--wcag", "Analyze WCAG contrast ratios between palette colors")
   .option("--crawl [n]", "Auto-discover and extract up to N pages via DOM links (default: 5); combine with --sitemap to use sitemap discovery instead", (v: any) => {
@@ -230,6 +233,7 @@ program
             screenshotPath: opts.screenshot,
             discoverLinks: isAutoCrawl ? crawlN - 1 : null,
             wcag: opts.wcag,
+            voice: opts.voice,
             includeRawColors: opts.rawColors,
             stealth: opts.stealth,
             cookie: opts.cookie,
@@ -296,6 +300,7 @@ program
                   header: opts.header,
                   screenSize: opts.screenSize,
                   wcag: opts.wcag,
+                  voice: opts.voice,
                   includeRawColors: opts.rawColors,
                   userAgent: opts.userAgent,
                   locale: opts.locale,

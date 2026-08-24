@@ -17,6 +17,7 @@ import { guardExtractor } from './guard.js';
 import { dismissConsent } from './consent.js';
 import type { Browser, Page } from 'playwright';
 import type { ExtractOptions, BrandingResult, Spinner, ExtractorError, WcagPair } from '../types.js';
+import type { VoiceResult } from '../voice/index.js';
 
 // Gaussian noise via Box-Muller
 function gaussian(mean = 0, std = 1) {
@@ -1293,6 +1294,31 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       console.log(color.info(`💡 Tip: Try running with ${chalk.bold('--slow')} flag for more reliable results on slow-loading sites`));
     }
 
+    // Runs outside the parallel block: the 404 probe navigates, which would move
+    // the page under the other extractors.
+    let voiceResult: VoiceResult = { voice: null };
+    if (options.voice) {
+      spinner.start("Extracting voice...");
+      try {
+        const { collectVoice } = await import('../voice/index.js');
+        voiceResult = await collectVoice(page, url, { probeTimeout: 15000 * timeoutMultiplier });
+        spinner.stop();
+        if (voiceResult.voice) {
+          const { wordCount, sentenceCount } = voiceResult.voice.metrics.structural;
+          if (options.verbose) {
+            log(chalk.dim(`  voice: ${voiceResult.voice.fragments.length} fragments, ${wordCount} words, ${sentenceCount} sentences`));
+          }
+        } else if (options.verbose) {
+          log(chalk.dim(`  voice: skipped (${voiceResult.voiceSkipped})`));
+        }
+      } catch (err) {
+        spinner.stop();
+        extractorErrors.push({ stage: 'voice', reason: err instanceof Error ? err.message : String(err) });
+        // 'error', not 'no-text': a failure must not read as an empty page.
+        voiceResult = { voice: null, voiceSkipped: 'error' };
+      }
+    }
+
     let wcag: WcagPair[] = [];
     if (options.wcag) {
       spinner.start("Analyzing WCAG contrast pairs...");
@@ -1399,6 +1425,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       iconSystem,
       frameworks,
       ...(options.wcag ? { wcag } : {}),
+      ...(options.voice ? { voice: voiceResult.voice, ...(voiceResult.voiceSkipped ? { voiceSkipped: voiceResult.voiceSkipped } : {}) } : {}),
     };
 
     let isCanvasOnly = false;
