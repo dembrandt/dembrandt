@@ -8,11 +8,9 @@ import type {
 } from '../types.js';
 
 /**
- * Only two lexical signals are kept: pronouns are a closed word class, and
- * Flesch is a published formula. Hand-built word lists for hedging, commitment,
- * urgency, jargon and imperative verbs were removed. They encoded an opinion and
- * presented it as a measurement, and being English-only they gave a Finnish page
- * nothing at all. That characterisation belongs to the layer reading `fragments`.
+ * Only signals that are counted from a closed word class or computed by a
+ * published formula. Anything resting on a curated word list is interpretation,
+ * and belongs to the layer that reads `fragments`.
  */
 
 /** Languages the Flesch formula models. */
@@ -25,9 +23,7 @@ const FIRST_PERSON = /\b(we|us|our|ours|ourselves)\b/gi;
 const SECOND_PERSON = /\b(you|your|yours|yourself)\b/gi;
 const THIRD_PERSON = /\b(they|them|their|theirs|themselves|it|its)\b/gi;
 
-// Headings are labels, not sentences. Counting "Pricing" or a bare product name
-// as a sentence inflates sentenceCount and drags mean sentence length toward the
-// length of a heading rather than of the prose.
+// Headings are labels, not sentences, and skew every sentence statistic.
 const HEADING_ROLES: ReadonlySet<VoiceRole> = new Set<VoiceRole>([
   'hero-h1',
   'section-h2',
@@ -51,24 +47,13 @@ const PROSE_ROLES: ReadonlySet<VoiceRole> = new Set<VoiceRole>([
   ...SENTENCE_ROLES,
 ]);
 
-// Measured across real brand sites: image-led marketing pages land at 220-330
-// prose words, so a 300 floor nulls out most of them. Below LOW_SAMPLE_WORDS the
-// sentence-length statistics are noisy and metrics carry `lowSample`.
-/**
- * Below this, emit nothing. Calibrated on English marketing pages, which yield
- * 90-330 prose words; a 300 floor nulled out most of them. Finnish yields
- * roughly 40% fewer words for the same content, so the floor sits closer to the
- * per-role limits there than intended. DEM-236 settles it with real data.
- */
+/** Below this, emit nothing. Calibrated on English pages; Finnish yields ~40% fewer words. */
 export const WORD_FLOOR = 150;
 
 /** Below this, sentence statistics are noisy and metrics carry `lowSample`. */
 export const LOW_SAMPLE_WORDS = 300;
 
-/**
- * Upper bound on collected copy. No site measured has come close, so this is a
- * guard against a pathological page rather than a tuned budget.
- */
+/** Guard against a pathological page rather than a tuned budget. */
 export const WORD_CAP = 800;
 
 export const PAGE_TYPE_CAP: Record<VoicePageType, number> = {

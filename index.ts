@@ -394,7 +394,6 @@ program
 
       // Collect "saved to" notices and print them after the results below
       const savedNotices = [];
-      // Set when --key was given but the snapshot did not reach the cloud.
       let syncFailed = false;
 
       // Save JSON output if --save-output or --dtcg is specified
@@ -605,19 +604,8 @@ program
         }
       }
 
-      // Sync to cloud if --key / DEMBRANDT_KEY is set.
-      //
-      // A failed sync used to print a warning and exit 0. In CI that warning
-      // scrolls past in a log nobody reads, the run reports success, and drift
-      // tracking silently never starts — invisible exactly where it matters.
-      // Passing --key states an intent, so failing to meet it is a failure of
-      // the run, on its own exit code (the extraction succeeded, so RUNTIME
-      // would be the wrong signal).
-      //
-      // Rate limiting is excluded on purpose. Hitting a quota is the system
-      // working as designed, not a fault to fix, and the published recipes
-      // promise it never fails a pipeline. A bad key, an oversized payload or
-      // an unreachable API are the opposite: nobody fixes what nobody sees.
+      // Sync to cloud if --key / DEMBRANDT_KEY is set. A failed sync exits
+      // SYNC_FAILED; a rate limit does not, and only warns.
       if (apiKey) {
         const syncFailure = (reason: string, remedy: string): void => {
           console.error(color.error(`✖ Cloud sync failed: ${reason}`));
@@ -716,8 +704,7 @@ program
         }
       }
 
-      // Drift (1) outranks this: a detected drift is the more actionable signal,
-      // and the sync failure is already printed above either way.
+      // Drift (1) outranks this.
       if (syncFailed && process.exitCode === undefined) process.exitCode = EXIT.SYNC_FAILED;
     } catch (err) {
       const { code, exit } = classifyError(err);

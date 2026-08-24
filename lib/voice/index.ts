@@ -9,11 +9,7 @@ export interface VoiceResult {
   voiceSkipped?: VoiceSkipReason;
 }
 
-/**
- * Fixed, deliberately unroutable path. A random one would change run to run on
- * the many 404 pages that echo the requested path back, turning the fragment
- * into drift noise. Long and specific enough that no real route collides.
- */
+/** Fixed and unroutable: a random path would churn on 404s that echo it back. */
 const PROBE_PATH = '/dembrandt-voice-probe-404-2f8a1c';
 
 async function readSignals(page: Page): Promise<PageTypeSignals & { lang: string }> {
@@ -28,12 +24,9 @@ async function readSignals(page: Page): Promise<PageTypeSignals & { lang: string
 
 /** Non-fatal: on failure the main page's fragments still stand. */
 async function probeErrorPage(page: Page, url: string, timeout: number): Promise<VoiceFragment[]> {
-  // A separate page in the same context: navigating the caller's page and
-  // restoring it would drop the hydration, reveal and consent state that
-  // everything downstream still reads.
+  // A separate page: navigating the caller's would drop its hydration state.
   let probe: Page | null = null;
   try {
-    // Inside the guard: a malformed URL must not abort the whole collection.
     const { origin } = new URL(url);
     probe = await page.context().newPage();
     await probe.goto(`${origin}${PROBE_PATH}`, { waitUntil: 'domcontentloaded', timeout });

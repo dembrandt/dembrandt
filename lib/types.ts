@@ -544,8 +544,8 @@ export interface VoiceStructuralMetrics {
 }
 
 /**
- * Language-dependent signals. Null in full outside supported languages: a zero
- * would read as a measured "no first-person voice" rather than "not measured".
+ * Language-dependent signals. Null in full outside supported languages, since a
+ * zero would read as measured rather than absent.
  */
 export interface VoiceLexicalMetrics {
   /** Pronoun stance. A closed word class, so this is counted, not guessed. */
