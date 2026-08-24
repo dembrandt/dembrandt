@@ -627,43 +627,41 @@ program
         };
 
         try {
-          const payload = JSON.stringify(result);
-          const byteSize = Buffer.byteLength(payload, "utf8");
-          const MAX_BYTES = 300_000;
-          if (byteSize > MAX_BYTES) {
-            syncFailure(
-              `extraction is ${Math.round(byteSize / 1024)} KB, over the ${Math.round(MAX_BYTES / 1024)} KB limit`,
-              result.pages?.length
-                ? `Extract fewer pages (--crawl ${Math.max(1, Math.floor((result.pages.length * MAX_BYTES) / byteSize))} or lower), or drop --raw-colors.`
-                : `Drop --raw-colors, or open an issue if a single page really is this large.`,
-            );
+          // No size check here. The cap belongs to the API, which already
+          // enforces it and reports the exact limit; duplicating the number in
+          // the CLI meant two sources of truth in two repos that could drift
+          // apart silently, and raising the cap would have needed a CLI release.
+          const apiBase = process.env.DEMBRANDT_API_URL ?? "https://www.dembrandt.com";
+          const syncRes = await fetch(`${apiBase}/api/extractions`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(result),
+          });
+
+          if (syncRes.ok) {
+            savedNotices.push(chalk.dim(`☁  Synced to your account (--key)`));
+          } else if (syncRes.status === 429) {
+            // Hitting the rate limit is the system working, not a fault, and
+            // the recipes have always promised it does not fail a pipeline.
+            const err = await syncRes.json().catch(() => ({ error: syncRes.statusText }));
+            console.error(color.warning(`! Cloud sync skipped: ${err.error ?? "rate limit reached"}`));
+            console.error(chalk.dim(`  This run was not recorded. Limits reset hourly.`));
           } else {
-            const apiBase = process.env.DEMBRANDT_API_URL ?? "https://www.dembrandt.com";
-            const syncRes = await fetch(`${apiBase}/api/extractions`, {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${apiKey}`,
-                "Content-Type": "application/json",
-              },
-              body: payload,
-            });
-            if (syncRes.ok) {
-              savedNotices.push(chalk.dim(`☁  Synced to your account (--key)`));
-            } else if (syncRes.status === 429) {
-              // Hitting the rate limit is the system working, not a fault, and
-              // the recipes have always promised it does not fail a pipeline.
-              const err = await syncRes.json().catch(() => ({ error: syncRes.statusText }));
-              console.error(color.warning(`! Cloud sync skipped: ${err.error ?? "rate limit reached"}`));
-              console.error(chalk.dim(`  This run was not recorded. Limits reset hourly.`));
-            } else {
-              const err = await syncRes.json().catch(() => ({ error: syncRes.statusText }));
-              syncFailure(
-                `${err.error ?? syncRes.statusText} (HTTP ${syncRes.status})`,
-                syncRes.status === 401
+            const err = await syncRes.json().catch(() => ({ error: syncRes.statusText }));
+            const pageCount = result.pages?.length ?? 0;
+            syncFailure(
+              `${err.error ?? syncRes.statusText} (HTTP ${syncRes.status})`,
+              syncRes.status === 413
+                ? pageCount > 1
+                  ? `Extract fewer pages (--crawl ${Math.max(1, Math.floor(pageCount / 2))} or lower), or drop --raw-colors.`
+                  : `Drop --raw-colors, or open an issue if a single page really is this large.`
+                : syncRes.status === 401
                   ? `Check the API key at dembrandt.com/app/api-keys.`
                   : `Retry, or check dembrandt.com/app for service status.`,
-              );
-            }
+            );
           }
         } catch (syncErr) {
           syncFailure(syncErr.message, `Check network access to the API host and retry.`);
