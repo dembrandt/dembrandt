@@ -94,7 +94,8 @@ async function additionalPages(first: any, requestedUrl: string, options: any) {
       path.startsWith("http") ? path : `${base.protocol}//${base.host}${path.startsWith("/") ? path : "/" + path}`,
     );
   }
-  const max = (options.pages ?? 1) - 1;
+  // A sitemap crawl with no explicit budget follows the CLI and takes up to 20.
+  const max = (options.pages ?? 1) > 1 ? (options.pages as number) - 1 : options.sitemap ? 20 : 0;
   if (max < 1) return [];
   if (options.sitemap) {
     const fromResult = await parseSitemap(first.url, max);
@@ -131,7 +132,7 @@ async function runExtraction(url: string, options: any = {}) {
     };
   }
 
-  const multiPage = (options.paths?.length ?? 0) > 0 || (options.pages ?? 1) > 1;
+  const multiPage = (options.paths?.length ?? 0) > 0 || (options.pages ?? 1) > 1 || !!options.sitemap;
 
   try {
     const first = await extractBranding(url, nullSpinner, browser, {
@@ -346,7 +347,7 @@ async function main() {
   const noSandbox = z.boolean().optional().default(false).describe("Disable the browser sandbox, required inside Docker and most CI containers");
   const pages = z.number().int().min(1).max(20).optional().default(1).describe("Extract up to N pages and merge them into one token set. Pages are discovered from DOM links, or from sitemap.xml when sitemap is true. Merged tokens are markedly stronger than a single page.");
   const paths = z.array(z.string()).optional().describe('Explicit extra paths on the same domain to extract and merge, e.g. ["/pricing", "/docs"]. Overrides page discovery.');
-  const sitemap = z.boolean().optional().default(false).describe("Discover the extra pages from sitemap.xml instead of DOM links; needs pages > 1");
+  const sitemap = z.boolean().optional().default(false).describe("Discover the extra pages from sitemap.xml instead of DOM links. Alone it takes up to 20 pages; set pages to cap it");
 
   // Every extraction tool takes the same navigation, auth and crawl surface.
   const crawlParams = { pages, paths, sitemap };
@@ -432,7 +433,7 @@ async function main() {
    * through the model as a tool argument, which is prohibitively large.
    */
   function resolveExtraction(inline: any, jobId: string | undefined, label: string) {
-    if (inline) return { ok: true as const, value: inline };
+    if (inline && Object.keys(inline).length > 0) return { ok: true as const, value: inline };
     if (!jobId) return { ok: false as const, error: `Pass either ${label} or job_id.` };
     const job = jobQueue.get(jobId);
     if (!job) return { ok: false as const, error: `No job found with id: ${jobId}` };
