@@ -2,7 +2,16 @@
 
 ## Unreleased
 
+### Added
+- MCP extraction tools take `pages`, `paths` and `sitemap`, crawling and merging several pages over the same path as the CLI. `sitemap` alone takes up to 20 pages; `pages` caps it. A page that fails to load is dropped and the merge carries the rest (#172)
+- MCP extraction tools take `noSandbox` (also `DEMBRANDT_NO_SANDBOX`) for Docker and CI containers, plus `header` and `userAgent`. A launch failure names `noSandbox` as the remedy (#172)
+- `compute_drift`, `get_findings`, `export_dtcg`, `generate_design_md` and `render_report` accept the `job_id` of a completed extraction in place of an inline one. They previously took the whole extraction as a tool argument, so an agent had to resend a result it had just received, which is prohibitive at real extraction sizes. An inline extraction still wins when both are given (#172)
+
 ### Fixed
+- MCP: two concurrent extractions restored each other's console handlers, so the second job's output could land in the JSON-RPC stream. Console is silenced once per process instead (#172)
+- MCP: `meta.dembrandtVersion` and the DTCG `toolVersion` were null on every extraction, because the server never passed the tool version to the extractor (#172)
+- MCP: the job cleanup interval kept the event loop alive, so the process outlived its transport by minutes (#172)
+- `BrandingResult._discoveredLinks` is typed `string[]`. `discoverLinks` has always returned href strings, which the crawl path feeds straight to `new URL()` (#172)
 - Drift compares `colors.semantic` role by role. The engine read that map only to attach role labels to palette entries, so a changed brand primary produced no drift at all: a rebrand that promotes a colour the page already used leaves the palette set identical and reported stable (DEM-208). Changes now appear as `semantic.<role>`, and `docs/FLAGS.md` no longer describes `--ai` primary drift the engine could not see
 
 ### Changed
