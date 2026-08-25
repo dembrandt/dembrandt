@@ -19,6 +19,8 @@ import { computeFindings } from "./lib/findings.js";
 import { generateHtmlReport } from "./lib/formatters/html.js";
 import { toDtcgTokens } from "./lib/formatters/dtcg.js";
 import { generateDesignMd } from "./lib/formatters/markdown.js";
+import { parseSitemap } from "./lib/discovery.js";
+import { mergeResults } from "./lib/merger.js";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
@@ -61,6 +63,47 @@ const nullSpinner = {
   info(_msg) { return this; },
 };
 
+function launchArgs(noSandbox: boolean) {
+  const args = ["--disable-blink-features=AutomationControlled"];
+  if (noSandbox || process.env.DEMBRANDT_NO_SANDBOX) {
+    args.push("--no-sandbox", "--disable-setuid-sandbox");
+  }
+  return args;
+}
+
+function extractOptions(options: any) {
+  return {
+    navigationTimeout: 90000,
+    slow: options.slow || false,
+    darkMode: options.darkMode || false,
+    mobile: options.mobile || false,
+    wcag: options.wcag || false,
+    _version: version,
+    ...(options.cookie ? { cookie: options.cookie } : {}),
+    ...(options.header ? { header: options.header } : {}),
+    ...(options.userAgent ? { userAgent: options.userAgent } : {}),
+  };
+}
+
+/** Resolve the extra page URLs to merge into the first result. */
+async function additionalPages(first: any, requestedUrl: string, options: any) {
+  const paths: string[] = options.paths ?? [];
+  if (paths.length > 0) {
+    const base = new URL(first.url);
+    return paths.map((path) =>
+      path.startsWith("http") ? path : `${base.protocol}//${base.host}${path.startsWith("/") ? path : "/" + path}`,
+    );
+  }
+  const max = (options.pages ?? 1) - 1;
+  if (max < 1) return [];
+  if (options.sitemap) {
+    const fromResult = await parseSitemap(first.url, max);
+    if (fromResult.length > 0) return fromResult;
+    return first.url !== requestedUrl ? await parseSitemap(requestedUrl, max) : [];
+  }
+  return first._discoveredLinks ?? [];
+}
+
 /**
  * Run extraction with error handling suitable for MCP responses.
  * Returns { ok, data?, error? } so tool handlers never throw.
@@ -77,36 +120,46 @@ async function runExtraction(url: string, options: any = {}) {
   }
   const pwVersion = createRequire(import.meta.url)("playwright-core/package.json").version;
   try {
-    browser = await chromium.launch({
-      headless: true,
-      args: ["--disable-blink-features=AutomationControlled"],
-    });
+    browser = await chromium.launch({ headless: true, args: launchArgs(options.noSandbox) });
   } catch (err) {
+    const sandboxHint = options.noSandbox
+      ? ""
+      : "\n\nIn a container or CI sandbox, retry with noSandbox: true.";
     return {
       ok: false,
-      error: `Browser launch failed. Install the matching browser: npx playwright@${pwVersion} install chromium\n\n${err.message}`,
+      error: `Browser launch failed. Install the matching browser: npx playwright@${pwVersion} install chromium${sandboxHint}\n\n${err.message}`,
     };
   }
 
-  // Suppress console output — extractors.js writes directly to stdout
-  // which would corrupt the JSON-RPC stream
-  const _log = console.log;
-  const _warn = console.warn;
-  const _error = console.error;
-  console.log = () => {};
-  console.warn = () => {};
-  console.error = () => {};
+  const multiPage = (options.paths?.length ?? 0) > 0 || (options.pages ?? 1) > 1;
 
   try {
-    const data = await extractBranding(url, nullSpinner, browser, {
-      navigationTimeout: 90000,
-      slow: options.slow || false,
-      darkMode: options.darkMode || false,
-      mobile: options.mobile || false,
-      wcag: options.wcag || false,
-      ...(options.cookie ? { cookie: options.cookie } : {}),
+    const first = await extractBranding(url, nullSpinner, browser, {
+      ...extractOptions(options),
+      discoverLinks: multiPage && !options.sitemap && !(options.paths?.length) ? (options.pages ?? 1) - 1 : null,
     });
-    return { ok: true, data };
+
+    if (!multiPage) {
+      delete first._discoveredLinks;
+      return { ok: true, data: first };
+    }
+
+    const extraUrls = await additionalPages(first, url, options);
+    delete first._discoveredLinks;
+
+    const results = [first];
+    for (const pageUrl of extraUrls) {
+      await new Promise((r) => setTimeout(r, 1500 + Math.random() * 1500));
+      try {
+        const pageResult = await extractBranding(pageUrl, nullSpinner, browser, extractOptions(options));
+        delete pageResult._discoveredLinks;
+        results.push(pageResult);
+      } catch {
+        // A page that fails to load is dropped; the merge still carries the rest.
+      }
+    }
+
+    return { ok: true, data: results.length > 1 ? mergeResults(results) : first };
   } catch (err) {
     const msg = err.message || String(err);
     if (msg.includes("timeout") || msg.includes("Timeout")) {
@@ -120,9 +173,6 @@ async function runExtraction(url: string, options: any = {}) {
     }
     return { ok: false, error: `Extraction failed for ${url}: ${msg}` };
   } finally {
-    console.log = _log;
-    console.warn = _warn;
-    console.error = _error;
     await browser.close().catch(() => {});
   }
 }
@@ -154,6 +204,7 @@ class JobQueue {
       startedAt: undefined,
       completedAt: undefined,
       result: undefined,
+      full: undefined,
       error: undefined,
     });
     this.#queue.push(id);
@@ -200,6 +251,7 @@ class JobQueue {
           if (job.status === "cancelled") return;
           if (result.ok) {
             job.status = "completed";
+            job.full = result.data;
             job.result = job.pick(result.data);
           } else {
             job.status = "failed";
@@ -236,7 +288,8 @@ class JobQueue {
 }
 
 const jobQueue = new JobQueue();
-setInterval(() => jobQueue.cleanup(), 600_000);
+const cleanupTimer = setInterval(() => jobQueue.cleanup(), 600_000);
+cleanupTimer.unref();
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -272,6 +325,13 @@ async function main() {
     process.exit(1);
   }
 
+  // stdout is the JSON-RPC stream. Anything a dependency prints would corrupt
+  // it, so silence console for the process once. Per-call save/restore is not
+  // an option: two concurrent extractions would restore each other's handlers.
+  console.log = () => {};
+  console.warn = () => {};
+  console.error = () => {};
+
   const server = new McpServer({ name: "dembrandt", version });
 
   // ── Shared params ──────────────────────────────────────────────────────
@@ -281,14 +341,24 @@ async function main() {
   const sync = z.boolean().optional().default(false).describe("Wait for result directly instead of returning a job_id (blocks 15-40s)");
   const mobile = z.boolean().optional().default(false).describe("Extract from a mobile viewport instead of desktop");
   const cookie = z.string().optional().describe('Cookie string for authenticated pages, e.g. "session=abc; token=xyz"');
+  const header = z.string().optional().describe('Extra HTTP header, e.g. "Authorization: Bearer eyJ..."');
+  const userAgent = z.string().optional().describe("Custom user agent string");
+  const noSandbox = z.boolean().optional().default(false).describe("Disable the browser sandbox, required inside Docker and most CI containers");
+  const pages = z.number().int().min(1).max(20).optional().default(1).describe("Extract up to N pages and merge them into one token set. Pages are discovered from DOM links, or from sitemap.xml when sitemap is true. Merged tokens are markedly stronger than a single page.");
+  const paths = z.array(z.string()).optional().describe('Explicit extra paths on the same domain to extract and merge, e.g. ["/pricing", "/docs"]. Overrides page discovery.');
+  const sitemap = z.boolean().optional().default(false).describe("Discover the extra pages from sitemap.xml instead of DOM links; needs pages > 1");
+
+  // Every extraction tool takes the same navigation, auth and crawl surface.
+  const crawlParams = { pages, paths, sitemap };
+  const browserParams = { slow, mobile, cookie, header, userAgent, noSandbox };
 
   // ── Extraction tools ───────────────────────────────────────────────────
 
   (server.tool as any)(
     "get_design_tokens",
-    "Extract the full design system from a live website. Launches a real browser, navigates to the site, and returns production-ready design tokens: color palette (hex, RGB, LCH, OKLCH) with semantic roles and CSS custom properties, typography scale (families, fallbacks, sizes, weights, line heights, letter spacing by context), spacing system with grid detection, border radii, border patterns, box shadows for elevation, component styles (buttons with hover/focus states, inputs, links, badges), responsive breakpoints, logo and favicons, site name, detected CSS frameworks, and icon systems. Returns a job_id by default — use get_job_status to poll for the result.",
+    "Extract the full design system from a live website. Launches a real browser, navigates to the site, and returns production-ready design tokens: color palette (hex, RGB, LCH, OKLCH) with semantic roles and CSS custom properties, typography scale (families, fallbacks, sizes, weights, line heights, letter spacing by context), spacing system with grid detection, border radii, border patterns, box shadows for elevation, component styles (buttons with hover/focus states, inputs, links, badges), responsive breakpoints, logo and favicons, site name, detected CSS frameworks, and icon systems. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
     {
-      url, slow, sync, mobile, cookie,
+      url, sync, ...browserParams, ...crawlParams,
       darkMode: z.boolean().optional().default(false).describe("Extract with dark mode emulation (prefers-color-scheme: dark)"),
       wcag: z.boolean().optional().default(false).describe("Include WCAG contrast analysis between palette colors"),
     },
@@ -297,9 +367,9 @@ async function main() {
 
   (server.tool as any)(
     "get_color_palette",
-    "Extract brand colors from a live website. Returns semantic colors (primary, secondary, accent, plus background and text promoted from the page surface and body text), full palette ranked by usage frequency and confidence (high/medium/low), CSS custom properties with their design-system names, and hover/focus state colors discovered by simulating real user interactions. Each color in hex, RGB, LCH, and OKLCH. Returns a job_id by default — use get_job_status to poll for the result.",
+    "Extract brand colors from a live website. Returns semantic colors (primary, secondary, accent, plus background and text promoted from the page surface and body text), full palette ranked by usage frequency and confidence (high/medium/low), CSS custom properties with their design-system names, and hover/focus state colors discovered by simulating real user interactions. Each color in hex, RGB, LCH, and OKLCH. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
     {
-      url, slow, sync, mobile, cookie,
+      url, sync, ...browserParams, ...crawlParams,
       darkMode: z.boolean().optional().default(false).describe("Also extract dark mode palette"),
       wcag: z.boolean().optional().default(false).describe("Include WCAG contrast analysis between palette colors"),
     },
@@ -308,22 +378,22 @@ async function main() {
 
   (server.tool as any)(
     "get_typography",
-    "Extract typography from a live website. Returns every font family with its fallback stack, the complete type scale grouped by context (heading, body, text, button, link, caption) with pixel and rem sizes, weights, line heights, letter spacing, and text transforms. The body context marks the dominant reading-text font; text marks other body-eligible copy. Also reports font sources: Google Fonts URLs, Adobe Fonts usage, and variable font detection. Returns a job_id by default — use get_job_status to poll for the result.",
-    { url, slow, sync, mobile, cookie },
+    "Extract typography from a live website. Returns every font family with its fallback stack, the complete type scale grouped by context (heading, body, text, button, link, caption) with pixel and rem sizes, weights, line heights, letter spacing, and text transforms. The body context marks the dominant reading-text font; text marks other body-eligible copy. Also reports font sources: Google Fonts URLs, Adobe Fonts usage, and variable font detection. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
+    { url, sync, ...browserParams, ...crawlParams },
     toolHandler((d) => ({ url: d.url, typography: d.typography })),
   );
 
   (server.tool as any)(
     "get_component_styles",
-    "Extract UI component styles from a live website. Returns button variants with default, hover, active, and focus states (background, text color, padding, border radius, border, shadow, outline, opacity), input field styles (border, focus ring, padding, placeholder), link styles (color, text decoration, hover changes), and badge/tag styles. Returns a job_id by default — use get_job_status to poll for the result.",
-    { url, slow, sync, mobile, cookie },
+    "Extract UI component styles from a live website. Returns button variants with default, hover, active, and focus states (background, text color, padding, border radius, border, shadow, outline, opacity), input field styles (border, focus ring, padding, placeholder), link styles (color, text decoration, hover changes), and badge/tag styles. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
+    { url, sync, ...browserParams, ...crawlParams },
     toolHandler((d) => ({ url: d.url, components: d.components })),
   );
 
   (server.tool as any)(
     "get_surfaces",
-    "Extract surface treatment tokens from a live website: border radii with element context (which radii are used on buttons vs cards vs inputs vs modals), border patterns (width + style + color combinations), and box shadow elevation levels. Returns a job_id by default — use get_job_status to poll for the result.",
-    { url, slow, sync, mobile, cookie },
+    "Extract surface treatment tokens from a live website: border radii with element context (which radii are used on buttons vs cards vs inputs vs modals), border patterns (width + style + color combinations), and box shadow elevation levels. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
+    { url, sync, ...browserParams, ...crawlParams },
     toolHandler((d) => ({
       url: d.url,
       borderRadius: d.borderRadius,
@@ -334,15 +404,15 @@ async function main() {
 
   (server.tool as any)(
     "get_spacing",
-    "Extract the spacing system from a live website: common margin and padding values sorted by frequency, pixel and rem values, and grid system detection (4px, 8px, or custom scale). Returns a job_id by default — use get_job_status to poll for the result.",
-    { url, slow, sync, mobile, cookie },
+    "Extract the spacing system from a live website: common margin and padding values sorted by frequency, pixel and rem values, and grid system detection (4px, 8px, or custom scale). Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
+    { url, sync, ...browserParams, ...crawlParams },
     toolHandler((d) => ({ url: d.url, spacing: d.spacing })),
   );
 
   (server.tool as any)(
     "get_brand_identity",
-    "Extract brand identity from a live website: site name, logo (source, dimensions, safe zone), all favicon variants (icon, apple-touch-icon, og:image, twitter:image with sizes and URLs), detected CSS frameworks (Tailwind, Bootstrap, MUI, etc.), icon systems (Font Awesome, Material Icons, SVG), and responsive breakpoints. Returns a job_id by default — use get_job_status to poll for the result.",
-    { url, slow, sync, mobile, cookie },
+    "Extract brand identity from a live website: site name, logo (source, dimensions, safe zone), all favicon variants (icon, apple-touch-icon, og:image, twitter:image with sizes and URLs), detected CSS frameworks (Tailwind, Bootstrap, MUI, etc.), icon systems (Font Awesome, Material Icons, SVG), and responsive breakpoints. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
+    { url, sync, ...browserParams, ...crawlParams },
     toolHandler((d) => ({
       url: d.url,
       siteName: d.siteName,
@@ -356,56 +426,96 @@ async function main() {
 
   // ── Drift & report tools (synchronous, no browser) ─────────────────────
 
+  /**
+   * Pure tools accept either an inline extraction or the job_id of a completed
+   * one. The job path exists because an inline extraction has to travel back
+   * through the model as a tool argument, which is prohibitively large.
+   */
+  function resolveExtraction(inline: any, jobId: string | undefined, label: string) {
+    if (inline) return { ok: true as const, value: inline };
+    if (!jobId) return { ok: false as const, error: `Pass either ${label} or job_id.` };
+    const job = jobQueue.get(jobId);
+    if (!job) return { ok: false as const, error: `No job found with id: ${jobId}` };
+    if (job.status !== "completed") return { ok: false as const, error: `Job ${jobId} is ${job.status}, not completed.` };
+    return { ok: true as const, value: job.full };
+  }
+
   // zod 4: z.record needs explicit key + value types; z.record(z.any()) treats
   // the lone arg as the KEY and leaves value undefined, which crashes tools/list.
-  const extract = z.record(z.string(), z.any()).describe("A dembrandt extraction object, as returned by get_design_tokens");
+  const extract = z
+    .record(z.string(), z.any())
+    .optional()
+    .describe("A dembrandt extraction object. Omit it and pass job_id instead to read a completed extraction straight out of the job queue, which avoids sending the whole extraction back through the model.");
+  const sourceJob = z
+    .string()
+    .optional()
+    .describe("job_id of a completed extraction to read instead of passing result inline");
 
   (server.tool as any)(
     "compute_drift",
-    "Compare two dembrandt extractions and return a design-drift report: a 0-100 score (0 = identical), a stable/drift verdict, per-category scores, and the list of changed/added/removed tokens (colors, typography, spacing, radius, shadows). Pure and synchronous — no browser. Use it to check whether generated or updated UI has drifted from a brand baseline.",
+    "Compare two dembrandt extractions and return a design-drift report: a 0-100 score (0 = identical), a stable/drift verdict, per-category scores, and the list of changed/added/removed tokens (colors, typography, spacing, radius, shadows). Pure and synchronous, no browser. Takes either an inline extraction or the job_id of a completed one. Use it to check whether generated or updated UI has drifted from a brand baseline.",
     {
       baseline: extract,
       candidate: extract,
+      baselineJobId: sourceJob,
+      candidateJobId: sourceJob,
       failThreshold: z.number().optional().describe("Score above this yields a 'drift' verdict (default 10)"),
     },
-    ({ baseline, candidate, failThreshold }: any) => {
-      const report = computeDrift(baseline, candidate, failThreshold != null ? { failThreshold } : {});
+    ({ baseline, candidate, baselineJobId, candidateJobId, failThreshold }: any) => {
+      const a = resolveExtraction(baseline, baselineJobId, "baseline");
+      if (!a.ok) return errorResult(a.error);
+      const b = resolveExtraction(candidate, candidateJobId, "candidate");
+      if (!b.ok) return errorResult(b.error);
+      const report = computeDrift(a.value, b.value, failThreshold != null ? { failThreshold } : {});
       return jsonResult(report);
     },
   );
 
   (server.tool as any)(
     "render_report",
-    "Render a self-contained HTML report (inline CSS, no external resources) from a dembrandt extraction, optionally including a drift diff. Returns the HTML as text — write it to a .html file to open offline or attach as a CI artifact.",
+    "Render a self-contained HTML report (inline CSS, no external resources) from a dembrandt extraction, optionally including a drift diff. Takes either an inline extraction or the job_id of a completed one. Returns the HTML as text: write it to a .html file to open offline or attach as a CI artifact.",
     {
       result: extract,
+      job_id: sourceJob,
       drift: z.any().optional().describe("A drift report from compute_drift, to render the diff banner"),
     },
-    ({ result, drift }: any) => {
-      const html = generateHtmlReport(result, { drift: drift ?? undefined });
+    ({ result, job_id, drift }: any) => {
+      const source = resolveExtraction(result, job_id, "result");
+      if (!source.ok) return errorResult(source.error);
+      const html = generateHtmlReport(source.value, { drift: drift ?? undefined });
       return { content: [{ type: "text", text: html }] };
     },
   );
 
   (server.tool as any)(
     "get_findings",
-    "Lint a dembrandt extraction for design-system quality issues: WCAG contrast failures, inconsistency (near-duplicate colors, off-scale spacing values, radius sprawl), and duplication. Returns findings with severity (error/warn), category, and a human-readable message, plus summary counts. Pure and synchronous — no browser. Complements compute_drift: drift asks 'did it change', findings asks 'is it good'.",
-    { result: extract },
-    ({ result }: any) => jsonResult(computeFindings(result)),
+    "Lint a dembrandt extraction for design-system quality issues: WCAG contrast failures, inconsistency (near-duplicate colors, off-scale spacing values, radius sprawl), and duplication. Returns findings with severity (error/warn), category, and a human-readable message, plus summary counts. Pure and synchronous, no browser. Takes either an inline extraction or the job_id of a completed one. Complements compute_drift: drift asks 'did it change', findings asks 'is it good'.",
+    { result: extract, job_id: sourceJob },
+    ({ result, job_id }: any) => {
+      const source = resolveExtraction(result, job_id, "result");
+      return source.ok ? jsonResult(computeFindings(source.value)) : errorResult(source.error);
+    },
   );
 
   (server.tool as any)(
     "export_dtcg",
-    "Convert a dembrandt extraction to W3C Design Tokens (DTCG) format: color, typography, spacing, radius, border, and shadow tokens with $type/$value structure and dembrandt provenance under $extensions. Pure and synchronous — no browser. Use it to hand tokens to Style Dictionary, Figma token plugins, or any DTCG-compatible pipeline.",
-    { result: extract },
-    ({ result }: any) => jsonResult(toDtcgTokens(result)),
+    "Convert a dembrandt extraction to W3C Design Tokens (DTCG) format: color, typography, spacing, radius, border, and shadow tokens with $type/$value structure and dembrandt provenance under $extensions. Pure and synchronous, no browser. Takes either an inline extraction or the job_id of a completed one. Use it to hand tokens to Style Dictionary, Figma token plugins, or any DTCG-compatible pipeline.",
+    { result: extract, job_id: sourceJob },
+    ({ result, job_id }: any) => {
+      const source = resolveExtraction(result, job_id, "result");
+      return source.ok ? jsonResult(toDtcgTokens(source.value)) : errorResult(source.error);
+    },
   );
 
   (server.tool as any)(
     "generate_design_md",
-    "Render a DESIGN.md brand guide (markdown) from a dembrandt extraction: colors, typography, spacing, surfaces, and components as a human-readable design reference. Pure and synchronous — no browser. Write the output to DESIGN.md in a project so agents and developers build UI against the extracted brand.",
-    { result: extract },
-    ({ result }: any) => ({ content: [{ type: "text", text: generateDesignMd(result) }] }),
+    "Render a DESIGN.md brand guide (markdown) from a dembrandt extraction: colors, typography, spacing, surfaces, and components as a human-readable design reference. Pure and synchronous, no browser. Takes either an inline extraction or the job_id of a completed one. Write the output to DESIGN.md in a project so agents and developers build UI against the extracted brand.",
+    { result: extract, job_id: sourceJob },
+    ({ result, job_id }: any) => {
+      const source = resolveExtraction(result, job_id, "result");
+      if (!source.ok) return errorResult(source.error);
+      return { content: [{ type: "text", text: generateDesignMd(source.value) }] };
+    },
   );
 
   // ── Job management tools ───────────────────────────────────────────────
@@ -443,6 +553,9 @@ async function main() {
   // ── Start ──────────────────────────────────────────────────────────────
 
   const transport = new StdioServerTransport();
+  transport.onclose = () => process.exit(0);
+  process.on("SIGINT", () => process.exit(0));
+  process.on("SIGTERM", () => process.exit(0));
   await server.connect(transport);
 }
 
