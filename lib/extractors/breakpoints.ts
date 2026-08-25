@@ -259,9 +259,12 @@ export async function extractGradients(page) {
   });
 }
 
-export async function extractMotion(page) {
-  // Phase 1: static pass — collect durations, easings, animations per semantic context
-  const staticMotion = await page.evaluate(() => {
+export const FREEZE_STYLE_ID = 'dembrandt-freeze-motion';
+
+// Static pass: durations, easings and animations per semantic context. Read
+// before the orchestrator freezes animations, so the authored values survive.
+export async function extractMotionStatic(page) {
+  return await page.evaluate(() => {
     function getContext(el) {
       const tag = el.tagName.toLowerCase();
       const role = el.getAttribute('role') || '';
@@ -379,6 +382,10 @@ export async function extractMotion(page) {
       contexts: ctxOut,
     };
   });
+}
+
+export async function extractMotion(page, staticSnapshot = null) {
+  const staticMotion = staticSnapshot ?? await extractMotionStatic(page);
 
   // Phase 2: hover interaction deltas on a sample of interactive elements
   const interactiveDeltas = [];

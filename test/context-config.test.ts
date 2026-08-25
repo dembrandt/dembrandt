@@ -107,6 +107,7 @@ test('buildContextOptions assembles defaults and is pure', () => {
   assert.equal(opts.userAgent, DEFAULT_USER_AGENT);
   assert.equal(opts.locale, 'en-US');
   assert.equal(opts.colorScheme, 'light');
+  assert.equal(opts.reducedMotion, 'no-preference');
   assert.equal(opts.extraHTTPHeaders['Accept-Language'], 'en-US,en;q=0.9,en;q=0.8');
   assert.deepEqual(opts.permissions, ['clipboard-read', 'clipboard-write']);
 });

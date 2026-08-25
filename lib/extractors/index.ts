@@ -8,7 +8,7 @@ import { MENU_TRIGGER_SELECTOR, CAROUSEL_NEXT_SELECTOR } from './menu-triggers.j
 import { extractTypography } from './typography.js';
 import { extractSpacing, extractBorderRadius, extractBorders, extractShadows } from './spacing.js';
 import { extractButtonStyles, extractInputStyles, extractLinkStyles, extractBadgeStyles } from './components.js';
-import { extractBreakpoints, detectIconSystem, detectFrameworks, extractGradients, extractMotion } from './breakpoints.js';
+import { extractBreakpoints, detectIconSystem, detectFrameworks, extractGradients, extractMotion, extractMotionStatic, FREEZE_STYLE_ID } from './breakpoints.js';
 import { extractTeach } from './teach.js';
 import { extractWcagPairs } from './colors.js';
 import { SCHEMA_VERSION } from '../version.js';
@@ -714,10 +714,16 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
     // report a different computed value on each run, producing phantom drift.
     // 1ms duration + iteration-count:1 + fill-mode:forwards snaps finite and
     // infinite animations to a stable end state. Opt out with keepAnimations.
+    // Authored durations and easings must be read before the freeze below
+    // rewrites every one of them to 1ms.
+    const motionStatic = await extractMotionStatic(page).catch(() => null);
+
     if (!options.keepAnimations) {
       try {
-        await page.addStyleTag({
-          content: `*, *::before, *::after {
+        await page.evaluate((id) => {
+          const style = document.createElement('style');
+          style.id = id;
+          style.textContent = `*, *::before, *::after {
             animation-duration: 1ms !important;
             animation-delay: 0ms !important;
             animation-iteration-count: 1 !important;
@@ -725,8 +731,9 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
             transition-duration: 1ms !important;
             transition-delay: 0ms !important;
             scroll-behavior: auto !important;
-          }`,
-        });
+          }`;
+          document.head.appendChild(style);
+        }, FREEZE_STYLE_ID);
         await page.waitForTimeout(200 * timeoutMultiplier);
       } catch {
         // best-effort; never block extraction on animation freezing
@@ -797,7 +804,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       // The fallback must satisfy Motion in full: the terminal renderer reads
       // motion.animations, so a short default turned an extractor failure into a
       // crash of the whole render.
-      guardExtractor('motion', extractMotion(page), { durations: [], easings: [], animations: [], contexts: {}, interactiveDeltas: [] }, extractorErrors),
+      guardExtractor('motion', extractMotion(page, motionStatic), { durations: [], easings: [], animations: [], contexts: {}, interactiveDeltas: [] }, extractorErrors),
     ]);
 
     const { logo, instances: logoInstances, favicons, manifest } = logoResult;

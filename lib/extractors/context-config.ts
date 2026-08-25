@@ -21,6 +21,7 @@ export interface ScreenSize {
 }
 
 export type ColorScheme = 'light' | 'dark' | 'no-preference';
+export type ReducedMotion = 'reduce' | 'no-preference';
 
 /**
  * The subset of Playwright's BrowserContextOptions that we set. Declared
@@ -36,6 +37,7 @@ export interface ContextOptions {
   timezoneId: string;
   extraHTTPHeaders: Record<string, string>;
   colorScheme: ColorScheme;
+  reducedMotion: ReducedMotion;
   permissions?: string[];
 }
 
@@ -126,6 +128,7 @@ export function buildContextOptions(options: ExtractOptions, browserName: string
     timezoneId: options.timezoneId || DEFAULT_TIMEZONE,
     extraHTTPHeaders,
     colorScheme: 'light',
+    reducedMotion: 'no-preference',
   };
 
   if (browserName === 'chromium') {
