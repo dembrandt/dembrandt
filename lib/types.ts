@@ -430,7 +430,7 @@ export interface BrandingResult {
   note?: string;
   isCanvasOnly?: boolean;
   /** Internal/transient fields used during crawl + merge. Never persist; see stripTransient(). */
-  _discoveredLinks?: DiscoveredLink[];
+  _discoveredLinks?: string[];
   _extractedUrls?: string[];
   _pageResults?: BrandingResult[];
 }

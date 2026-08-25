@@ -19,8 +19,10 @@ import { computeFindings } from "./lib/findings.js";
 import { generateHtmlReport } from "./lib/formatters/html.js";
 import { toDtcgTokens } from "./lib/formatters/dtcg.js";
 import { generateDesignMd } from "./lib/formatters/markdown.js";
-import { parseSitemap } from "./lib/discovery.js";
 import { mergeResults } from "./lib/merger.js";
+import { additionalPages, discoveryBudget, extractOptions, isMultiPage, launchArgs } from "./lib/mcp/options.js";
+import type { Extraction, ExtractionRequest } from "./lib/mcp/options.js";
+import { JobQueue, resolveExtraction } from "./lib/mcp/jobs.js";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
@@ -63,53 +65,11 @@ const nullSpinner = {
   info(_msg) { return this; },
 };
 
-function launchArgs(noSandbox: boolean) {
-  const args = ["--disable-blink-features=AutomationControlled"];
-  if (noSandbox || process.env.DEMBRANDT_NO_SANDBOX) {
-    args.push("--no-sandbox", "--disable-setuid-sandbox");
-  }
-  return args;
-}
-
-function extractOptions(options: any) {
-  return {
-    navigationTimeout: 90000,
-    slow: options.slow || false,
-    darkMode: options.darkMode || false,
-    mobile: options.mobile || false,
-    wcag: options.wcag || false,
-    _version: version,
-    ...(options.cookie ? { cookie: options.cookie } : {}),
-    ...(options.header ? { header: options.header } : {}),
-    ...(options.userAgent ? { userAgent: options.userAgent } : {}),
-  };
-}
-
-/** Resolve the extra page URLs to merge into the first result. */
-async function additionalPages(first: any, requestedUrl: string, options: any) {
-  const paths: string[] = options.paths ?? [];
-  if (paths.length > 0) {
-    const base = new URL(first.url);
-    return paths.map((path) =>
-      path.startsWith("http") ? path : `${base.protocol}//${base.host}${path.startsWith("/") ? path : "/" + path}`,
-    );
-  }
-  // A sitemap crawl with no explicit budget follows the CLI and takes up to 20.
-  const max = (options.pages ?? 1) > 1 ? (options.pages as number) - 1 : options.sitemap ? 20 : 0;
-  if (max < 1) return [];
-  if (options.sitemap) {
-    const fromResult = await parseSitemap(first.url, max);
-    if (fromResult.length > 0) return fromResult;
-    return first.url !== requestedUrl ? await parseSitemap(requestedUrl, max) : [];
-  }
-  return first._discoveredLinks ?? [];
-}
-
 /**
  * Run extraction with error handling suitable for MCP responses.
  * Returns { ok, data?, error? } so tool handlers never throw.
  */
-async function runExtraction(url: string, options: any = {}) {
+async function runExtraction(url: string, options: ExtractionRequest = {}) {
   if (!/^https?:\/\//i.test(url)) url = "https://" + url;
   let browser;
   let chromium;
@@ -132,15 +92,13 @@ async function runExtraction(url: string, options: any = {}) {
     };
   }
 
-  const multiPage = (options.paths?.length ?? 0) > 0 || (options.pages ?? 1) > 1 || !!options.sitemap;
-
   try {
-    const first = await extractBranding(url, nullSpinner, browser, {
-      ...extractOptions(options),
-      discoverLinks: multiPage && !options.sitemap && !(options.paths?.length) ? (options.pages ?? 1) - 1 : null,
+    const first: Extraction = await extractBranding(url, nullSpinner, browser, {
+      ...extractOptions(options, version),
+      discoverLinks: discoveryBudget(options),
     });
 
-    if (!multiPage) {
+    if (!isMultiPage(options)) {
       delete first._discoveredLinks;
       return { ok: true, data: first };
     }
@@ -152,7 +110,7 @@ async function runExtraction(url: string, options: any = {}) {
     for (const pageUrl of extraUrls) {
       await new Promise((r) => setTimeout(r, 1500 + Math.random() * 1500));
       try {
-        const pageResult = await extractBranding(pageUrl, nullSpinner, browser, extractOptions(options));
+        const pageResult: Extraction = await extractBranding(pageUrl, nullSpinner, browser, extractOptions(options, version));
         delete pageResult._discoveredLinks;
         results.push(pageResult);
       } catch {
@@ -186,109 +144,7 @@ function errorResult(message) {
   return { content: [{ type: "text", text: message }], isError: true };
 }
 
-// ── Job Queue ──────────────────────────────────────────────────────────
-
-class JobQueue {
-  #jobs = new Map();
-  #queue = [];
-  #running = new Set();
-  #maxConcurrent = 2;
-
-  enqueue(url, opts, pick) {
-    const id = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    this.#jobs.set(id, {
-      status: "queued",
-      url,
-      opts,
-      pick,
-      createdAt: Date.now(),
-      startedAt: undefined,
-      completedAt: undefined,
-      result: undefined,
-      full: undefined,
-      error: undefined,
-    });
-    this.#queue.push(id);
-    void this.#drain();
-    return id;
-  }
-
-  get(id) {
-    return this.#jobs.get(id) ?? null;
-  }
-
-  list() {
-    return Array.from(this.#jobs, ([id, job]) => ({
-      job_id: id,
-      status: job.status,
-      url: job.url,
-      createdAt: job.createdAt,
-      completedAt: job.completedAt,
-    }));
-  }
-
-  cancel(id) {
-    const job = this.#jobs.get(id);
-    if (!job || job.status !== "queued") return false;
-    job.status = "cancelled";
-    job.completedAt = Date.now();
-    const idx = this.#queue.indexOf(id);
-    if (idx !== -1) this.#queue.splice(idx, 1);
-    return true;
-  }
-
-  async #drain() {
-    while (this.#queue.length > 0 && this.#running.size < this.#maxConcurrent) {
-      const id = this.#queue.shift();
-      const job = this.#jobs.get(id);
-      if (!job || job.status === "cancelled") continue;
-
-      job.status = "running";
-      job.startedAt = Date.now();
-      this.#running.add(id);
-
-      runExtraction(job.url, job.opts)
-        .then((result) => {
-          if (job.status === "cancelled") return;
-          if (result.ok) {
-            job.status = "completed";
-            job.full = result.data;
-            job.result = job.pick(result.data);
-          } else {
-            job.status = "failed";
-            job.error = result.error;
-          }
-        })
-        .catch((err) => {
-          if (job.status !== "cancelled") {
-            job.status = "failed";
-            job.error = err.message || String(err);
-          }
-        })
-        .finally(() => {
-          job.completedAt = Date.now();
-          this.#running.delete(id);
-          void this.#drain();
-        });
-    }
-  }
-
-  // Remove completed/failed/cancelled jobs older than 1 hour
-  cleanup() {
-    const cutoff = Date.now() - 3_600_000;
-    for (const [id, job] of this.#jobs) {
-      if (
-        ["completed", "failed", "cancelled"].includes(job.status) &&
-        job.completedAt !== undefined &&
-        job.completedAt < cutoff
-      ) {
-        this.#jobs.delete(id);
-      }
-    }
-  }
-}
-
-const jobQueue = new JobQueue();
+const jobQueue = new JobQueue<Extraction>({ run: runExtraction });
 const cleanupTimer = setInterval(() => jobQueue.cleanup(), 600_000);
 cleanupTimer.unref();
 
@@ -339,14 +195,14 @@ async function main() {
 
   const url = z.string().describe("Website URL (e.g. example.com)");
   const slow = z.boolean().optional().default(false).describe("3x timeouts for heavy SPAs");
-  const sync = z.boolean().optional().default(false).describe("Wait for result directly instead of returning a job_id (blocks 15-40s)");
+  const sync = z.boolean().optional().default(false).describe("Wait for the result directly instead of returning a job_id. Blocks 15-40s for one page, and proportionally longer for a multi-page crawl.");
   const mobile = z.boolean().optional().default(false).describe("Extract from a mobile viewport instead of desktop");
   const cookie = z.string().optional().describe('Cookie string for authenticated pages, e.g. "session=abc; token=xyz"');
   const header = z.string().optional().describe('Extra HTTP header, e.g. "Authorization: Bearer eyJ..."');
   const userAgent = z.string().optional().describe("Custom user agent string");
   const noSandbox = z.boolean().optional().default(false).describe("Disable the browser sandbox, required inside Docker and most CI containers");
   const pages = z.number().int().min(1).max(20).optional().default(1).describe("Extract up to N pages and merge them into one token set. Pages are discovered from DOM links, or from sitemap.xml when sitemap is true. Merged tokens are markedly stronger than a single page.");
-  const paths = z.array(z.string()).optional().describe('Explicit extra paths on the same domain to extract and merge, e.g. ["/pricing", "/docs"]. Overrides page discovery.');
+  const paths = z.array(z.string()).max(20).optional().describe('Explicit extra paths on the same domain to extract and merge, e.g. ["/pricing", "/docs"]. Overrides page discovery.');
   const sitemap = z.boolean().optional().default(false).describe("Discover the extra pages from sitemap.xml instead of DOM links. Alone it takes up to 20 pages; set pages to cap it");
 
   // Every extraction tool takes the same navigation, auth and crawl surface.
@@ -427,20 +283,6 @@ async function main() {
 
   // ── Drift & report tools (synchronous, no browser) ─────────────────────
 
-  /**
-   * Pure tools accept either an inline extraction or the job_id of a completed
-   * one. The job path exists because an inline extraction has to travel back
-   * through the model as a tool argument, which is prohibitively large.
-   */
-  function resolveExtraction(inline: any, jobId: string | undefined, label: string) {
-    if (inline && Object.keys(inline).length > 0) return { ok: true as const, value: inline };
-    if (!jobId) return { ok: false as const, error: `Pass either ${label} or job_id.` };
-    const job = jobQueue.get(jobId);
-    if (!job) return { ok: false as const, error: `No job found with id: ${jobId}` };
-    if (job.status !== "completed") return { ok: false as const, error: `Job ${jobId} is ${job.status}, not completed.` };
-    return { ok: true as const, value: job.full };
-  }
-
   // zod 4: z.record needs explicit key + value types; z.record(z.any()) treats
   // the lone arg as the KEY and leaves value undefined, which crashes tools/list.
   const extract = z
@@ -463,9 +305,9 @@ async function main() {
       failThreshold: z.number().optional().describe("Score above this yields a 'drift' verdict (default 10)"),
     },
     ({ baseline, candidate, baselineJobId, candidateJobId, failThreshold }: any) => {
-      const a = resolveExtraction(baseline, baselineJobId, "baseline");
+      const a = resolveExtraction(baseline, baselineJobId, "baseline", jobQueue);
       if (!a.ok) return errorResult(a.error);
-      const b = resolveExtraction(candidate, candidateJobId, "candidate");
+      const b = resolveExtraction(candidate, candidateJobId, "candidate", jobQueue);
       if (!b.ok) return errorResult(b.error);
       const report = computeDrift(a.value, b.value, failThreshold != null ? { failThreshold } : {});
       return jsonResult(report);
@@ -481,7 +323,7 @@ async function main() {
       drift: z.any().optional().describe("A drift report from compute_drift, to render the diff banner"),
     },
     ({ result, job_id, drift }: any) => {
-      const source = resolveExtraction(result, job_id, "result");
+      const source = resolveExtraction(result, job_id, "result", jobQueue);
       if (!source.ok) return errorResult(source.error);
       const html = generateHtmlReport(source.value, { drift: drift ?? undefined });
       return { content: [{ type: "text", text: html }] };
@@ -493,7 +335,7 @@ async function main() {
     "Lint a dembrandt extraction for design-system quality issues: WCAG contrast failures, inconsistency (near-duplicate colors, off-scale spacing values, radius sprawl), and duplication. Returns findings with severity (error/warn), category, and a human-readable message, plus summary counts. Pure and synchronous, no browser. Takes either an inline extraction or the job_id of a completed one. Complements compute_drift: drift asks 'did it change', findings asks 'is it good'.",
     { result: extract, job_id: sourceJob },
     ({ result, job_id }: any) => {
-      const source = resolveExtraction(result, job_id, "result");
+      const source = resolveExtraction(result, job_id, "result", jobQueue);
       return source.ok ? jsonResult(computeFindings(source.value)) : errorResult(source.error);
     },
   );
@@ -503,7 +345,7 @@ async function main() {
     "Convert a dembrandt extraction to W3C Design Tokens (DTCG) format: color, typography, spacing, radius, border, and shadow tokens with $type/$value structure and dembrandt provenance under $extensions. Pure and synchronous, no browser. Takes either an inline extraction or the job_id of a completed one. Use it to hand tokens to Style Dictionary, Figma token plugins, or any DTCG-compatible pipeline.",
     { result: extract, job_id: sourceJob },
     ({ result, job_id }: any) => {
-      const source = resolveExtraction(result, job_id, "result");
+      const source = resolveExtraction(result, job_id, "result", jobQueue);
       return source.ok ? jsonResult(toDtcgTokens(source.value)) : errorResult(source.error);
     },
   );
@@ -513,7 +355,7 @@ async function main() {
     "Render a DESIGN.md brand guide (markdown) from a dembrandt extraction: colors, typography, spacing, surfaces, and components as a human-readable design reference. Pure and synchronous, no browser. Takes either an inline extraction or the job_id of a completed one. Write the output to DESIGN.md in a project so agents and developers build UI against the extracted brand.",
     { result: extract, job_id: sourceJob },
     ({ result, job_id }: any) => {
-      const source = resolveExtraction(result, job_id, "result");
+      const source = resolveExtraction(result, job_id, "result", jobQueue);
       if (!source.ok) return errorResult(source.error);
       return { content: [{ type: "text", text: generateDesignMd(source.value) }] };
     },
