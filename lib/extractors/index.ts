@@ -1305,11 +1305,13 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         spinner.stop();
         if (voiceResult.voice) {
           const { wordCount, sentenceCount } = voiceResult.voice.metrics.structural;
-          if (options.verbose) {
+          if (voiceResult.voice.belowWordFloor) {
+            log(color.warning(`  ! voice: ${wordCount} words, below the reliability floor — metrics may be noisy`));
+          } else if (options.verbose) {
             log(chalk.dim(`  voice: ${voiceResult.voice.fragments.length} fragments, ${wordCount} words, ${sentenceCount} sentences`));
           }
-        } else if (options.verbose) {
-          log(chalk.dim(`  voice: skipped (${voiceResult.voiceSkipped})`));
+        } else {
+          log(color.warning(`  ! voice: skipped (${voiceResult.voiceSkipped})`));
         }
       } catch (err) {
         spinner.stop();

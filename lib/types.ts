@@ -566,6 +566,8 @@ export interface Voice {
   fragments: VoiceFragment[];
   metrics: VoiceMetrics;
   pageType: VoicePageType;
+  /** Total word count fell under WORD_FLOOR: metrics are computed but noisy. */
+  belowWordFloor?: boolean;
 }
 
 /** CLI / programmatic options accepted by extractBranding(). */

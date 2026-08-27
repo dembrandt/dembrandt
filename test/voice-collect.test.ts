@@ -138,12 +138,24 @@ test('a malformed url degrades to no probe rather than aborting collection', asy
   await page.close();
 });
 
-test('a page under the word floor yields null plus a reason, never a partial object', async () => {
+test('a page under the word floor still returns fragments, flagged as low confidence', async () => {
   const page = await open('https://example.test/', doc('<h1>Hi</h1>'), { with404: false });
   const result = await collectVoice(page, 'https://example.test/');
 
+  assert.ok(result.voice, 'thin pages must still yield whatever copy exists');
+  assert.equal(result.voice.belowWordFloor, true);
+  assert.equal(result.voiceSkipped, undefined);
+  await page.close();
+});
+
+test('a page with no extractable text at all yields null plus a reason', async () => {
+  const page = await open('https://example.test/', '<!doctype html><html><head></head><body></body></html>', {
+    with404: false,
+  });
+  const result = await collectVoice(page, 'https://example.test/');
+
   assert.equal(result.voice, null);
-  assert.ok(result.voiceSkipped === 'below-word-floor' || result.voiceSkipped === 'no-text');
+  assert.equal(result.voiceSkipped, 'no-text');
   await page.close();
 });
 

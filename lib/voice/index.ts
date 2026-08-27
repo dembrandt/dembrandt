@@ -59,8 +59,15 @@ export async function collectVoice(
   const errorFragments = probe404 ? await probeErrorPage(page, url, probeTimeout) : [];
   const all = [...fragments, ...errorFragments];
 
-  if (totalWords(all) < WORD_FLOOR) return { voice: null, voiceSkipped: 'below-word-floor' };
+  const belowWordFloor = totalWords(all) < WORD_FLOOR;
 
   const budgeted = applyBudget(all, pageType);
-  return { voice: { fragments: budgeted, metrics: computeMetrics(budgeted, signals.lang), pageType } };
+  return {
+    voice: {
+      fragments: budgeted,
+      metrics: computeMetrics(budgeted, signals.lang),
+      pageType,
+      ...(belowWordFloor ? { belowWordFloor: true } : {}),
+    },
+  };
 }
