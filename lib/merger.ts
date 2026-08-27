@@ -9,6 +9,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { deltaE } from './colors.js';
+import { applyBudget, computeMetrics, totalWords, WORD_FLOOR } from './voice/metrics.js';
 
 /**
  * Meta for a merged snapshot. The merged artifact is a distinct snapshot, so it
@@ -406,6 +407,54 @@ function mergeWcag(results) {
 }
 
 /**
+ * All pages' voice fragments, deduplicated and rebudgeted as one corpus.
+ *
+ * Root `voice` deliberately stays the homepage's own further down: a metric
+ * like mean sentence length genuinely should not be averaged across a
+ * marketing page and a docs page, it would describe neither. Fragments are a
+ * different kind of thing. A quote is evidence regardless of which page
+ * carried it, and a homepage that is mostly nav chrome starves any reader
+ * that classifies brand voice from a handful of fragments -- exactly what a
+ * category-heavy site like an e-commerce homepage does to a one-page voice
+ * sample. Recomputing metrics from the merged corpus (not averaging two
+ * numbers) keeps every structural stat internally consistent.
+ *
+ * Returns null rather than a hollow object when nothing survives: a caller
+ * checking `voiceAllPages` should not have to also check `fragments.length`.
+ */
+function mergeVoice(results) {
+  const withVoice = results.filter((r) => r.voice && r.voice.fragments && r.voice.fragments.length);
+  if (withVoice.length === 0) return null;
+
+  const seen = new Set();
+  const fragments = [];
+  for (const r of withVoice) {
+    for (const f of r.voice.fragments) {
+      const key = `${f.role}|${f.text.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      fragments.push({ ...f, page: r.url });
+    }
+  }
+  if (fragments.length === 0) return null;
+
+  // The homepage's classification stands for the merged budget too: it is
+  // usually the most representative single page, and a budget has to pick one
+  // cap rather than average several.
+  const pageType = withVoice[0].voice.pageType;
+  const lang = withVoice[0].voice.metrics.lang;
+  const budgeted = applyBudget(fragments, pageType);
+  const belowWordFloor = totalWords(fragments) < WORD_FLOOR;
+
+  return {
+    fragments: budgeted,
+    metrics: computeMetrics(budgeted, lang),
+    pageType,
+    ...(belowWordFloor ? { belowWordFloor: true } : {}),
+  };
+}
+
+/**
  * Merge an array of per-page result objects into a single unified result.
  * @param {Object[]} results - Array of extractBranding() result objects
  * @returns {Object} Merged result with same shape as single-page result
@@ -440,10 +489,14 @@ export function mergeResults(results) {
     iconSystem: mergeByName(results, r => r.iconSystem),
     frameworks: mergeByName(results, r => r.frameworks),
     ...(results.some(r => r.wcag) ? { wcag: mergeWcag(results) } : {}),
-    // Not merged: the variation between pages is the signal. Root keeps the
-    // homepage's, each page keeps its own, as with rawColors.
+    // Metrics are not merged: the variation between pages is the signal. Root
+    // keeps the homepage's own, each page keeps its own, as with rawColors.
     ...(home.voice !== undefined ? { voice: home.voice } : {}),
     ...(home.voiceSkipped ? { voiceSkipped: home.voiceSkipped } : {}),
+    // Fragments are merged, deduplicated and rebudgeted across every page that
+    // yielded voice: see mergeVoice above for why this is a separate field
+    // from `voice` rather than a replacement for it.
+    ...(results.some((r) => r.voice !== undefined) ? { voiceAllPages: mergeVoice(results) } : {}),
     // rawColors are per-page filter diagnostics: merging them would destroy the
     // page provenance they exist for, so each page keeps its own set here.
     // colors.rawColors stays the first page's (via mergeColors) for back-compat.

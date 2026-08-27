@@ -408,4 +408,79 @@ test('a run without --voice gains no voice keys', () => {
   const merged = mergeResults([page('https://a.com/'), page('https://a.com/b')]);
   assert.equal('voice' in merged, false);
   assert.equal('voice' in merged.pages[0], false);
+  assert.equal('voiceAllPages' in merged, false);
+});
+
+// DEM-257 follow-up: a homepage carrying only nav chrome and one recycled
+// sentence starves a reader that classifies brand voice from `voice` alone
+// (see lib/merger.ts's mergeVoice doc comment). `voiceAllPages` is the fix:
+// every page's fragments, deduplicated, as one corpus -- while `voice` and
+// `pages[]` above stay exactly as the previous tests already pin them.
+test('voiceAllPages merges fragments across pages and dedupes repeats, without touching root voice', () => {
+  const home = page('https://a.com/', {
+    voice: {
+      fragments: [
+        { role: 'hero-h1', text: 'Hankkija - Kasvun osaaja', order: 0 },
+        { role: 'hero-body', text: 'Hankkija on Suomen johtava maatalouskauppa.', order: 0 },
+        { role: 'nav-label', text: 'Etusivu', order: 0 },
+        { role: 'nav-label', text: 'Piha ja puutarha', order: 1 },
+      ],
+      metrics: { structural: { wordCount: 10, sentenceCount: 1, meanSentenceLength: 7, sentenceLengthStdev: 0, exclamationRatio: 0, questionRatio: 0, longWordRatio: 0, avgSyllablesPerWord: 2, lowSample: true }, lexical: null, lang: 'fi' },
+      pageType: 'landing',
+    },
+  });
+  const category = page('https://a.com/piha-ja-puutarha', {
+    voice: {
+      fragments: [
+        // Same nav label as the homepage: identical role + text, must collapse to one.
+        { role: 'nav-label', text: 'Etusivu', order: 0 },
+        { role: 'section-h2', text: 'Kasvimaan perustaminen' },
+        { role: 'value-prop', text: 'Autamme sinua onnistumaan puutarhassa askel askeleelta.', order: 0 },
+      ],
+      metrics: { structural: { wordCount: 12, sentenceCount: 1, meanSentenceLength: 8, sentenceLengthStdev: 0, exclamationRatio: 0, questionRatio: 0, longWordRatio: 0, avgSyllablesPerWord: 2, lowSample: true }, lexical: null, lang: 'fi' },
+      pageType: 'other',
+    },
+  });
+
+  const merged = mergeResults([home, category]);
+
+  // Root voice is untouched: still exactly the homepage's four fragments.
+  assert.equal(merged.voice.fragments.length, 4);
+
+  const all = merged.voiceAllPages;
+  assert.ok(all);
+  // 4 + 3 fragments minus the one duplicate nav-label = 6.
+  assert.equal(all.fragments.length, 6);
+  assert.equal(all.fragments.filter((f) => f.role === 'nav-label' && f.text === 'Etusivu').length, 1);
+  // The category page's prose survives, which is the entire point.
+  assert.ok(all.fragments.some((f) => f.role === 'value-prop' && f.text.includes('puutarhassa')));
+  // Provenance: each fragment says which page it came from.
+  const valueProp = all.fragments.find((f) => f.role === 'value-prop');
+  assert.equal(valueProp.page, 'https://a.com/piha-ja-puutarha');
+  // Budget/classification decisions pick the homepage's, same as root voice.
+  assert.equal(all.pageType, 'landing');
+});
+
+test('voiceAllPages skips pages with no voice instead of throwing', () => {
+  const home = page('https://a.com/', {
+    voice: {
+      fragments: [{ role: 'hero-h1', text: 'Heading', order: 0 }],
+      metrics: { structural: { wordCount: 1, sentenceCount: 0, meanSentenceLength: 0, sentenceLengthStdev: 0, exclamationRatio: 0, questionRatio: 0, longWordRatio: 0, avgSyllablesPerWord: 1, lowSample: true }, lexical: null, lang: 'en' },
+      pageType: 'landing',
+    },
+  });
+  const thin = page('https://a.com/contact', { voice: null, voiceSkipped: 'below-word-floor' });
+
+  const merged = mergeResults([home, thin]);
+
+  assert.equal(merged.voiceAllPages.fragments.length, 1);
+});
+
+test('voiceAllPages is null when every page skipped voice, even though the run used --voice', () => {
+  const home = page('https://a.com/', { voice: null, voiceSkipped: 'no-text' });
+  const other = page('https://a.com/b', { voice: null, voiceSkipped: 'no-text' });
+
+  const merged = mergeResults([home, other]);
+
+  assert.equal(merged.voiceAllPages, null);
 });
