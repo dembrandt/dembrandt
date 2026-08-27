@@ -278,7 +278,8 @@ async function simulateHumanMouse(page: Page) {
  * @returns {Promise<BrandingResult>}
  */
 export async function extractBranding(url: string, spinner: Spinner, browser: Browser, options: ExtractOptions = {}): Promise<BrandingResult> {
-  const timeoutMultiplier = options.slow ? 3 : 1;
+  // let: escalates to the --slow budget automatically, see main-content wait below.
+  let timeoutMultiplier = options.slow ? 3 : 1;
   const timeouts = [];
   const degraded: string[] = []; // post-extraction stages that failed but did not abort the run
   const extractorErrors: ExtractorError[] = []; // scoped failures of the parallel extractors
@@ -496,24 +497,29 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         log(color.success(`  ✓ Hydration settled (${(elapsed / 1000).toFixed(1)}s)`));
 
         spinner.start("Waiting for main content...");
-        // Many SPAs never render a semantic main/header/section at all; everything
-        // lives in one framework root div. Include the same roots the logo
-        // extractor already treats as a transparent wrapper (lib/extractors/logo.ts).
-        const mainContentSelector = "main, header, [data-hero], section, #app, #root, #__next, #__nuxt, [data-reactroot]";
+        // Framework-agnostic: any sizable rendered block, not a specific selector list.
+        const hasRenderedContent = () => document.body && [...document.body.querySelectorAll('*')].some(el => {
+          if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || el.tagName === 'LINK' || el.tagName === 'META') return false;
+          const r = el.getBoundingClientRect();
+          return r.width > 200 && r.height > 100;
+        });
         try {
-          await page.waitForSelector(mainContentSelector, {
-            timeout: 10000 * timeoutMultiplier,
-          });
+          await page.waitForFunction(hasRenderedContent, { timeout: 10000 * timeoutMultiplier });
           spinner.stop();
           log(color.success(`  ✓ Main content detected`));
         } catch {
           spinner.stop();
-          console.log(color.warning(`  ! Main content selector timeout, giving it one more moment...`));
+          if (timeoutMultiplier === 1) {
+            timeoutMultiplier = 3;
+            console.log(color.warning(`  ! Main content slow to render, switching to --slow-equivalent timeouts for the rest of this run...`));
+          } else {
+            console.log(color.warning(`  ! Main content still slow, giving it one more moment...`));
+          }
           try {
-            await page.waitForSelector(mainContentSelector, { timeout: 5000 * timeoutMultiplier });
+            await page.waitForFunction(hasRenderedContent, { timeout: 10000 * timeoutMultiplier });
             log(color.success(`  ✓ Main content detected on retry`));
           } catch {
-            console.log(color.warning(`  ! Main content selector timeout (continuing)`));
+            console.log(color.warning(`  ! Main content timeout (continuing)`));
             timeouts.push('Main content selector');
           }
         }
@@ -1296,12 +1302,8 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
     console.log();
     log(color.success.bold("✓ Brand extraction complete!"));
 
-    if (timeouts.length > 0 && !options.slow) {
-      console.log();
-      console.log(color.warning(`! ${timeouts.length} timeout(s) occurred during extraction:`));
-      timeouts.forEach(t => console.log(chalk.dim(`  • ${t}`)));
-      console.log();
-      console.log(color.info(`💡 Tip: Try running with ${chalk.bold('--slow')} flag for more reliable results on slow-loading sites`));
+    if (timeouts.length > 0) {
+      console.log(color.warning(`! ${timeouts.length} timeout(s) even at slow-tier waits: ${timeouts.join(', ')} — extraction may be incomplete`));
     }
 
     // Runs outside the parallel block: the 404 probe navigates, which would move
