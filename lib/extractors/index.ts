@@ -496,16 +496,26 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         log(color.success(`  ✓ Hydration settled (${(elapsed / 1000).toFixed(1)}s)`));
 
         spinner.start("Waiting for main content...");
+        // Many SPAs never render a semantic main/header/section at all; everything
+        // lives in one framework root div. Include the same roots the logo
+        // extractor already treats as a transparent wrapper (lib/extractors/logo.ts).
+        const mainContentSelector = "main, header, [data-hero], section, #app, #root, #__next, #__nuxt, [data-reactroot]";
         try {
-          await page.waitForSelector("main, header, [data-hero], section", {
+          await page.waitForSelector(mainContentSelector, {
             timeout: 10000 * timeoutMultiplier,
           });
           spinner.stop();
           log(color.success(`  ✓ Main content detected`));
         } catch {
           spinner.stop();
-          console.log(color.warning(`  ! Main content selector timeout (continuing)`));
-          timeouts.push('Main content selector');
+          console.log(color.warning(`  ! Main content selector timeout, giving it one more moment...`));
+          try {
+            await page.waitForSelector(mainContentSelector, { timeout: 5000 * timeoutMultiplier });
+            log(color.success(`  ✓ Main content detected on retry`));
+          } catch {
+            console.log(color.warning(`  ! Main content selector timeout (continuing)`));
+            timeouts.push('Main content selector');
+          }
         }
 
         if (options.stealth) {
