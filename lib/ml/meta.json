@@ -28,11 +28,11 @@
     "is_brand_token",
     "rank"
   ],
-  "trainedAt": "2026-06-22T17:13:59.596569+00:00",
-  "nSites": 60,
-  "nCandidates": 410,
+  "trainedAt": "2026-07-19T01:57:11.478945+00:00",
+  "nSites": 102,
+  "nCandidates": 1532,
   "metrics": {
-    "leave_one_site_out_top1": 0.6833,
-    "sites_evaluated": 60
+    "leave_one_site_out_top1": 0.6765,
+    "sites_evaluated": 102
   }
 }

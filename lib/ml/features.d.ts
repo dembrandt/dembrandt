@@ -7,12 +7,15 @@ export interface PaletteEntry {
     source?: string;
     oklch?: string | null;
     lch?: string | null;
+    usageFrac?: number;
+    isToken?: boolean;
 }
 export interface Extraction {
     url?: string;
     colors?: {
         semantic?: Record<string, string | null>;
         palette?: PaletteEntry[];
+        detected?: PaletteEntry[];
         cssVariables?: Record<string, string | {
             value?: string;
         } | null> | null;
