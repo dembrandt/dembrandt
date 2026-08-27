@@ -112,10 +112,13 @@ export async function extractLogo(page, url) {
     function inLogoWall(el) {
       const r0 = el.getBoundingClientRect();
       if (r0.width < 24 || r0.height < 8) return false;
-      // The primary logo lives in the header / nav; brand walls are content sections
-      // ("trusted by", integrations, press). Never treat a header/nav mark as a wall
-      // member — that protected e.g. a header logo sitting beside a couple of UI marks.
-      if (el.closest('header, nav, [role="banner"]')) return false;
+      // The primary logo lives in the header/nav or the footer; brand walls are content
+      // sections ("trusted by", integrations, press) in between. Never treat a header/nav
+      // or footer mark as a wall member — that protected e.g. a header logo sitting beside
+      // a couple of UI marks. A footer logo needs the same protection: footers commonly
+      // group it with social/app-store icons, which is exactly the >=3-sizable-marks shape
+      // this function otherwise flags as a wall.
+      if (el.closest('header, nav, [role="banner"], footer, [role="contentinfo"], [class*="footer" i], [id*="footer" i]')) return false;
       // Some sites build the top bar from plain divs (no <header>). A mark in the top strip
       // is chrome, not a content wall, so protect it by position too.
       if (r0.top + window.scrollY < 180) return false;
