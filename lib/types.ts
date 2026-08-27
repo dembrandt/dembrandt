@@ -598,4 +598,6 @@ export interface ExtractOptions {
   teach?: boolean;
   /** Injected CLI version, surfaced as meta.dembrandtVersion. */
   _version?: string;
+  /** Engine used to launch the page, e.g. "chromium" (default) or "firefox". */
+  browser?: string;
 }

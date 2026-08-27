@@ -444,6 +444,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
     let attempts = 0;
     const maxAttempts = 2;
     let lastNavigationStatus: number | null = null;
+    let lastContentLength = 0;
 
     while (attempts < maxAttempts) {
       attempts++;
@@ -684,6 +685,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
 
         spinner.start("Validating page content...");
         const contentLength = await page.evaluate(() => document.body.textContent.length);
+        lastContentLength = contentLength;
         spinner.stop();
 
         if (contentLength > 100) {
@@ -1384,11 +1386,18 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         viewport: { width: screenW, height: screenH },
         fontsReady,
         ...(pendingFonts.length ? { pendingFonts } : {}),
+        // `url` above is wherever the page ended up (redirects included); this is
+        // what was actually asked for, so a same-domain locale/region redirect
+        // (common on large multi-market sites) is visible without diffing the two.
+        requestedUrl: url,
+        contentLength: lastContentLength,
+        ...(timeouts.length ? { timeouts } : {}),
         flags: {
           ...(options.stealth && { stealth: true }),
           ...(options.darkMode && { darkMode: true }),
           ...(options.mobile && { mobile: true }),
           ...(options.slow && { slow: true }),
+          ...(options.browser && options.browser !== 'chromium' && { browser: options.browser }),
           ...(options.userAgent && { userAgent: options.userAgent }),
           ...(options.locale && { locale: options.locale }),
           ...(options.timezoneId && { timezone: options.timezoneId }),

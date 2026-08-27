@@ -265,6 +265,7 @@ program
             acceptLanguage: opts.acceptLanguage,
             screenSize: opts.screenSize,
             teach: opts.teach,
+            browser: opts.browser,
             _version: version,
           });
 
@@ -291,9 +292,14 @@ program
 
           delete result._discoveredLinks;
 
+          const crawlTechnique = hasExplicitPaths ? 'explicit-paths' : opts.sitemap ? 'sitemap' : isAutoCrawl ? 'auto' : null;
+
           if (additionalUrls.length === 0) {
             if ((hasExplicitPaths || opts.sitemap || isAutoCrawl) && !opts.jsonOnly) {
               spinner.warn("No additional pages discovered");
+            }
+            if (crawlTechnique && result.meta) {
+              result.meta.crawl = { technique: crawlTechnique, pagesRequested: hasExplicitPaths ? paths.length + 1 : (crawlN || null), pagesFound: 1 };
             }
           } else {
             spinner.stop();
@@ -327,6 +333,7 @@ program
                   locale: opts.locale,
                   timezoneId: opts.timezone,
                   acceptLanguage: opts.acceptLanguage,
+                  browser: opts.browser,
                 });
                 delete pageResult._discoveredLinks;
                 allResults.push(pageResult);
@@ -336,7 +343,18 @@ program
             }
 
             spinner.stop();
+            const pagesFound = allResults.length;
             result = mergeResults(allResults);
+            if (crawlTechnique && result.meta) {
+              // How the merged page set was discovered, not just how many pages ended
+              // up in it — "asked for 5 via --crawl, only 2 existed" reads very
+              // differently from "asked for 2 explicit paths, got 2".
+              result.meta.crawl = {
+                technique: crawlTechnique,
+                pagesRequested: hasExplicitPaths ? paths.length + 1 : (crawlN || null),
+                pagesFound,
+              };
+            }
           }
 
           if (!hasExplicitPaths && !opts.sitemap && !isAutoCrawl) {
