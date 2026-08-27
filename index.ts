@@ -346,9 +346,6 @@ program
             const pagesFound = allResults.length;
             result = mergeResults(allResults);
             if (crawlTechnique && result.meta) {
-              // How the merged page set was discovered, not just how many pages ended
-              // up in it — "asked for 5 via --crawl, only 2 existed" reads very
-              // differently from "asked for 2 explicit paths, got 2".
               result.meta.crawl = {
                 technique: crawlTechnique,
                 pagesRequested: hasExplicitPaths ? paths.length + 1 : (crawlN || null),

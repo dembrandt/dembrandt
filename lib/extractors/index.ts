@@ -1386,9 +1386,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         viewport: { width: screenW, height: screenH },
         fontsReady,
         ...(pendingFonts.length ? { pendingFonts } : {}),
-        // `url` above is wherever the page ended up (redirects included); this is
-        // what was actually asked for, so a same-domain locale/region redirect
-        // (common on large multi-market sites) is visible without diffing the two.
+        // top-level `url` is post-redirect; this is what was passed in.
         requestedUrl: url,
         contentLength: lastContentLength,
         ...(timeouts.length ? { timeouts } : {}),
