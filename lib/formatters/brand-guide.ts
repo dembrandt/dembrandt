@@ -882,7 +882,7 @@ ${fonts.length > 0 ? (() => {
       0123456789  !@#$%&amp;*()
     </div>
     <div class="type-meta" style="margin-top:16px">
-      ${primaryFont.weights.map(w => weightName(w)).join(', ')}${primaryFont.fallbacks ? `  /  ${escapeHtml(primaryFont.fallbacks)}` : ''}
+      ${primaryFont.weights.map(w => weightName(w)).join(', ')}${primaryFont.fallbacks ? `  /  ${escapeHtml(primaryFont.fallbacks)}` : ''}${primaryFont.sourceUrl ? `  /  ${escapeHtml(primaryFont.sourceUrl)}` : ''}
     </div>
     ${primaryFont.weights.length > 1 ? `
     <div class="type-weights">
@@ -921,7 +921,7 @@ ${fonts.length > 0 ? (() => {
       0123456789  !@#$%&amp;*()
     </div>
     <div class="type-meta" style="margin-top:16px">
-      ${secondaryFont.weights.map(w => weightName(w)).join(', ')}${secondaryFont.fallbacks ? `  /  ${escapeHtml(secondaryFont.fallbacks)}` : ''}
+      ${secondaryFont.weights.map(w => weightName(w)).join(', ')}${secondaryFont.fallbacks ? `  /  ${escapeHtml(secondaryFont.fallbacks)}` : ''}${secondaryFont.sourceUrl ? `  /  ${escapeHtml(secondaryFont.sourceUrl)}` : ''}
     </div>
     ${secondaryFont.weights.length > 1 ? `
     <div class="type-weights">
@@ -947,7 +947,23 @@ ${fonts.length > 0 ? (() => {
 <!-- BACK COVER -->
 ${(() => {
   const year = (() => { const y = new Date(data.extractedAt).getFullYear(); return Number.isFinite(y) ? y : new Date().getFullYear(); })();
-  const version = data.meta?.dembrandtVersion;
+  const meta = data.meta || {};
+  const version = meta.dembrandtVersion;
+
+  // Redirected to a different URL than what was asked for (locale/region redirects
+  // are common on large multi-market sites and otherwise invisible in the guide).
+  const redirected = meta.requestedUrl && data.url && meta.requestedUrl !== data.url;
+  const crawlNote = meta.crawl && typeof meta.crawl.pagesFound === 'number' && meta.crawl.technique
+    ? `${meta.crawl.pagesFound} page${meta.crawl.pagesFound === 1 ? '' : 's'} analyzed via ${escapeHtml(meta.crawl.technique)}${meta.crawl.pagesRequested ? ` (${meta.crawl.pagesRequested} requested)` : ''}`
+    : '';
+  const provenanceLines = [
+    redirected ? `Requested ${escapeHtml(meta.requestedUrl)}, redirected to ${escapeHtml(data.url)}` : '',
+    crawlNote,
+    Array.isArray(meta.timeouts) && meta.timeouts.length
+      ? `${meta.timeouts.length} timeout${meta.timeouts.length === 1 ? '' : 's'} during extraction: ${escapeHtml(meta.timeouts.join(', '))} — some values may be incomplete`
+      : ''
+  ].filter(Boolean);
+
   return `
 <div class="page back-cover">
   ${logoUrl ? `<img class="logo-img" src="${escapeAttr(logoUrl)}" />` : ''}
@@ -957,6 +973,7 @@ ${(() => {
     &copy; ${year} ${escapeHtml(companyName)}. All rights reserved.<br>
     These guidelines and the assets within remain the property of ${escapeHtml(companyName)}.
   </div>
+  ${provenanceLines.length ? `<div class="back-attrib" style="margin-top:8px">${provenanceLines.join('<br>')}</div>` : ''}
   <div class="back-attrib">
     Created with <strong>DEMBRANDT</strong>&nbsp;&nbsp;&middot;&nbsp;&nbsp;dembrandt.com${version ? `&nbsp;&nbsp;&middot;&nbsp;&nbsp;v${escapeHtml(version)}` : ''}
   </div>
@@ -1057,10 +1074,34 @@ function gatherColors(colors) {
   return result;
 }
 
+function findFontSourceUrl(family: string, urls: string[]): string {
+  if (!family || !Array.isArray(urls) || !urls.length) return '';
+  const decode = (u: unknown): string => {
+    if (typeof u !== 'string') return '';
+    try { return decodeURIComponent(u).toLowerCase(); } catch { return u.toLowerCase(); }
+  };
+
+  const slug = family.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const exact = urls.find(u => decode(u).replace(/[^a-z0-9]+/g, '').includes(slug));
+  if (exact) return exact;
+
+  // Real font filenames often insert a format/version code between words
+  // (e.g. "HM Ampersand Regular" -> "HMAmpersandW01-Regular-75537.ttf"),
+  // which breaks a plain substring match. Fall back to requiring every
+  // significant word of the family name to appear somewhere in the URL.
+  const words = family.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 3);
+  if (!words.length) return '';
+  return urls.find(u => {
+    const decoded = decode(u);
+    return decoded && words.every(w => decoded.includes(w));
+  }) || '';
+}
+
 function gatherFonts(typography) {
   if (!Array.isArray(typography?.styles) || !typography.styles.length) return [];
 
   const families = new Map();
+  const sourceUrls = Array.isArray(typography?.sources?.urls) ? typography.sources.urls : [];
 
   for (const style of typography.styles) {
     if (!style.family) continue;
@@ -1069,7 +1110,8 @@ function gatherFonts(typography) {
         family: style.family,
         fallbacks: style.fallbacks || '',
         weights: new Set(),
-        sizes: []
+        sizes: [],
+        sourceUrl: findFontSourceUrl(style.family, sourceUrls)
       });
     }
     const f = families.get(style.family);
