@@ -67,3 +67,36 @@ test('buildHTML accepts bare color strings in the palette', () => {
   const html = buildHTML({ url: 'https://x.test', colors: { palette: ['#38BDF8', '#EA580C'] } });
   assert.ok(isDocument(html));
 });
+
+// A light/white logo rendered on a white or light-gray box is invisible.
+// The Logo Usage page must swap those boxes for dark ones when the logo
+// itself is light, the same way the Logo Misuse page already does.
+test('buildHTML swaps light-logo contrast boxes to dark backgrounds', () => {
+  const html = buildHTML({
+    url: 'https://x.test',
+    logo: { url: 'https://x.test/logo-white.svg', width: 200, height: 60 },
+  });
+  assert.ok(isDocument(html));
+  assert.doesNotMatch(html, /background:#ffffff;border:1px solid #d0d0d0/);
+  assert.doesNotMatch(html, /background:#f5f5f5;border:1px solid #d0d0d0/);
+  assert.match(html, />Black</);
+  assert.match(html, />Charcoal</);
+});
+
+test('buildHTML keeps White/Light gray contrast boxes for a normal logo', () => {
+  const html = buildHTML({
+    url: 'https://x.test',
+    logo: { url: 'https://x.test/logo.svg', width: 200, height: 60 },
+  });
+  assert.ok(isDocument(html));
+  assert.match(html, />White</);
+  assert.match(html, />Light gray</);
+});
+
+test('buildHTML renders the Clear Space diagram in dark for a light logo', () => {
+  const html = buildHTML({
+    url: 'https://x.test',
+    logo: { url: 'https://x.test/logo-white.svg', width: 200, height: 60 },
+  });
+  assert.match(html, /background:#0a0a0a;border:1px solid #333/);
+});

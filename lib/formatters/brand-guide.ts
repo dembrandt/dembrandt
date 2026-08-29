@@ -729,13 +729,23 @@ ${logoUrl ? (() => {
   const dH = Math.round(logoH * scale);
   const dA = dH; // A in diagram pixels = scaled logo height
 
-  // Logo contrast boxes: pick label color that works on each bg
-  const boxes = [
-    { bg: '#ffffff', border: true, label: 'White' },
-    { bg: '#0a0a0a', border: false, label: 'Dark' },
-    { bg: brandColorHex, border: false, label: brandColorHex.toUpperCase() },
-    { bg: '#f5f5f5', border: true, label: 'Light gray' },
-  ];
+  // Logo contrast boxes: pick label color that works on each bg.
+  // A light/white logo is invisible on the light boxes below, so swap
+  // those two for dark ones instead of showing it disappear on the page
+  // meant to demonstrate correct usage.
+  const boxes = logoIsLight
+    ? [
+        { bg: '#0a0a0a', border: false, label: 'Dark' },
+        { bg: '#2e2e2e', border: false, label: 'Charcoal' },
+        { bg: brandColorHex, border: false, label: brandColorHex.toUpperCase() },
+        { bg: '#000000', border: false, label: 'Black' },
+      ]
+    : [
+        { bg: '#ffffff', border: true, label: 'White' },
+        { bg: '#0a0a0a', border: false, label: 'Dark' },
+        { bg: brandColorHex, border: false, label: brandColorHex.toUpperCase() },
+        { bg: '#f5f5f5', border: true, label: 'Light gray' },
+      ];
 
   return `
 <div class="page">
@@ -756,7 +766,7 @@ ${logoUrl ? (() => {
     <div style="flex-shrink:0">
       <div style="position:relative;width:${dW + dA * 2}px;height:${dH + dA * 2}px;background:#f5f5f5;border-radius:4px">
         <div style="position:absolute;inset:0;border:1px dashed #aaa;border-radius:4px"></div>
-        <div style="position:absolute;top:${dA}px;left:${dA}px;width:${dW}px;height:${dH}px;background:#fff;border:1px solid #ccc;border-radius:2px;display:flex;align-items:center;justify-content:center">
+        <div style="position:absolute;top:${dA}px;left:${dA}px;width:${dW}px;height:${dH}px;background:${logoIsLight ? '#0a0a0a' : '#fff'};border:1px solid ${logoIsLight ? '#333' : '#ccc'};border-radius:2px;display:flex;align-items:center;justify-content:center">
           <img src="${escapeAttr(logoUrl)}" style="max-width:${dW - 8}px;max-height:${dH - 8}px;object-fit:contain" />
         </div>
         <div style="position:absolute;top:${Math.round(dA / 2 - 7)}px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:700;font-style:italic;font-family:Georgia,serif;color:#555">A</div>
