@@ -41,7 +41,7 @@ test('a snapshot taken before the freeze keeps the authored durations', async ()
     await freeze(page);
 
     const motion = await extractMotion(page, snapshot);
-    const values = motion.durations.map((d: any) => d.value);
+    const values = motion.durations.map((d: { value: string }) => d.value);
     assert.ok(values.includes('0.2s'), `expected 0.2s, got ${values.join(', ')}`);
     assert.ok(values.includes('0.15s'), `expected 0.15s, got ${values.join(', ')}`);
     assert.equal(motion.contexts.link.durations[0], '0.2s');
@@ -57,7 +57,7 @@ test('reading a frozen page reports the freeze, not the design', async () => {
     await freeze(page);
 
     const motion = await extractMotion(page);
-    const values = motion.durations.map((d: any) => d.value);
+    const values = motion.durations.map((d: { value: string }) => d.value);
     assert.deepEqual(values, ['0.001s']);
   } finally {
     await page.close();
