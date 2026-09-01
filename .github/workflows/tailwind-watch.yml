@@ -76,7 +76,7 @@ jobs:
       - name: Update the emitter
         id: agent
         if: (steps.check.outputs.code == '1' || steps.latest.outcome == 'failure') && env.HAS_AGENT == 'true'
-        uses: anthropics/claude-code-action@24dcd50c0568f0fc9e9211213a4fd2d9eb15c4e0 # v1.0.200
+        uses: anthropics/claude-code-action@a874e9ecd7bb36efdad65429c6b35815f5a08f10 # v1.0.210
         continue-on-error: true
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -142,7 +142,7 @@ jobs:
         env:
           REPORT: ${{ steps.check.outputs.report }}
           LATEST: ${{ steps.latest.outcome }}
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const title = 'Tailwind: upstream moved, review the --tailwind export';
