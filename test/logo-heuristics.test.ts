@@ -7,6 +7,7 @@ import {
   positionFraction,
   fitPaintedBox,
   isLogoSized,
+  isOwnBrandMark,
   LOGO_HEURISTICS_SOURCE,
 } from '../lib/extractors/logo-heuristics.js';
 
@@ -213,10 +214,37 @@ test('isLogoSized: defensive against zero / negative / NaN / non-numeric', () =>
   assert.equal(isLogoSized('40' as any, undefined as any), false);
 });
 
+// ---- isOwnBrandMark ---------------------------------------------------------
+test('isOwnBrandMark: alt text naming the site brand matches', () => {
+  assert.equal(isOwnBrandMark('Acme Corp', null, 'acme.com'), true);
+  assert.equal(isOwnBrandMark('acme.com logo', null, 'acme.com'), true);
+});
+
+test('isOwnBrandMark: filename naming the site brand matches when alt is absent', () => {
+  assert.equal(isOwnBrandMark(null, 'https://cdn.x.com/assets/acme.com.webp', 'acme.com'), true);
+  assert.equal(isOwnBrandMark('', '/img/acme-logo-single-white.svg', 'acme.com'), true);
+});
+
+test('isOwnBrandMark: a different brand in alt or filename does not match', () => {
+  assert.equal(isOwnBrandMark('Globex Inc', null, 'acme.com'), false);
+  assert.equal(isOwnBrandMark(null, '/logos/partner-globex.svg', 'acme.com'), false);
+});
+
+test('isOwnBrandMark: generic alt with no brand signal does not match', () => {
+  assert.equal(isOwnBrandMark('Logo', null, 'acme.com'), false);
+  assert.equal(isOwnBrandMark(null, null, 'acme.com'), false);
+});
+
+test('isOwnBrandMark: defensive against null / non-string / short site root', () => {
+  assert.equal(isOwnBrandMark(undefined as any, undefined as any, undefined as any), false);
+  assert.equal(isOwnBrandMark('Acme', null, 'a'), false);
+  assert.equal(isOwnBrandMark(42 as any, 42 as any, 'acme.com'), false);
+});
+
 // ---- serialization contract ------------------------------------------------
 test('LOGO_HEURISTICS_SOURCE re-hydrates to functions that behave identically', () => {
   const H = new Function(LOGO_HEURISTICS_SOURCE +
-    '\nreturn { isHomeHref, classifyContextByPosition, thirdPartyBrandFromAlt, positionFraction, fitPaintedBox, isLogoSized };')();
+    '\nreturn { isHomeHref, classifyContextByPosition, thirdPartyBrandFromAlt, positionFraction, fitPaintedBox, isLogoSized, isOwnBrandMark };')();
   assert.equal(typeof H.isHomeHref, 'function');
   assert.equal(H.isHomeHref('/', 'https://x.com'), isHomeHref('/', 'https://x.com'));
   assert.equal(H.classifyContextByPosition(7500, 8000), classifyContextByPosition(7500, 8000));
@@ -226,6 +254,7 @@ test('LOGO_HEURISTICS_SOURCE re-hydrates to functions that behave identically', 
     fitPaintedBox(box(0, 0, 200, 200), { width: 400, height: 100 }, 'contain'),
   );
   assert.equal(H.isLogoSized(16, 16), isLogoSized(16, 16));
+  assert.equal(H.isOwnBrandMark('acme.com logo', null, 'acme.com'), isOwnBrandMark('acme.com logo', null, 'acme.com'));
 });
 
 test('LOGO_HEURISTICS_SOURCE is self-contained: no module refs leak in', () => {

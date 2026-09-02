@@ -146,6 +146,29 @@ export function isLogoSized(width: unknown, height: unknown, minLongEdge = 24): 
   return Math.max(w, h) >= minLongEdge;
 }
 
+/**
+ * Does this alt text or filename explicitly name the site's OWN brand? The below-fold
+ * pre-scan otherwise drops every non-home-linked mark to keep out partner/customer walls —
+ * but a footer logo is often not wrapped in a home link at all, and gets discarded along
+ * with them. A mark that self-identifies as the site's own brand should survive that guard
+ * even without a home link.
+ */
+export function isOwnBrandMark(altText: unknown, fileUrl: unknown, siteDomain: unknown): boolean {
+  const root = (typeof siteDomain === 'string' ? siteDomain : '').toLowerCase().split('.')[0];
+  if (!root || root.length < 2) return false;
+  const squash = (s: unknown) => (typeof s === 'string' ? s : '')
+    .replace(/\b(logos?|logotypes?|logomarks?|brandmarks?|wordmarks?|icons?|brands?|marks?)\b/gi, ' ')
+    .replace(/\.(svg|png|webp|avif|jpe?g|gif)\b/gi, ' ')
+    .replace(/\b(on[-_]?white|on[-_]?black|white|black|dark|light|colou?r|mono|full|small|large|[0-9]+x|2x|3x|v?[0-9]{1,4})\b/gi, ' ')
+    .replace(/[^a-z0-9]+/gi, '')
+    .toLowerCase();
+  const alt = squash(altText);
+  if (alt.length >= 2 && alt.includes(root)) return true;
+  const fileName = typeof fileUrl === 'string' ? (fileUrl.split(/[/?#]/).filter(Boolean).pop() || '') : '';
+  const file = squash(fileName);
+  return file.length >= 2 && file.includes(root);
+}
+
 // Serialized twins, injected into page.evaluate so the browser runs identical code.
 // Order matters only for readability; none reference each other.
 export const LOGO_HEURISTICS_SOURCE: string = [
@@ -155,4 +178,5 @@ export const LOGO_HEURISTICS_SOURCE: string = [
   positionFraction,
   fitPaintedBox,
   isLogoSized,
+  isOwnBrandMark,
 ].map((fn) => fn.toString()).join('\n\n');
