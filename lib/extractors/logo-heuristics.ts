@@ -154,19 +154,28 @@ export function isLogoSized(width: unknown, height: unknown, minLongEdge = 24): 
  * even without a home link.
  */
 export function isOwnBrandMark(altText: unknown, fileUrl: unknown, siteDomain: unknown): boolean {
-  const root = (typeof siteDomain === 'string' ? siteDomain : '').toLowerCase().split('.')[0];
-  if (!root || root.length < 2) return false;
   const squash = (s: unknown) => (typeof s === 'string' ? s : '')
     .replace(/\b(logos?|logotypes?|logomarks?|brandmarks?|wordmarks?|icons?|brands?|marks?)\b/gi, ' ')
     .replace(/\.(svg|png|webp|avif|jpe?g|gif)\b/gi, ' ')
     .replace(/\b(on[-_]?white|on[-_]?black|white|black|dark|light|colou?r|mono|full|small|large|[0-9]+x|2x|3x|v?[0-9]{1,4})\b/gi, ' ')
     .replace(/[^a-z0-9]+/gi, '')
     .toLowerCase();
-  const alt = squash(altText);
-  if (alt.length >= 2 && alt.includes(root)) return true;
+  // Squash the domain root through the same pipeline as alt/filename so a
+  // hyphenated brand ("my-shop.com") still matches "My Shop logo".
+  const root = squash((typeof siteDomain === 'string' ? siteDomain : '').split('.')[0]);
+  if (!root || root.length < 2) return false;
+  // A root under 4 chars (ba, hp, ge...) is too common a substring of
+  // unrelated words to trust with includes() ("zex" inside "Buzzexchange") —
+  // require it to stand as a whole word instead. squash() already strips
+  // word boundaries, so the word check runs on the un-squashed, merely
+  // tokenized text.
+  const tokenize = (s: unknown) => (typeof s === 'string' ? s : '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const matches = (s: unknown) => root.length >= 4
+    ? squash(s).includes(root)
+    : tokenize(s).includes(root);
+  if (matches(altText)) return true;
   const fileName = typeof fileUrl === 'string' ? (fileUrl.split(/[/?#]/).filter(Boolean).pop() || '') : '';
-  const file = squash(fileName);
-  return file.length >= 2 && file.includes(root);
+  return matches(fileName);
 }
 
 // Serialized twins, injected into page.evaluate so the browser runs identical code.

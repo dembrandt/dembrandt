@@ -241,6 +241,20 @@ test('isOwnBrandMark: defensive against null / non-string / short site root', ()
   assert.equal(isOwnBrandMark(42 as any, 42 as any, 'acme.com'), false);
 });
 
+test('isOwnBrandMark: a short domain root does not match as a substring of an unrelated word', () => {
+  // "zex.com" must not let "Buzzexchange Ltd" through just because "zex" sits inside it.
+  assert.equal(isOwnBrandMark('Buzzexchange Ltd', null, 'zex.com'), false);
+});
+
+test('isOwnBrandMark: a short domain root still matches as its own word', () => {
+  assert.equal(isOwnBrandMark('Zex Inc', null, 'zex.com'), true);
+  assert.equal(isOwnBrandMark(null, '/img/zex-logo.svg', 'zex.com'), true);
+});
+
+test('isOwnBrandMark: a hyphenated domain root matches an unhyphenated brand name', () => {
+  assert.equal(isOwnBrandMark('My Shop logo', null, 'my-shop.com'), true);
+});
+
 // ---- serialization contract ------------------------------------------------
 test('LOGO_HEURISTICS_SOURCE re-hydrates to functions that behave identically', () => {
   const H = new Function(LOGO_HEURISTICS_SOURCE +
