@@ -37,8 +37,15 @@
  * dembrandt output contract version. Bump per the policy documented above.
  *
  *  (unversioned) — `voice` / `voiceSkipped` ship behind a hidden, opt-in flag
- *          and deliberately do not bump the contract. Bump to 1.9.0 when the
- *          flag is documented, not before.
+ *          and deliberately do not bump the contract. Bump when the flag is
+ *          documented, not before.
+ *  1.9.0 — meta gains requestedUrl (the URL as passed on the command line,
+ *          before redirect resolution), contentLength (extracted page text
+ *          length, for spotting thin/bot-wall pages) and timeouts (present
+ *          only when at least one occurred, naming which wait timed out).
+ *          meta.crawl (technique, pagesRequested, pagesFound) is new when
+ *          --crawl, --sitemap or explicit paths are used. Additive: 1.8.x
+ *          consumers ignore all of it.
  *  1.8.0 — no shape change. BEHAVIOR: the drift engine compares colors.semantic
  *          role by role. It previously read that map only to attach role labels
  *          to palette entries, so a changed brand primary produced no drift at
@@ -98,7 +105,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.8.0';
+export const SCHEMA_VERSION = '1.9.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
