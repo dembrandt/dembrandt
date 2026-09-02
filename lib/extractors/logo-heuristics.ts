@@ -160,9 +160,14 @@ export function isOwnBrandMark(altText: unknown, fileUrl: unknown, siteDomain: u
     .replace(/\b(on[-_]?white|on[-_]?black|white|black|dark|light|colou?r|mono|full|small|large|[0-9]+x|2x|3x|v?[0-9]{1,4})\b/gi, ' ')
     .replace(/[^a-z0-9]+/gi, '')
     .toLowerCase();
-  // Squash the domain root through the same pipeline as alt/filename so a
-  // hyphenated brand ("my-shop.com") still matches "My Shop logo".
-  const root = squash((typeof siteDomain === 'string' ? siteDomain : '').split('.')[0]);
+  // Strip non-alphanumerics from the domain root so a hyphenated brand
+  // ("my-shop.com") still matches "My Shop logo" — but skip the noise-word
+  // and variant-number removal from squash(), which is tuned for filenames
+  // and alt text: a purely numeric root ("123.com") would otherwise be
+  // stripped to nothing by the "[0-9]{1,4}" variant-suffix rule.
+  const root = (typeof siteDomain === 'string' ? siteDomain : '').split('.')[0]
+    .replace(/[^a-z0-9]+/gi, '')
+    .toLowerCase();
   if (!root || root.length < 2) return false;
   // A root under 4 chars (ba, hp, ge...) is too common a substring of
   // unrelated words to trust with includes() ("zex" inside "Buzzexchange") —

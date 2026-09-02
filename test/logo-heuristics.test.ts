@@ -255,6 +255,12 @@ test('isOwnBrandMark: a hyphenated domain root matches an unhyphenated brand nam
   assert.equal(isOwnBrandMark('My Shop logo', null, 'my-shop.com'), true);
 });
 
+test('isOwnBrandMark: a purely numeric domain root is not stripped to nothing', () => {
+  // squash()'s variant-suffix rule ([0-9]{1,4}) would otherwise erase "123"
+  // entirely when it's run over the domain root instead of just alt/filename.
+  assert.equal(isOwnBrandMark('123 Inc', null, '123.com'), true);
+});
+
 // ---- serialization contract ------------------------------------------------
 test('LOGO_HEURISTICS_SOURCE re-hydrates to functions that behave identically', () => {
   const H = new Function(LOGO_HEURISTICS_SOURCE +
