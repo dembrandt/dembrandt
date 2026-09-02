@@ -19,6 +19,8 @@ import type {
   TypographyStyle,
   ButtonStyle,
   BadgeStyle,
+  InputStyle,
+  LinkStyle,
   WcagPair,
   CssState,
 } from "../types.js";
@@ -58,6 +60,21 @@ function safeCss(value: unknown): string {
   // hex, rgb/rgba, hsl/hsla, named-ish words, numbers+units, commas, %, spaces, parens, dots, slashes (for line-height font shorthand)
   if (/^[#0-9a-zA-Z().,%\s/\-+]+$/.test(v) && !/[<>{};]/.test(v)) return v;
   return "";
+}
+
+/** Only http(s) links may be rendered as `<a>`/`<img src>` — no javascript:/file: URLs from extracted content. */
+function isHttpUrl(u: string): boolean {
+  try {
+    const p = new URL(u).protocol;
+    return p === "http:" || p === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/** An <img> src: an http(s) URL, or a data: URI already inlined by extraction. */
+function isSafeImgSrc(u: string): boolean {
+  return isHttpUrl(u) || /^data:image\//i.test(u.trim());
 }
 
 /* -------------------------------- styles -------------------------------- */
@@ -336,6 +353,38 @@ function paletteSection(result: BrandingResult): string {
   return section("Palette", `<div class="colors">${cards}</div>`, undefined, all);
 }
 
+/** The extracted brand mark, plus any favicons. */
+function logoSection(result: BrandingResult): string {
+  const logo = result.logo;
+  const favicons = result.favicons ?? [];
+  const parts: string[] = [];
+  if (logo) {
+    const src = logo.dataUri || logo.url;
+    const img = src && isSafeImgSrc(src) ? `<img src="${esc(src)}" alt="${esc(logo.alt || logo.ariaLabel || "logo")}" style="max-height:48px;max-width:220px;object-fit:contain;background:${safeCss(logo.background) || "transparent"}">` : "";
+    const meta: string[] = [];
+    if (logo.width && logo.height) meta.push(`${logo.width}×${logo.height}`);
+    if (logo.safeZone) {
+      const z = logo.safeZone;
+      meta.push(`safe zone ${z.top}/${z.right}/${z.bottom}/${z.left}`);
+    }
+    const swatches = (logo.svgColors ?? [])
+      .map((c) => `<span class="sw2" style="width:16px;height:16px;background:${safeCss(c) || "transparent"}"></span>`)
+      .join("");
+    if (img || meta.length || swatches) {
+      parts.push(`<div class="row">${img}<div>${meta.length ? `<p class="sub">${esc(meta.join(" · "))}</p>` : ""}${swatches ? `<div class="row" style="gap:4px;margin-top:4px">${swatches}</div>` : ""}</div></div>`);
+    }
+  }
+  if (favicons.length) {
+    const icons = favicons
+      .filter((f) => isSafeImgSrc(f.url))
+      .map((f) => `<img src="${esc(f.url)}" alt="${esc(f.type)}" title="${esc(f.type)}${f.sizes ? ` ${esc(f.sizes)}` : ""}" style="width:24px;height:24px;object-fit:contain">`)
+      .join("");
+    if (icons) parts.push(`<div class="row" style="margin-top:12px">${icons}</div>`);
+  }
+  if (!parts.length) return "";
+  return section("Logo", parts.join(""), "logo");
+}
+
 function semanticSection(result: BrandingResult): string {
   const sem = Object.entries(result.colors?.semantic ?? {}).filter(([, v]) => v);
   if (!sem.length) return "";
@@ -396,14 +445,6 @@ function typographySection(result: BrandingResult): string {
     ...(srcs.selfHostedFonts ?? []),
   ];
   const srcLine = fams.length ? `<p class="sub">Sources: ${esc(fams.join(", "))}</p>` : "";
-  const isHttpUrl = (u: string): boolean => {
-    try {
-      const p = new URL(u).protocol;
-      return p === "http:" || p === "https:";
-    } catch {
-      return false;
-    }
-  };
   const fontUrls = (srcs.urls ?? []).filter(isHttpUrl);
   const urlsLine = fontUrls.length
     ? `<p class="sub">Font files: ${fontUrls.map((u) => `<a href="${esc(u)}">${esc(u)}</a>`).join(", ")}</p>`
@@ -506,7 +547,58 @@ function buttonsSection(result: BrandingResult): string {
       return `<button class="previewbtn" style="${esc(style)}">${esc(b.text || "Button")}</button>`;
     })
     .join(" ");
-  return section("Buttons", `<div class="row">${previews}</div>`);
+  const all = buttons
+    .map((b: ButtonStyle) => {
+      const st = b.states?.default ?? {};
+      return `${b.text || "Button"}: ${[st.backgroundColor, st.color, st.borderRadius].filter(Boolean).join(" / ")}`;
+    })
+    .join("\n");
+  return section("Buttons", `<div class="row">${previews}</div>`, undefined, all);
+}
+
+/** A rendered `<input>` preview per style. */
+function inputsSection(result: BrandingResult): string {
+  const raw = result.components?.inputs;
+  const list: InputStyle[] = Array.isArray(raw) ? raw : raw?.text ?? [];
+  if (!list.length) return "";
+  const previews = list
+    .slice(0, 8)
+    .map((i: InputStyle) => {
+      const st = i.states?.default ?? {};
+      const style = [
+        st.backgroundColor ? `background:${safeCss(st.backgroundColor)}` : "",
+        st.color ? `color:${safeCss(st.color)}` : "",
+        i.borderRadius ? `border-radius:${safeCss(i.borderRadius)}` : "",
+        i.padding ? `padding:${safeCss(i.padding)}` : "padding:8px 12px",
+        i.border ? `border:${safeCss(i.border)}` : "border:1px solid var(--line)",
+      ]
+        .filter(Boolean)
+        .join(";");
+      return `<input class="previewbtn" style="${esc(style)}" placeholder="${esc(i.type || "text")}" readonly>`;
+    })
+    .join(" ");
+  const all = list.map((i) => [i.type, i.border, i.borderRadius].filter(Boolean).join(" / ")).join("\n");
+  return section("Inputs", `<div class="row">${previews}</div>`, undefined, all);
+}
+
+/** Link swatches: default + hover colour, so an underline/colour change reads at a glance. */
+function linksSection(result: BrandingResult): string {
+  const links = result.components?.links ?? [];
+  if (!links.length) return "";
+  const chips = links
+    .slice(0, 12)
+    .map((l: LinkStyle) => {
+      const d = l.states?.default ?? {};
+      const h = l.states?.hover;
+      const style = [d.color ? `color:${safeCss(d.color)}` : "", d.textDecoration ? `text-decoration:${safeCss(d.textDecoration)}` : "", l.fontWeight ? `font-weight:${safeCss(l.fontWeight)}` : ""]
+        .filter(Boolean)
+        .join(";");
+      const hoverNote = h?.color && h.color !== d.color ? ` <span class="sub">hover ${esc(h.color)}</span>` : "";
+      return `<span class="badgepv"><a href="#" style="${esc(style)}" onclick="return false">Link</a>${hoverNote}</span>`;
+    })
+    .join(" ");
+  const all = links.map((l) => [l.states?.default?.color, l.states?.hover?.color].filter(Boolean).join(" -> ")).join("\n");
+  return section("Links", `<div class="row">${chips}</div>`, undefined, all);
 }
 
 function badgesSection(result: BrandingResult): string {
@@ -526,7 +618,8 @@ function badgesSection(result: BrandingResult): string {
       return `<span class="badgepv" style="${esc(style)}">${esc(bd.styleType || "badge")}</span>`;
     })
     .join(" ");
-  return section("Badges", `<div class="row">${chips}</div>`);
+  const all = list.map((bd: BadgeStyle) => [bd.styleType, bd.backgroundColor, bd.color].filter(Boolean).join(" / ")).join("\n");
+  return section("Badges", `<div class="row">${chips}</div>`, undefined, all);
 }
 
 function wcagSection(result: BrandingResult): string {
@@ -679,12 +772,15 @@ export function generateHtmlReport(result: BrandingResult, options: HtmlReportOp
   const body = [
     options.drift ? driftSection(options.drift, result, options.baselineLabel) : "",
     findingsSection(fr),
+    logoSection(result),
     paletteSection(result),
     semanticSection(result),
     typographySection(result),
     cardRow(spacingSection(result), radiusSection(result)),
     shadowsSection(result),
     buttonsSection(result),
+    inputsSection(result),
+    linksSection(result),
     badgesSection(result),
     wcagSection(result),
     metaSection(result),

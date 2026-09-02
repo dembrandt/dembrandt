@@ -163,16 +163,39 @@ export async function extractLogo(page, url) {
       } catch { return null; }
     }
 
-    function findBgColor(el) {
-      let node = el;
+    // Walk an element's own ancestors for the first solid background-color;
+    // null if one paints an image/gradient instead (can't reduce that to one hex).
+    function bgFromAncestors(node) {
       while (node && node.tagName !== 'HTML') {
         try {
-          const bg = toHex(getComputedStyle(node).backgroundColor);
+          const style = getComputedStyle(node);
+          if (style.backgroundImage && style.backgroundImage !== 'none') return null;
+          const bg = toHex(style.backgroundColor);
           if (bg) return bg;
         } catch {}
         node = node.parentElement;
       }
       return null;
+    }
+
+    function findBgColor(el) {
+      // Prefer what's actually painted at a point beside the logo (handles a
+      // transparent header over a hero) over el's own DOM ancestors.
+      const rect = el.getBoundingClientRect();
+      const points = [
+        [rect.left - 6, rect.top + rect.height / 2],
+        [rect.right + 6, rect.top + rect.height / 2],
+        [rect.left + rect.width / 2, rect.top - 6],
+        [rect.left + rect.width / 2, rect.bottom + 6],
+      ];
+      for (const [x, y] of points) {
+        if (x < 0 || y < 0) continue;
+        const hit = document.elementFromPoint(x, y);
+        if (!hit || el.contains(hit) || hit.contains(el)) continue;
+        const bg = bgFromAncestors(hit);
+        if (bg) return bg;
+      }
+      return bgFromAncestors(el);
     }
 
     function isLight(hex) {
@@ -393,6 +416,21 @@ export async function extractLogo(page, url) {
           // Bake the resolved color in so `currentColor` fills render standalone.
           if (color) clone.style.color = color;
           if (!clone.getAttribute('xmlns')) clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+          // fill/stroke may be var(--token) from the page's own CSS — bake the computed value in.
+          const origEls = el.querySelectorAll('*');
+          const cloneEls = clone.querySelectorAll('*');
+          origEls.forEach((orig, i) => {
+            const c = cloneEls[i];
+            if (!c) return;
+            const cs = getComputedStyle(orig);
+            (['fill', 'stroke'] as const).forEach(attr => {
+              const raw = orig.getAttribute(attr);
+              if (raw && raw !== 'none' && !/^#[0-9a-f]{3,8}$/i.test(raw)) {
+                const resolved = toHex(cs[attr]);
+                if (resolved) c.setAttribute(attr, resolved);
+              }
+            });
+          });
           const serialized = clone.outerHTML;
           // Skip pathological inline SVGs (sprite sheets, embedded rasters).
           if (serialized && serialized.length <= 50000) {
