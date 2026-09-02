@@ -877,8 +877,7 @@ export async function extractWcagPairs(page) {
 /**
  * Bind each observed WCAG contrast pair back onto the palette candidate it was
  * measured against, so a colour carries "this is AA-compliant text against X"
- * as a feature instead of leaving pairs and candidates as two unlinked lists
- * (DEM-267). Mutates each matching entry's `contrastAgainst` in place and
+ * as a feature. Mutates each matching entry's `contrastAgainst` in place and
  * returns the palette for convenience; entries with no observed pair are
  * left untouched (no empty array).
  */

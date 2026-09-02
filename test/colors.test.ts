@@ -116,9 +116,6 @@ test('capConfidenceByUsage never promotes, and never throws on a missing count',
   assert.equal(capConfidenceByUsage('high', undefined), 'low');
 });
 
-// bindContrastToPalette (DEM-267): link observed WCAG pairs back onto the
-// palette candidate they were measured against.
-
 type TestCandidate = { normalized: string; contrastAgainst?: { bg: string; ratio: number; aa: boolean }[] };
 
 test('bindContrastToPalette attaches contrastAgainst to a matching candidate on either side of a pair', () => {
