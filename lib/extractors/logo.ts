@@ -94,13 +94,14 @@ export async function extractLogo(page, url) {
     // code. guardExtractor wraps this whole evaluate, so even a rehydration failure only
     // yields an empty logo result for this one site — never a crash.
     const H = new Function(heuristicsSource +
-      '\nreturn { isHomeHref, classifyContextByPosition, thirdPartyBrandFromAlt, positionFraction, fitPaintedBox, isLogoSized };')() as {
+      '\nreturn { isHomeHref, classifyContextByPosition, thirdPartyBrandFromAlt, positionFraction, fitPaintedBox, isLogoSized, isOwnBrandMark };')() as {
         isHomeHref: (href: any, origin: any) => boolean;
         classifyContextByPosition: (top: any, docHeight: any, foldY?: number) => 'header'|'footer'|'hero'|'body';
         thirdPartyBrandFromAlt: (alt: any, site: any) => string | null;
         positionFraction: (token: any) => number;
         fitPaintedBox: (content: any, intrinsic: any, fit: any, px?: number, py?: number) => { x: number; y: number; width: number; height: number };
         isLogoSized: (w: any, h: any, minLongEdge?: number) => boolean;
+        isOwnBrandMark: (alt: any, fileUrl: any, site: any) => boolean;
       };
 
     // A customer / partner logo wall is a STRUCTURAL pattern, not a naming one: three or
@@ -680,12 +681,16 @@ export async function extractLogo(page, url) {
             // names a different brand in its alt or file name, it is not ours — skip it.
             // (A partner strip of "logo-<Brand>.svg" images slipped in here: the pre-scan
             // never ran the third-party guard that findLogosInZone applies.)
+            const altText = (el.getAttribute('alt') || '');
             if (!homeLinked) {
-              const altText = (el.getAttribute('alt') || '');
               if (H.thirdPartyBrandFromAlt(altText, siteDomain) || inLogoWall(el)) continue;
             }
             const belowFold = rect.top > 500;
-            if (belowFold && !homeLinked) continue; // below the fold, only our own home-linked mark
+            // A below-fold mark normally needs a home link to prove it's ours — but a footer
+            // logo is often not linked at all. If its alt or filename self-identifies as the
+            // site's own brand, that's proof enough without the link.
+            const ownBrand = homeLinked || H.isOwnBrandMark(altText, el.getAttribute('src') || el.getAttribute('href') || '', siteDomain);
+            if (belowFold && !ownBrand) continue; // below the fold, only our own mark qualifies
             const context = !belowFold ? 'header'
               : (rect.top > document.documentElement.scrollHeight - 1200 ? 'footer' : 'body');
             const score = scoreLogo(el, context) + 20; // bonus for semantic match
