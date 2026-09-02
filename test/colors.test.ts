@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { hexToRgb, relativeLuminance, computeWcag, convertColor, deltaE, deltaE2000 } from '../lib/colors.js';
-import { capConfidenceByUsage, bindContrastToPalette } from '../lib/extractors/colors.js';
+import { capConfidenceByUsage, bindContrastToPalette, extractColors } from '../lib/extractors/colors.js';
 
 test('hexToRgb parses 6, 3, and 8 digit hex', () => {
   assert.deepEqual(hexToRgb('#ff0000'), { r: 255, g: 0, b: 0 });
@@ -157,4 +157,46 @@ test('bindContrastToPalette leaves candidates untouched when wcag is empty, and 
   assert.equal(palette[0].contrastAgainst, undefined);
   assert.deepEqual(bindContrastToPalette(null, [{ fg: '#111111', bg: '#fff' }]), null);
   assert.deepEqual(bindContrastToPalette([{}], [{ fg: '#111111', bg: '#fff', ratio: 1, aa: false }]), [{}]);
+});
+
+// DEM-211: three CIE76 implementations existed (lib/colors.ts, lib/drift.ts,
+// and this page-context copy) and quietly disagreed. drift.ts now imports
+// rgbToLab from lib/colors.ts directly, so only the page-context copy —
+// which can't import anything, since it runs inside page.evaluate() — is
+// still a hand-duplicated twin. This pulls that twin's source out of
+// extractColors.toString() and evals it, so any future edit to lib/colors.ts's
+// Lab maths that isn't mirrored here fails a test instead of silently
+// reintroducing the disagreement.
+function extractFunctionSource(source: string, name: string): string {
+  const marker = `function ${name}(`;
+  const start = source.indexOf(marker);
+  assert.ok(start !== -1, `function ${name} not found in source`);
+  const braceStart = source.indexOf('{', start);
+  let depth = 0;
+  for (let i = braceStart; i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}') {
+      depth--;
+      if (depth === 0) return source.slice(start, i + 1);
+    }
+  }
+  throw new Error(`unbalanced braces extracting ${name}`);
+}
+
+test('the page-context deltaE (DEM-211) numerically matches lib/colors.ts deltaE', () => {
+  const src = extractFunctionSource(extractColors.toString(), 'deltaE');
+  const inlineDeltaE: (a: string, b: string) => number = new Function(`${src}\nreturn deltaE;`)();
+  const pairs: [string, string][] = [
+    ['#ff0000', '#00ff00'],
+    ['#1a2b3c', '#1a2b3d'],
+    ['#000000', '#ffffff'],
+    ['#336699', '#996633'],
+    ['#010101', '#020202'], // exercises the below-threshold branch of f(t)
+  ];
+  for (const [a, b] of pairs) {
+    assert.ok(
+      Math.abs(inlineDeltaE(a, b) - deltaE(a, b)) < 1e-9,
+      `deltaE(${a}, ${b}): inline=${inlineDeltaE(a, b)} canonical=${deltaE(a, b)}`,
+    );
+  }
 });
