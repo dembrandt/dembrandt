@@ -42,10 +42,14 @@
  *  1.10.0 — colors.palette entries gain contrastAgainst: [{bg, ratio, aa}],
  *          the WCAG pairs (from `wcag`, --wcag only) this candidate was
  *          actually observed against on the page, sorted by ratio descending
- *          and deduped by the other colour (DEM-267). Behind --wcag, same as
- *          `wcag` itself: absent entirely when the flag is off. Additive:
- *          1.9.x consumers ignore it. DRIFT: not read by the drift engine;
- *          candidate colour values and ordering are unchanged.
+ *          and deduped by the other colour. Behind --wcag, same as `wcag`
+ *          itself: absent entirely when the flag is off. Additive: 1.9.x
+ *          consumers ignore it. BEHAVIOR: `wcag` pairs and colors.palette's
+ *          new contrastAgainst now reflect the effective, alpha-composited
+ *          color a viewer actually sees rather than the raw declared value —
+ *          a translucent background or text color was previously read as
+ *          opaque. DRIFT: neither is read by the drift engine; candidate
+ *          colour values and ordering are unchanged.
  *  1.9.0 — meta gains requestedUrl (the URL as passed on the command line,
  *          before redirect resolution), contentLength (extracted page text
  *          length, for spotting thin/bot-wall pages) and timeouts (present
