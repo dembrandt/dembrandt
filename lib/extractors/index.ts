@@ -501,7 +501,10 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         const hasRenderedContent = () => document.body && [...document.body.querySelectorAll('*')].some(el => {
           if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || el.tagName === 'LINK' || el.tagName === 'META') return false;
           const r = el.getBoundingClientRect();
-          return r.width > 200 && r.height > 100;
+          if (r.width <= 200 || r.height <= 100) return false;
+          const style = getComputedStyle(el);
+          if (style.visibility === 'hidden' || style.display === 'none' || parseFloat(style.opacity) === 0) return false;
+          return true;
         });
         try {
           await page.waitForFunction(hasRenderedContent, { timeout: 10000 * timeoutMultiplier });
