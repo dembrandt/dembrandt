@@ -159,14 +159,7 @@ test('bindContrastToPalette leaves candidates untouched when wcag is empty, and 
   assert.deepEqual(bindContrastToPalette([{}], [{ fg: '#111111', bg: '#fff', ratio: 1, aa: false }]), [{}]);
 });
 
-// DEM-211: three CIE76 implementations existed (lib/colors.ts, lib/drift.ts,
-// and this page-context copy) and quietly disagreed. drift.ts now imports
-// rgbToLab from lib/colors.ts directly, so only the page-context copy —
-// which can't import anything, since it runs inside page.evaluate() — is
-// still a hand-duplicated twin. This pulls that twin's source out of
-// extractColors.toString() and evals it, so any future edit to lib/colors.ts's
-// Lab maths that isn't mirrored here fails a test instead of silently
-// reintroducing the disagreement.
+// DEM-211: guards the page-context deltaE against drifting from lib/colors.ts again.
 function extractFunctionSource(source: string, name: string): string {
   const marker = `function ${name}(`;
   const start = source.indexOf(marker);

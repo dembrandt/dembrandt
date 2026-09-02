@@ -451,10 +451,7 @@ export async function extractColors(page) {
         };
       }
       function xyzToLab(x, y, z) {
-        // Same threshold constant as lib/colors.ts's xyzToLab (DEM-211): the
-        // exact CIE formula is (903.3*t+16)/116, not the 7.787 rounding this
-        // used to carry, which put this copy ~0.00007 off per channel from
-        // the canonical implementation on any pre-threshold Lab value.
+        // Exact CIE threshold constant, matching lib/colors.ts (DEM-211).
         x = x / 95.047; y = y / 100.000; z = z / 108.883;
         const f = (t) => t > 0.008856 ? Math.cbrt(t) : (903.3 * t + 16) / 116;
         const fx = f(x), fy = f(y), fz = f(z);
