@@ -788,41 +788,74 @@ export async function extractWcagPairs(page) {
       canvas.width = canvas.height = 1;
       const ctx = canvas.getContext('2d');
 
-      function toHex(color) {
+      function parseRgba(color) {
         if (!color) return null;
         try {
           const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
           if (m) {
-            if (m[4] !== undefined && parseFloat(m[4]) < 0.1) return null;
-            const r = parseInt(m[1]).toString(16).padStart(2, '0');
-            const g = parseInt(m[2]).toString(16).padStart(2, '0');
-            const b = parseInt(m[3]).toString(16).padStart(2, '0');
-            return `#${r}${g}${b}`;
+            const a = m[4] !== undefined ? parseFloat(m[4]) : 1;
+            return { r: parseInt(m[1]), g: parseInt(m[2]), b: parseInt(m[3]), a };
           }
-          if (/^#[0-9a-f]{6}$/i.test(color)) return color.toLowerCase();
+          if (/^#[0-9a-f]{6}$/i.test(color)) {
+            return { r: parseInt(color.slice(1, 3), 16), g: parseInt(color.slice(3, 5), 16), b: parseInt(color.slice(5, 7), 16), a: 1 };
+          }
           if (!ctx) return null;
           ctx.clearRect(0, 0, 1, 1);
           ctx.fillStyle = 'rgba(0,0,0,0)';
           ctx.fillStyle = color;
           ctx.fillRect(0, 0, 1, 1);
           const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-          if (a < 25) return null;
-          return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+          return { r, g, b, a: a / 255 };
         } catch {
           return null;
         }
       }
 
-      function findBg(el) {
+      function toHexFromRgb(r, g, b) {
+        const c = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+        return `#${c(r)}${c(g)}${c(b)}`;
+      }
+
+      // Alpha-composite background layers front-to-back over an assumed-white
+      // canvas — the same over-blend dompdf.js uses for rasterisation
+      // (findOpaqueBackdropColor). Pure array math, no DOM: kept separate from
+      // the ancestor walk below so it is unit-testable on its own (DEM-171).
+      function compositeBackgroundLayers(layers) {
+        let rAcc = 0, gAcc = 0, bAcc = 0, alphaRem = 1;
+        for (const rgba of layers) {
+          if (alphaRem <= 0.001) break;
+          if (!rgba || rgba.a <= 0.001) continue;
+          rAcc += rgba.r * rgba.a * alphaRem;
+          gAcc += rgba.g * rgba.a * alphaRem;
+          bAcc += rgba.b * rgba.a * alphaRem;
+          alphaRem *= (1 - rgba.a);
+        }
+        if (alphaRem > 0.001) {
+          rAcc += 255 * alphaRem;
+          gAcc += 255 * alphaRem;
+          bAcc += 255 * alphaRem;
+        }
+        return { r: rAcc, g: gAcc, b: bAcc };
+      }
+
+      // A translucent rgba() background is not the colour a viewer actually
+      // sees; what they see depends on everything painted behind it, and most
+      // pages never redeclare an opaque background anywhere up to <html>,
+      // relying on the browser's white default the way a viewer's eye does.
+      // Walk the ancestor chain (el itself first) collecting each layer, then
+      // hand the list to the pure compositor above.
+      function effectiveBackground(el) {
+        const layers = [];
         let node = el;
-        while (node && node.tagName !== 'HTML') {
+        let alphaRem = 1;
+        while (node && node.tagName !== 'HTML' && alphaRem > 0.001) {
           try {
-            const bg = toHex(getComputedStyle(node).backgroundColor);
-            if (bg) return bg;
+            const rgba = parseRgba(getComputedStyle(node).backgroundColor);
+            if (rgba && rgba.a > 0.001) { layers.push(rgba); alphaRem *= (1 - rgba.a); }
           } catch { /* skip stale node */ }
           node = node.parentElement;
         }
-        return null;
+        return compositeBackgroundLayers(layers);
       }
 
       const seen = new Map();
@@ -836,10 +869,18 @@ export async function extractWcagPairs(page) {
           if (s.display === 'none' || s.visibility === 'hidden' || s.opacity === '0') continue;
           const rect = el.getBoundingClientRect();
           if (rect.width === 0 || rect.height === 0) continue;
-          const fg = toHex(s.color);
-          if (!fg) continue;
-          const bg = findBg(el);
-          if (!bg || fg === bg) continue;
+          const fgRgba = parseRgba(s.color);
+          if (!fgRgba || fgRgba.a < 0.1) continue;
+          const bgRgb = effectiveBackground(el);
+          // Text is itself a paint layer over whatever is behind it: when it
+          // carries alpha, the perceived colour is the composite, not the
+          // authored rgba() (same DEM-171 issue, on the foreground side).
+          const effR = fgRgba.a >= 0.999 ? fgRgba.r : fgRgba.r * fgRgba.a + bgRgb.r * (1 - fgRgba.a);
+          const effG = fgRgba.a >= 0.999 ? fgRgba.g : fgRgba.g * fgRgba.a + bgRgb.g * (1 - fgRgba.a);
+          const effB = fgRgba.a >= 0.999 ? fgRgba.b : fgRgba.b * fgRgba.a + bgRgb.b * (1 - fgRgba.a);
+          const fg = toHexFromRgb(effR, effG, effB);
+          const bg = toHexFromRgb(bgRgb.r, bgRgb.g, bgRgb.b);
+          if (fg === bg) continue;
           const key = [fg, bg].sort().join('/');
           const entry = seen.get(key);
           if (entry) { entry.count++; } else { seen.set(key, { fg, bg, count: 1 }); }

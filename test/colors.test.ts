@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { hexToRgb, relativeLuminance, computeWcag, convertColor, deltaE, deltaE2000 } from '../lib/colors.js';
-import { capConfidenceByUsage, bindContrastToPalette } from '../lib/extractors/colors.js';
+import { capConfidenceByUsage, bindContrastToPalette, extractWcagPairs } from '../lib/extractors/colors.js';
 
 test('hexToRgb parses 6, 3, and 8 digit hex', () => {
   assert.deepEqual(hexToRgb('#ff0000'), { r: 255, g: 0, b: 0 });
@@ -157,4 +157,66 @@ test('bindContrastToPalette leaves candidates untouched when wcag is empty, and 
   assert.equal(palette[0].contrastAgainst, undefined);
   assert.deepEqual(bindContrastToPalette(null, [{ fg: '#111111', bg: '#fff' }]), null);
   assert.deepEqual(bindContrastToPalette([{}], [{ fg: '#111111', bg: '#fff', ratio: 1, aa: false }]), [{}]);
+});
+
+// compositeBackgroundLayers (DEM-171): alpha-composite a stack of translucent
+// backgrounds the way a viewer actually sees them, instead of reporting the
+// topmost declared rgba() as if it were opaque. Extracted from the page-context
+// source the same way the DEM-211 deltaE parity test is: this function runs
+// inside page.evaluate() and can't be imported directly.
+function extractFunctionSource(source: string, name: string): string {
+  const marker = `function ${name}(`;
+  const start = source.indexOf(marker);
+  assert.ok(start !== -1, `function ${name} not found in source`);
+  const braceStart = source.indexOf('{', start);
+  let depth = 0;
+  for (let i = braceStart; i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}') {
+      depth--;
+      if (depth === 0) return source.slice(start, i + 1);
+    }
+  }
+  throw new Error(`unbalanced braces extracting ${name}`);
+}
+
+function loadCompositeBackgroundLayers(): (layers: ({ r: number; g: number; b: number; a: number } | null)[]) => { r: number; g: number; b: number } {
+  const src = extractFunctionSource(extractWcagPairs.toString(), 'compositeBackgroundLayers');
+  return new Function(`${src}\nreturn compositeBackgroundLayers;`)();
+}
+
+test('compositeBackgroundLayers: a single opaque layer passes through unchanged', () => {
+  const composite = loadCompositeBackgroundLayers();
+  assert.deepEqual(composite([{ r: 10, g: 20, b: 30, a: 1 }]), { r: 10, g: 20, b: 30 });
+});
+
+test('compositeBackgroundLayers: a 50% black over white composites to mid-grey', () => {
+  const composite = loadCompositeBackgroundLayers();
+  const { r, g, b } = composite([{ r: 0, g: 0, b: 0, a: 0.5 }]);
+  // No opaque layer beneath -> falls through to the assumed white canvas.
+  assert.ok(Math.abs(r - 127.5) < 0.01 && r === g && g === b);
+});
+
+test('compositeBackgroundLayers: stacked translucent layers blend front to back', () => {
+  const composite = loadCompositeBackgroundLayers();
+  // A 50% red over a 50% blue over opaque white: front layer dominates.
+  const { r, b } = composite([
+    { r: 255, g: 0, b: 0, a: 0.5 },
+    { r: 0, g: 0, b: 255, a: 0.5 },
+    { r: 255, g: 255, b: 255, a: 1 },
+  ]);
+  assert.ok(r > b, `expected red-heavy blend, got r=${r} b=${b}`);
+  assert.ok(Math.abs(r - 191.25) < 0.01, `r=${r}`);
+});
+
+test('compositeBackgroundLayers: an opaque layer makes everything behind it irrelevant', () => {
+  const composite = loadCompositeBackgroundLayers();
+  const withOpaqueTail = composite([{ r: 10, g: 20, b: 30, a: 1 }, { r: 200, g: 200, b: 200, a: 1 }]);
+  assert.deepEqual(withOpaqueTail, { r: 10, g: 20, b: 30 });
+});
+
+test('compositeBackgroundLayers: empty stack, and null/fully-transparent layers, resolve to white', () => {
+  const composite = loadCompositeBackgroundLayers();
+  assert.deepEqual(composite([]), { r: 255, g: 255, b: 255 });
+  assert.deepEqual(composite([null, { r: 1, g: 2, b: 3, a: 0 }]), { r: 255, g: 255, b: 255 });
 });
