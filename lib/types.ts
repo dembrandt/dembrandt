@@ -382,6 +382,26 @@ export interface ExtractionMeta {
    */
   errors?: ExtractorError[];
   /**
+   * The URL as passed on the command line or to the tool, before redirect
+   * resolution. Differs from the top-level `url` whenever the site redirected.
+   */
+  requestedUrl?: string;
+  /** Extracted page text length. Low values point at a thin or bot-wall page. */
+  contentLength?: number;
+  /** Names of waits that timed out during extraction, present only when at least one did. */
+  timeouts?: string[];
+  /**
+   * Present when `--crawl`, `--sitemap` or explicit paths were used to merge
+   * more than one page into this result.
+   */
+  crawl?: {
+    technique: 'explicit-paths' | 'sitemap' | 'auto';
+    /** How many pages were asked for, or null when the request had no fixed count. */
+    pagesRequested: number | null;
+    /** How many pages actually made it into the merged result. */
+    pagesFound: number;
+  };
+  /**
    * Human-readable notes on pages robots.txt disallowed but the run still
    * touched or skipped. The check is advisory: it never blocks extraction,
    * so this is the only record of what it flagged.
