@@ -817,9 +817,7 @@ export async function extractWcagPairs(page) {
       }
 
       // Alpha-composite background layers front-to-back over an assumed-white
-      // canvas — the same over-blend dompdf.js uses for rasterisation
-      // (findOpaqueBackdropColor). Pure array math, no DOM: kept separate from
-      // the ancestor walk below so it is unit-testable on its own (DEM-171).
+      // canvas. Pure array math, no DOM, so it's unit-testable on its own.
       function compositeBackgroundLayers(layers) {
         let rAcc = 0, gAcc = 0, bAcc = 0, alphaRem = 1;
         for (const rgba of layers) {
@@ -838,12 +836,7 @@ export async function extractWcagPairs(page) {
         return { r: rAcc, g: gAcc, b: bAcc };
       }
 
-      // A translucent rgba() background is not the colour a viewer actually
-      // sees; what they see depends on everything painted behind it, and most
-      // pages never redeclare an opaque background anywhere up to <html>,
-      // relying on the browser's white default the way a viewer's eye does.
-      // Walk the ancestor chain (el itself first) collecting each layer, then
-      // hand the list to the pure compositor above.
+      // Walk the ancestor chain, defaulting to white if nothing opaque is found.
       function effectiveBackground(el) {
         const layers = [];
         let node = el;
@@ -872,9 +865,7 @@ export async function extractWcagPairs(page) {
           const fgRgba = parseRgba(s.color);
           if (!fgRgba || fgRgba.a < 0.1) continue;
           const bgRgb = effectiveBackground(el);
-          // Text is itself a paint layer over whatever is behind it: when it
-          // carries alpha, the perceived colour is the composite, not the
-          // authored rgba() (same DEM-171 issue, on the foreground side).
+          // Text with alpha composites over the background too.
           const effR = fgRgba.a >= 0.999 ? fgRgba.r : fgRgba.r * fgRgba.a + bgRgb.r * (1 - fgRgba.a);
           const effG = fgRgba.a >= 0.999 ? fgRgba.g : fgRgba.g * fgRgba.a + bgRgb.g * (1 - fgRgba.a);
           const effB = fgRgba.a >= 0.999 ? fgRgba.b : fgRgba.b * fgRgba.a + bgRgb.b * (1 - fgRgba.a);

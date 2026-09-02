@@ -159,11 +159,6 @@ test('bindContrastToPalette leaves candidates untouched when wcag is empty, and 
   assert.deepEqual(bindContrastToPalette([{}], [{ fg: '#111111', bg: '#fff', ratio: 1, aa: false }]), [{}]);
 });
 
-// compositeBackgroundLayers (DEM-171): alpha-composite a stack of translucent
-// backgrounds the way a viewer actually sees them, instead of reporting the
-// topmost declared rgba() as if it were opaque. Extracted from the page-context
-// source the same way the DEM-211 deltaE parity test is: this function runs
-// inside page.evaluate() and can't be imported directly.
 function extractFunctionSource(source: string, name: string): string {
   const marker = `function ${name}(`;
   const start = source.indexOf(marker);
