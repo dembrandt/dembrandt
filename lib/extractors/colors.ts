@@ -451,7 +451,7 @@ export async function extractColors(page) {
         };
       }
       function xyzToLab(x, y, z) {
-        // Exact CIE threshold constant, matching lib/colors.ts (DEM-211).
+        // Exact CIE threshold constant, matching lib/colors.ts.
         x = x / 95.047; y = y / 100.000; z = z / 108.883;
         const f = (t) => t > 0.008856 ? Math.cbrt(t) : (903.3 * t + 16) / 116;
         const fx = f(x), fy = f(y), fz = f(z);

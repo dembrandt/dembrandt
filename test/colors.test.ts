@@ -159,7 +159,6 @@ test('bindContrastToPalette leaves candidates untouched when wcag is empty, and 
   assert.deepEqual(bindContrastToPalette([{}], [{ fg: '#111111', bg: '#fff', ratio: 1, aa: false }]), [{}]);
 });
 
-// DEM-211: guards the page-context deltaE against drifting from lib/colors.ts again.
 function extractFunctionSource(source: string, name: string): string {
   const marker = `function ${name}(`;
   const start = source.indexOf(marker);
@@ -176,7 +175,7 @@ function extractFunctionSource(source: string, name: string): string {
   throw new Error(`unbalanced braces extracting ${name}`);
 }
 
-test('the page-context deltaE (DEM-211) numerically matches lib/colors.ts deltaE', () => {
+test('the page-context deltaE numerically matches lib/colors.ts deltaE', () => {
   const src = extractFunctionSource(extractColors.toString(), 'deltaE');
   const inlineDeltaE: (a: string, b: string) => number = new Function(`${src}\nreturn deltaE;`)();
   const pairs: [string, string][] = [
