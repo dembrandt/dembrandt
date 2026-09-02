@@ -45,7 +45,10 @@
  *          only when at least one occurred, naming which wait timed out).
  *          meta.crawl (technique, pagesRequested, pagesFound) is new when
  *          --crawl, --sitemap or explicit paths are used. Additive: 1.8.x
- *          consumers ignore all of it.
+ *          consumers ignore all of it. DRIFT: none of these are read by the
+ *          drift engine, and no existing value's meaning changed —
+ *          dembrandt.com and stripe.com reference extractions scored 0
+ *          churn against the previous release.
  *  1.8.0 — no shape change. BEHAVIOR: the drift engine compares colors.semantic
  *          role by role. It previously read that map only to attach role labels
  *          to palette entries, so a changed brand primary produced no drift at
