@@ -245,3 +245,22 @@ export async function parseSitemap(baseUrl, maxPages) {
 
   return scored.slice(0, maxPages).map(l => l.href);
 }
+
+/**
+ * How many pages a multi-page run asked for, for meta.crawl.pagesRequested.
+ * `sitemapMax` is the resolved cap passed to parseSitemap (crawlN - 1, or the
+ * 20-page default when no --crawl N is given) — pagesRequested must read that
+ * resolved cap, not crawlN directly, or the default-sitemap case reports null
+ * instead of 21.
+ */
+export function computePagesRequested(opts: {
+  hasExplicitPaths: boolean;
+  explicitPathCount: number;
+  isSitemap: boolean;
+  sitemapMax: number | null;
+  crawlN: number | null;
+}): number | null {
+  if (opts.hasExplicitPaths) return opts.explicitPathCount + 1;
+  if (opts.isSitemap) return opts.sitemapMax !== null ? opts.sitemapMax + 1 : null;
+  return opts.crawlN || null;
+}

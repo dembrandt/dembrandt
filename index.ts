@@ -22,7 +22,7 @@ import { generateTailwindTheme } from "./lib/formatters/tailwind.js";
 import { generateHtmlReport } from "./lib/formatters/html.js";
 import { resolveCompare } from "./lib/compare.js";
 import { emitDriftAnnotations } from "./lib/ci-annotations.js";
-import { parseSitemap } from "./lib/discovery.js";
+import { parseSitemap, computePagesRequested } from "./lib/discovery.js";
 import { mergeResults } from "./lib/merger.js";
 import { writeFileSync, mkdirSync, readFileSync } from "fs";
 import { join, dirname, resolve } from "path";
@@ -301,7 +301,11 @@ program
               spinner.warn("No additional pages discovered");
             }
             if (crawlTechnique && result.meta) {
-              result.meta.crawl = { technique: crawlTechnique, pagesRequested: hasExplicitPaths ? paths.length + 1 : opts.sitemap ? sitemapMax + 1 : (crawlN || null), pagesFound: 1 };
+              result.meta.crawl = {
+                technique: crawlTechnique,
+                pagesRequested: computePagesRequested({ hasExplicitPaths, explicitPathCount: paths?.length || 0, isSitemap: !!opts.sitemap, sitemapMax, crawlN }),
+                pagesFound: 1,
+              };
             }
           } else {
             spinner.stop();
@@ -350,7 +354,7 @@ program
             if (crawlTechnique && result.meta) {
               result.meta.crawl = {
                 technique: crawlTechnique,
-                pagesRequested: hasExplicitPaths ? paths.length + 1 : opts.sitemap ? sitemapMax + 1 : (crawlN || null),
+                pagesRequested: computePagesRequested({ hasExplicitPaths, explicitPathCount: paths?.length || 0, isSitemap: !!opts.sitemap, sitemapMax, crawlN }),
                 pagesFound,
               };
             }
