@@ -10,7 +10,7 @@ import { extractSpacing, extractBorderRadius, extractBorders, extractShadows } f
 import { extractButtonStyles, extractInputStyles, extractLinkStyles, extractBadgeStyles } from './components.js';
 import { extractBreakpoints, detectIconSystem, detectFrameworks, extractGradients, extractMotion, extractMotionStatic, FREEZE_STYLE_ID } from './breakpoints.js';
 import { extractTeach } from './teach.js';
-import { extractWcagPairs } from './colors.js';
+import { extractWcagPairs, bindContrastToPalette } from './colors.js';
 import { SCHEMA_VERSION } from '../version.js';
 import { buildContextOptions, parseCookies, parseScreenSize, DEFAULT_LOCALE } from './context-config.js';
 import { guardExtractor } from './guard.js';
@@ -1390,6 +1390,8 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       } catch {
         spinner.stop();
       }
+
+      bindContrastToPalette(colors.palette, wcag);
     }
 
     // Self-hosted font files, deduped and sorted. fontRequests is a Set filled

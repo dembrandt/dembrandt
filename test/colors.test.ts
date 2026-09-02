@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { hexToRgb, relativeLuminance, computeWcag, convertColor, deltaE, deltaE2000 } from '../lib/colors.js';
-import { capConfidenceByUsage } from '../lib/extractors/colors.js';
+import { capConfidenceByUsage, bindContrastToPalette } from '../lib/extractors/colors.js';
 
 test('hexToRgb parses 6, 3, and 8 digit hex', () => {
   assert.deepEqual(hexToRgb('#ff0000'), { r: 255, g: 0, b: 0 });
@@ -114,4 +114,47 @@ test('capConfidenceByUsage demotes a single-occurrence medium', () => {
 test('capConfidenceByUsage never promotes, and never throws on a missing count', () => {
   assert.equal(capConfidenceByUsage('low', 900), 'low');
   assert.equal(capConfidenceByUsage('high', undefined), 'low');
+});
+
+// bindContrastToPalette (DEM-267): link observed WCAG pairs back onto the
+// palette candidate they were measured against.
+
+type TestCandidate = { normalized: string; contrastAgainst?: { bg: string; ratio: number; aa: boolean }[] };
+
+test('bindContrastToPalette attaches contrastAgainst to a matching candidate on either side of a pair', () => {
+  const palette: TestCandidate[] = [{ normalized: '#111111' }, { normalized: '#ffffff' }, { normalized: '#ff0000' }];
+  const wcag = [{ fg: '#111111', bg: '#ffffff', ratio: 18.1, aa: true }];
+  bindContrastToPalette(palette, wcag);
+  assert.deepEqual(palette[0].contrastAgainst, [{ bg: '#ffffff', ratio: 18.1, aa: true }]);
+  assert.deepEqual(palette[1].contrastAgainst, [{ bg: '#111111', ratio: 18.1, aa: true }]);
+  assert.equal(palette[2].contrastAgainst, undefined);
+});
+
+test('bindContrastToPalette dedupes by the other colour, keeping the higher ratio', () => {
+  const palette: TestCandidate[] = [{ normalized: '#111111' }];
+  const wcag = [
+    { fg: '#111111', bg: '#ffffff', ratio: 15, aa: true },
+    { fg: '#111111', bg: '#ffffff', ratio: 18.1, aa: true },
+  ];
+  bindContrastToPalette(palette, wcag);
+  assert.deepEqual(palette[0].contrastAgainst, [{ bg: '#ffffff', ratio: 18.1, aa: true }]);
+});
+
+test('bindContrastToPalette sorts by ratio descending and caps at 10', () => {
+  const palette: TestCandidate[] = [{ normalized: '#111111' }];
+  const wcag = Array.from({ length: 15 }, (_, i) => ({
+    fg: '#111111', bg: `#${String(i).padStart(6, '0')}`, ratio: i + 1, aa: true,
+  }));
+  bindContrastToPalette(palette, wcag);
+  assert.equal(palette[0].contrastAgainst?.length, 10);
+  assert.equal(palette[0].contrastAgainst?.[0].ratio, 15);
+  assert.equal(palette[0].contrastAgainst?.[9].ratio, 6);
+});
+
+test('bindContrastToPalette leaves candidates untouched when wcag is empty, and never throws on malformed input', () => {
+  const palette: TestCandidate[] = [{ normalized: '#111111' }];
+  assert.equal(bindContrastToPalette(palette, []), palette);
+  assert.equal(palette[0].contrastAgainst, undefined);
+  assert.deepEqual(bindContrastToPalette(null, [{ fg: '#111111', bg: '#fff' }]), null);
+  assert.deepEqual(bindContrastToPalette([{}], [{ fg: '#111111', bg: '#fff', ratio: 1, aa: false }]), [{}]);
 });

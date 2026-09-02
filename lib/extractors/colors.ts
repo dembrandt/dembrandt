@@ -873,3 +873,38 @@ export async function extractWcagPairs(page) {
 
   return pairs.sort((a, b) => b.count - a.count);
 }
+
+/**
+ * Bind each observed WCAG contrast pair back onto the palette candidate it was
+ * measured against, so a colour carries "this is AA-compliant text against X"
+ * as a feature instead of leaving pairs and candidates as two unlinked lists
+ * (DEM-267). Mutates each matching entry's `contrastAgainst` in place and
+ * returns the palette for convenience; entries with no observed pair are
+ * left untouched (no empty array).
+ */
+export function bindContrastToPalette(palette: unknown, wcagPairs: unknown): unknown {
+  if (!Array.isArray(palette) || !Array.isArray(wcagPairs) || !wcagPairs.length) return palette;
+  const byColor = new Map<string, { bg: string; ratio: number; aa: boolean }[]>();
+  const add = (self: string, other: string, ratio: number, aa: boolean) => {
+    if (!self || !other) return;
+    if (!byColor.has(self)) byColor.set(self, []);
+    byColor.get(self).push({ bg: other, ratio, aa });
+  };
+  for (const p of wcagPairs) {
+    if (!p || !p.fg || !p.bg) continue;
+    add(p.fg, p.bg, p.ratio, p.aa);
+    add(p.bg, p.fg, p.ratio, p.aa);
+  }
+  for (const entry of palette) {
+    if (!entry || !entry.normalized) continue;
+    const matches = byColor.get(entry.normalized);
+    if (!matches || !matches.length) continue;
+    const byOther = new Map();
+    for (const m of matches) {
+      const prev = byOther.get(m.bg);
+      if (!prev || m.ratio > prev.ratio) byOther.set(m.bg, m);
+    }
+    entry.contrastAgainst = Array.from(byOther.values()).sort((a, b) => b.ratio - a.ratio).slice(0, 10);
+  }
+  return palette;
+}

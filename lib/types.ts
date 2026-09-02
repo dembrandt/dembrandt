@@ -31,6 +31,12 @@ export interface PaletteColor {
   /** Precomputed notations of `normalized`; see convertColor() */
   lch?: string;
   oklch?: string;
+  /**
+   * WCAG contrast pairs this candidate was actually seen against on the page
+   * (from `wcag`, when --wcag is on). Sorted by ratio descending, deduped by
+   * the other colour. Absent when --wcag is off or this colour was in no pair.
+   */
+  contrastAgainst?: { bg: string; ratio: number; aa: boolean }[];
 }
 
 /**
