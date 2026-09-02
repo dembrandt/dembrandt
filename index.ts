@@ -27,7 +27,7 @@ import { mergeResults } from "./lib/merger.js";
 import { writeFileSync, mkdirSync, readFileSync } from "fs";
 import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
-import { checkRobotsTxt } from "./lib/robots.js";
+import { checkRobotsTxt, fetchRobotsRules, filterAllowedUrls } from "./lib/robots.js";
 import { EXIT, classifyError } from "./lib/exit-codes.js";
 import { activeFlags, pathSummary } from "./lib/run-summary.js";
 import { consumeCloudHint } from "./lib/cli-state.js";
@@ -147,9 +147,11 @@ program
 
     const spinner = ora({ text: "Starting extraction...", ...spinnerOptions(opts.jsonOnly) }).start();
 
+    let entryRobotsWarning = null;
     try {
       const robots = await checkRobotsTxt(url);
       if (robots.status === "ok" && robots.allowed === false) {
+        entryRobotsWarning = `robots.txt disallows ${url} (rule: "${robots.rule}")`;
         spinner.warn(
           chalk.hex("#FFB86C")(
             `robots.txt disallows this path (rule: "${robots.rule}"). Proceeding anyway — respect the site's terms.`
@@ -269,6 +271,10 @@ program
             _version: version,
           });
 
+          if (entryRobotsWarning && result.meta) {
+            result.meta.robotsWarnings = [entryRobotsWarning];
+          }
+
           // Build list of additional URLs to extract
           let additionalUrls = [];
           let sitemapMax = null;
@@ -293,6 +299,28 @@ program
           }
 
           delete result._discoveredLinks;
+
+          if (additionalUrls.length > 0) {
+            const robotsRules = await fetchRobotsRules(result.url);
+            const { allowed, disallowed } = filterAllowedUrls(additionalUrls, robotsRules);
+            if (disallowed.length > 0) {
+              if (!opts.jsonOnly) {
+                spinner.warn(
+                  chalk.hex("#FFB86C")(
+                    `robots.txt disallows ${disallowed.length} discovered page(s), skipping: ${disallowed.map(d => d.url).join(', ')}`
+                  )
+                );
+                spinner.start("Continuing...");
+              }
+              additionalUrls = allowed;
+              if (result.meta) {
+                result.meta.robotsWarnings = [
+                  ...(result.meta.robotsWarnings || []),
+                  `robots.txt disallowed ${disallowed.length} discovered page(s): ${disallowed.map(d => d.url).join(', ')}`,
+                ];
+              }
+            }
+          }
 
           const crawlTechnique = hasExplicitPaths ? 'explicit-paths' : opts.sitemap ? 'sitemap' : isAutoCrawl ? 'auto' : null;
 

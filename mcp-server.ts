@@ -23,6 +23,7 @@ import { mergeResults } from "./lib/merger.js";
 import { additionalPages, discoveryBudget, extractOptions, isMultiPage, launchArgs } from "./lib/mcp/options.js";
 import type { Extraction, ExtractionRequest } from "./lib/mcp/options.js";
 import { JobQueue, resolveExtraction } from "./lib/mcp/jobs.js";
+import { checkRobotsTxt, fetchRobotsRules, filterAllowedUrls } from "./lib/robots.js";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
@@ -98,13 +99,32 @@ async function runExtraction(url: string, options: ExtractionRequest = {}) {
       discoverLinks: discoveryBudget(options),
     });
 
+    const entryRobots = await checkRobotsTxt(url).catch(() => null);
+    if (entryRobots?.status === "ok" && entryRobots.allowed === false && first.meta) {
+      first.meta.robotsWarnings = [`robots.txt disallows ${url} (rule: "${entryRobots.rule}")`];
+    }
+
     if (!isMultiPage(options)) {
       delete first._discoveredLinks;
       return { ok: true, data: first };
     }
 
-    const extraUrls = await additionalPages(first, url, options);
+    let extraUrls = await additionalPages(first, url, options);
     delete first._discoveredLinks;
+
+    if (extraUrls.length > 0) {
+      const robotsRules = await fetchRobotsRules(first.url);
+      const { allowed, disallowed } = filterAllowedUrls(extraUrls, robotsRules);
+      if (disallowed.length > 0) {
+        extraUrls = allowed;
+        if (first.meta) {
+          first.meta.robotsWarnings = [
+            ...(first.meta.robotsWarnings || []),
+            `robots.txt disallowed ${disallowed.length} discovered page(s): ${disallowed.map((d) => d.url).join(", ")}`,
+          ];
+        }
+      }
+    }
 
     const results = [first];
     for (const pageUrl of extraUrls) {

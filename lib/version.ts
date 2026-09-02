@@ -39,6 +39,12 @@
  *  (unversioned) — `voice` / `voiceSkipped` ship behind a hidden, opt-in flag
  *          and deliberately do not bump the contract. Bump when the flag is
  *          documented, not before.
+ *  1.11.0 — meta gains robotsWarnings: human-readable notes on pages robots.txt
+ *          disallowed, whether that was the entry URL or a page discovered
+ *          during --crawl/--sitemap/MCP pages. The check stays advisory (it
+ *          never blocks extraction), so this is the only record of what it
+ *          flagged. Additive: 1.10.x consumers ignore it. DRIFT: not read by
+ *          the drift engine.
  *  1.10.0 — colors.palette entries gain contrastAgainst: [{bg, ratio, aa}],
  *          the WCAG pairs (from `wcag`, --wcag only) this candidate was
  *          actually observed against on the page, sorted by ratio descending
@@ -119,7 +125,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.10.0';
+export const SCHEMA_VERSION = '1.11.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';

@@ -381,6 +381,12 @@ export interface ExtractionMeta {
    * an empty value, so a single broken extractor never aborts the whole run.
    */
   errors?: ExtractorError[];
+  /**
+   * Human-readable notes on pages robots.txt disallowed but the run still
+   * touched or skipped. The check is advisory: it never blocks extraction,
+   * so this is the only record of what it flagged.
+   */
+  robotsWarnings?: string[];
 }
 
 /** A single fault-isolated extractor failure. */

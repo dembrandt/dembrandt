@@ -14,13 +14,20 @@ export type RobotsResult =
   | { status: "unavailable"; robotsUrl: string }
   | { status: "ok"; robotsUrl: string; allowed: boolean; rule: string | null };
 
-export async function checkRobotsTxt(
+export type RobotsRules =
+  | { status: "unavailable" }
+  | { status: "ok"; robotsUrl: string; rules: RobotsRule[] };
+
+/**
+ * Fetch and parse robots.txt for the target's origin once, so a multi-page
+ * crawl can check every discovered URL against it without one request per page.
+ */
+export async function fetchRobotsRules(
   targetUrl: string,
   { timeoutMs = 5000 }: { timeoutMs?: number } = {},
-): Promise<RobotsResult> {
+): Promise<RobotsRules> {
   const u = new URL(targetUrl);
   const robotsUrl = `${u.protocol}//${u.host}/robots.txt`;
-  const path = u.pathname || "/";
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -31,19 +38,60 @@ export async function checkRobotsTxt(
       signal: controller.signal,
       headers: { "User-Agent": UA },
     });
-    if (!res.ok) return { status: "unavailable", robotsUrl };
+    if (!res.ok) return { status: "unavailable" };
     body = await res.text();
   } catch {
-    return { status: "unavailable", robotsUrl };
+    return { status: "unavailable" };
   } finally {
     clearTimeout(timer);
   }
 
   const groups = parseRobots(body);
   const rules = matchGroup(groups, UA) || matchGroup(groups, "*") || [];
-  const decision = evaluate(rules, path);
+  return { status: "ok", robotsUrl, rules };
+}
 
-  return { status: "ok", robotsUrl, ...decision };
+export function evaluatePath(rules: RobotsRule[], path: string): { allowed: boolean; rule: string | null } {
+  return evaluate(rules, path);
+}
+
+export async function checkRobotsTxt(
+  targetUrl: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<RobotsResult> {
+  const u = new URL(targetUrl);
+  const rules = await fetchRobotsRules(targetUrl, opts);
+  if (rules.status === "unavailable") {
+    return { status: "unavailable", robotsUrl: `${u.protocol}//${u.host}/robots.txt` };
+  }
+  return { status: "ok", robotsUrl: rules.robotsUrl, ...evaluatePath(rules.rules, u.pathname || "/") };
+}
+
+/**
+ * Split discovered crawl URLs into those robots.txt allows and those it
+ * doesn't, using an already-fetched rule set. Unavailable robots.txt allows
+ * everything through, matching checkRobotsTxt's fail-open behaviour.
+ */
+export function filterAllowedUrls(
+  urls: string[],
+  robotsRules: RobotsRules,
+): { allowed: string[]; disallowed: { url: string; rule: string | null }[] } {
+  if (robotsRules.status !== "ok") return { allowed: urls, disallowed: [] };
+  const allowed: string[] = [];
+  const disallowed: { url: string; rule: string | null }[] = [];
+  for (const url of urls) {
+    let path = "/";
+    try {
+      path = new URL(url).pathname || "/";
+    } catch {
+      allowed.push(url);
+      continue;
+    }
+    const decision = evaluatePath(robotsRules.rules, path);
+    if (decision.allowed) allowed.push(url);
+    else disallowed.push({ url, rule: decision.rule });
+  }
+  return { allowed, disallowed };
 }
 
 function parseRobots(text: string): RobotsGroup[] {
