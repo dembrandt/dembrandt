@@ -377,7 +377,7 @@ async function main() {
     ({ result, job_id }: any) => {
       const source = resolveExtraction(result, job_id, "result", jobQueue);
       if (!source.ok) return errorResult(source.error);
-      return { content: [{ type: "text", text: generateDesignMd(source.value) }] };
+      return { content: [{ type: "text", text: generateDesignMd(source.value, { version }) }] };
     },
   );
 

@@ -517,7 +517,7 @@ program
           const mdDir = join(process.cwd(), "output", mdDomain);
           mkdirSync(mdDir, { recursive: true });
           const mdPath = join(mdDir, "DESIGN.md");
-          writeFileSync(mdPath, generateDesignMd(result));
+          writeFileSync(mdPath, generateDesignMd(result, { version }));
           savedNotices.push(
             chalk.dim(
               `💾 DESIGN.md saved (--design-md): ${color.info(
