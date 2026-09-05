@@ -19,7 +19,7 @@ export interface GuardOptions {
   brandGuide?: boolean;
 }
 
-/** Voice never reaches the terminal — no formatter prints it — so a lone --voice needs a JSON sink. */
+/** No formatter prints voice, so a lone --voice needs a JSON sink of its own. */
 export function voiceNeedsOutputFile(opts: GuardOptions, hasApiKey: boolean): boolean {
   return !!opts.voice && !opts.saveOutput && !opts.dtcg && !opts.jsonOnly && !hasApiKey;
 }
@@ -50,12 +50,11 @@ export function colorFormatWarning(opts: GuardOptions): string | null {
   return `! --color-format=${opts.colorFormat} applies to terminal output only; ${unaffected.join(", ")} ${unaffected.length > 1 ? "are" : "is"} unaffected. JSON carries hex, rgb, lch and oklch for every colour.`;
 }
 
-/** --approve only means something against a local baseline file. */
 export function approveWarning(opts: GuardOptions): string | null {
   return opts.approve && !opts.compare ? "! --approve has no effect without --compare <file>." : null;
 }
 
-/** Every guard warning for a run, in the order they are emitted. */
+/** Every applicable warning, in emit order. */
 export function guardWarnings(opts: GuardOptions, paths: string[] | undefined): string[] {
   return [approveWarning(opts), ignoredDiscoveryWarning(opts, paths), colorFormatWarning(opts)].filter(
     (w): w is string => w !== null,

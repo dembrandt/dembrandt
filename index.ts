@@ -446,8 +446,6 @@ program
       const savedNotices = [];
       let syncFailed = false;
 
-      // Save JSON output if --save-output or --dtcg is specified, or if --voice
-      // was passed with nowhere else for the copy to go.
       if (opts.saveOutput || opts.dtcg || voiceWritesOutput) {
         try {
           const domain = new URL(url).hostname.replace("www.", "");
