@@ -138,10 +138,11 @@ function weightName(w) {
   return map[w] || `Weight ${w}`;
 }
 
-export function buildHTML(data) {
+export function buildHTML(data, options: { version?: string } = {}) {
   // Public entry point: callers may pass adapted/partial token data (e.g. from a
   // parsed design.md), so never assume a fully-formed extraction result.
   if (!data || typeof data !== 'object') data = {};
+  const toolVersion = options.version ?? data.meta?.dembrandtVersion;
 
   let domain;
   try { domain = new URL(data.url).hostname.replace('www.', ''); }
@@ -653,7 +654,7 @@ export function buildHTML(data) {
   <div class="domain">${escapeHtml(companyName)}</div>
   <div class="rule"></div>
   <div class="subtitle">Brand Guidelines</div>
-  <div class="cover-meta">${escapeHtml(domain)}&nbsp;&nbsp;&middot;&nbsp;&nbsp;${date}${data.meta?.dembrandtVersion ? `&nbsp;&nbsp;&middot;&nbsp;&nbsp;v${escapeHtml(data.meta.dembrandtVersion)}` : ''}</div>
+  <div class="cover-meta">${escapeHtml(domain)}&nbsp;&nbsp;&middot;&nbsp;&nbsp;${date}${toolVersion ? `&nbsp;&nbsp;&middot;&nbsp;&nbsp;v${escapeHtml(toolVersion)}` : ''}</div>
 </div>
 
 <!-- TABLE OF CONTENTS -->
@@ -948,7 +949,7 @@ ${fonts.length > 0 ? (() => {
 ${(() => {
   const year = (() => { const y = new Date(data.extractedAt).getFullYear(); return Number.isFinite(y) ? y : new Date().getFullYear(); })();
   const meta = data.meta || {};
-  const version = meta.dembrandtVersion;
+  const version = toolVersion;
 
   // Redirected to a different URL than what was asked for (locale/region redirects
   // are common on large multi-market sites and otherwise invisible in the guide).

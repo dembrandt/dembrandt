@@ -493,7 +493,7 @@ program
           const pdfFilename = `${pdfDomain}-brand-guide-${pdfDate}-${pdfTime}.pdf`;
           const pdfPath = join(pdfDir, pdfFilename);
           spinner.start("Generating PDF brand guide...");
-          await generatePDF(result, pdfPath, browser);
+          await generatePDF(result, pdfPath, browser, { version });
           spinner.stop();
           savedNotices.push(
             chalk.dim(
@@ -545,7 +545,7 @@ program
             mkdirSync(twDir, { recursive: true });
             twPath = join(twDir, "theme.css");
           }
-          writeFileSync(twPath, generateTailwindTheme(result));
+          writeFileSync(twPath, generateTailwindTheme(result, { version }));
           const twLabel =
             typeof opts.tailwind === "string" ? opts.tailwind : `output/${twDomain}/theme.css`;
           savedNotices.push(
