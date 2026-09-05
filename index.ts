@@ -32,6 +32,7 @@ import { EXIT, classifyError } from "./lib/exit-codes.js";
 import { activeFlags, pathSummary } from "./lib/run-summary.js";
 import { consumeCloudHint } from "./lib/cli-state.js";
 import { installBrowsers, bundledPlaywrightVersion } from "./lib/install-browser.js";
+import { guardWarnings, voiceNeedsOutputFile } from "./lib/cli-guards.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"));
@@ -114,30 +115,9 @@ program
     // Resolve API key: --key flag takes precedence over env var
     const apiKey: string | undefined = opts.key ?? process.env.DEMBRANDT_KEY;
 
-    if (opts.approve && !opts.compare) {
-      console.error(color.warning("! --approve has no effect without --compare <file>."));
-    }
+    const voiceWritesOutput: boolean = voiceNeedsOutputFile(opts, !!apiKey);
 
-    // --color-format governs the terminal colour column only. Silently ignoring
-    // it on an export path would read as a bug, so name the paths it misses.
-    if (opts.colorFormat && opts.colorFormat !== "hex") {
-      const unaffected = [
-        opts.jsonOnly && "--json-only",
-        opts.saveOutput && "--save-output",
-        opts.dtcg && "--dtcg",
-        opts.designMd && "--design-md",
-        opts.tailwind && "--tailwind",
-        opts.html && "--html",
-        opts.brandGuide && "--brand-guide",
-      ].filter(Boolean);
-      if (unaffected.length) {
-        console.error(
-          color.warning(
-            `! --color-format=${opts.colorFormat} applies to terminal output only; ${unaffected.join(", ")} ${unaffected.length > 1 ? "are" : "is"} unaffected. JSON carries hex, rgb, lch and oklch for every colour.`
-          )
-        );
-      }
-    }
+    for (const warning of guardWarnings(opts, paths)) console.error(color.warning(warning));
 
     // In --json-only mode, redirect all status output to stderr so stdout is clean JSON
     const originalConsoleLog = console.log;
@@ -466,8 +446,9 @@ program
       const savedNotices = [];
       let syncFailed = false;
 
-      // Save JSON output if --save-output or --dtcg is specified
-      if (opts.saveOutput || opts.dtcg) {
+      // Save JSON output if --save-output or --dtcg is specified, or if --voice
+      // was passed with nowhere else for the copy to go.
+      if (opts.saveOutput || opts.dtcg || voiceWritesOutput) {
         try {
           const domain = new URL(url).hostname.replace("www.", "");
           const timestamp = new Date()
@@ -482,6 +463,7 @@ program
           // extraction, --dtcg writes the tokens file. Both flags = both files.
           const saves = [];
           if (opts.saveOutput) saves.push({ data: result, suffix: '', label: 'JSON saved (--save-output)' });
+          else if (voiceWritesOutput) saves.push({ data: result, suffix: '', label: 'JSON saved (--voice)' });
           if (opts.dtcg) saves.push({ data: outputData, suffix: '.tokens', label: 'DTCG tokens saved (--dtcg)' });
           for (const { data, suffix, label } of saves) {
             const filename = `${timestamp}_v${version}${suffix}.json`;
