@@ -118,6 +118,16 @@ program
       console.error(color.warning("! --approve has no effect without --compare <file>."));
     }
 
+    // Explicit paths are a page list, and discovery is what runs when there is
+    // none, so the two cannot both be in charge. Passing both looked like it
+    // would extract the paths and then crawl for more, and it silently did the
+    // paths alone.
+    if (opts.crawl && paths?.length && !opts.sitemap) {
+      console.error(color.warning(
+        `! --crawl is ignored when paths are listed: extracting the ${paths.length} given path${paths.length === 1 ? "" : "s"}. Drop the paths to crawl instead.`,
+      ));
+    }
+
     // --color-format governs the terminal colour column only. Silently ignoring
     // it on an export path would read as a bug, so name the paths it misses.
     if (opts.colorFormat && opts.colorFormat !== "hex") {
