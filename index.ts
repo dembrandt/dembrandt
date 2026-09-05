@@ -114,6 +114,13 @@ program
     // Resolve API key: --key flag takes precedence over env var
     const apiKey: string | undefined = opts.key ?? process.env.DEMBRANDT_KEY;
 
+    // Voice is the one extraction that never reaches the terminal: no formatter
+    // prints a fragment, so without a sink the flag costs a pass over every
+    // page and produces nothing the user can open. Rather than warn about that,
+    // write the file the flag exists to produce.
+    const voiceWritesOutput: boolean =
+      !!opts.voice && !opts.saveOutput && !opts.dtcg && !opts.jsonOnly && !apiKey;
+
     if (opts.approve && !opts.compare) {
       console.error(color.warning("! --approve has no effect without --compare <file>."));
     }
@@ -466,8 +473,9 @@ program
       const savedNotices = [];
       let syncFailed = false;
 
-      // Save JSON output if --save-output or --dtcg is specified
-      if (opts.saveOutput || opts.dtcg) {
+      // Save JSON output if --save-output or --dtcg is specified, or if --voice
+      // was passed with nowhere else for the copy to go.
+      if (opts.saveOutput || opts.dtcg || voiceWritesOutput) {
         try {
           const domain = new URL(url).hostname.replace("www.", "");
           const timestamp = new Date()
@@ -482,6 +490,7 @@ program
           // extraction, --dtcg writes the tokens file. Both flags = both files.
           const saves = [];
           if (opts.saveOutput) saves.push({ data: result, suffix: '', label: 'JSON saved (--save-output)' });
+          else if (voiceWritesOutput) saves.push({ data: result, suffix: '', label: 'JSON saved (--voice)' });
           if (opts.dtcg) saves.push({ data: outputData, suffix: '.tokens', label: 'DTCG tokens saved (--dtcg)' });
           for (const { data, suffix, label } of saves) {
             const filename = `${timestamp}_v${version}${suffix}.json`;
