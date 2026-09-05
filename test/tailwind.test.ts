@@ -317,3 +317,20 @@ test('generateTailwindTheme degrades to a valid file on an empty extraction', ()
 test('the targeted Tailwind major is pinned so tailwind:check can detect drift', () => {
   assert.equal(TAILWIND_TARGET_MAJOR, 4);
 });
+
+test('theme header stamps the renderer version when the extraction carries no meta', () => {
+  const bare: TailwindThemeInput = { ...sample, meta: undefined };
+  const withMeta = generateTailwindTheme({ ...sample, meta: { dembrandtVersion: '0.0.1' } });
+  assert.match(withMeta, /^ \* dembrandt v0\.0\.1$/m);
+
+  const rendered = generateTailwindTheme(bare, { version: '1.2.3' });
+  assert.match(rendered, /^ \* dembrandt v1\.2\.3$/m);
+
+  const optionWins = generateTailwindTheme(
+    { ...sample, meta: { dembrandtVersion: '0.0.1' } },
+    { version: '1.2.3' },
+  );
+  assert.match(optionWins, /^ \* dembrandt v1\.2\.3$/m);
+
+  assert.doesNotMatch(generateTailwindTheme(bare), /dembrandt v/);
+});

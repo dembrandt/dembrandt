@@ -176,3 +176,17 @@ test('buildHTML flags timeouts as a data-completeness caveat', () => {
   assert.match(html, /2 timeouts during extraction: Body content rendering, Main content selector/);
   assert.match(html, /some values may be incomplete/);
 });
+
+test('buildHTML stamps the renderer version when the data carries no meta', () => {
+  const rendered = buildHTML({ url: 'https://example.com' }, { version: '1.2.3' });
+  assert.match(rendered, /v1\.2\.3/);
+
+  const optionWins = buildHTML(
+    { url: 'https://example.com', meta: { dembrandtVersion: '0.0.1' } },
+    { version: '1.2.3' },
+  );
+  assert.match(optionWins, /v1\.2\.3/);
+  assert.doesNotMatch(optionWins, /v0\.0\.1/);
+
+  assert.match(buildHTML({ url: 'https://example.com' }), /Created with <strong>DEMBRANDT/);
+});
