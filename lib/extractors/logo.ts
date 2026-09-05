@@ -189,7 +189,7 @@ export async function extractLogo(page, url) {
         [rect.left + rect.width / 2, rect.bottom + 6],
       ];
       for (const [x, y] of points) {
-        if (x < 0 || y < 0) continue;
+        if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) continue;
         const hit = document.elementFromPoint(x, y);
         if (!hit || el.contains(hit) || hit.contains(el)) continue;
         const bg = bgFromAncestors(hit);
