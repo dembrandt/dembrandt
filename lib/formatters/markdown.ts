@@ -60,7 +60,10 @@ export function generateDesignMd(result: any) {
     hasComponentEvidence(result) ? buildComponentsSection(result) : null,
   ].filter(Boolean);
 
-  return `---\n${toYaml(frontMatter)}---\n\n${sections.join('\n\n')}\n`;
+  const version = result.meta?.dembrandtVersion;
+  const attribution = `<!-- dembrandt${version ? ` v${version}` : ''} -->`;
+
+  return `---\n${toYaml(frontMatter)}---\n\n${sections.join('\n\n')}\n\n${attribution}\n`;
 }
 
 function getDomain(result) {
