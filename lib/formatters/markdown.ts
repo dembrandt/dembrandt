@@ -26,11 +26,6 @@ import { convertColor, deltaE } from '../colors.js';
  */
 export const DESIGN_MD_TARGET_SPEC = '0.4';
 
-/**
- * @param result - dembrandt extraction result
- * @param options.version - renderer version, used when the extraction carries no meta
- * @returns DESIGN.md content
- */
 export function generateDesignMd(result: any, options: { version?: string } = {}) {
   const domain = getDomain(result);
   const name = getName(result, domain);
