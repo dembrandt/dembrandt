@@ -26,11 +26,7 @@ import { convertColor, deltaE } from '../colors.js';
  */
 export const DESIGN_MD_TARGET_SPEC = '0.4';
 
-/**
- * @param {object} result - dembrandt extraction result
- * @returns {string} DESIGN.md content
- */
-export function generateDesignMd(result: any) {
+export function generateDesignMd(result: any, options: { version?: string } = {}) {
   const domain = getDomain(result);
   const name = getName(result, domain);
   const colorRoles = buildColorRoles(result);
@@ -60,7 +56,10 @@ export function generateDesignMd(result: any) {
     hasComponentEvidence(result) ? buildComponentsSection(result) : null,
   ].filter(Boolean);
 
-  return `---\n${toYaml(frontMatter)}---\n\n${sections.join('\n\n')}\n`;
+  const version = options.version ?? result.meta?.dembrandtVersion;
+  const attribution = `<!-- dembrandt${version ? ` v${version}` : ''} -->`;
+
+  return `---\n${toYaml(frontMatter)}---\n\n${sections.join('\n\n')}\n\n${attribution}\n`;
 }
 
 function getDomain(result) {

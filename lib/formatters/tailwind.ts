@@ -119,7 +119,7 @@ const MAX_COLORS = 24;
  * @param result - dembrandt extraction result, or any partial of it
  * @returns CSS: a provenance header, `@import "tailwindcss"`, one `@theme` block
  */
-export function generateTailwindTheme(result: TailwindThemeInput): string {
+export function generateTailwindTheme(result: TailwindThemeInput, options: { version?: string } = {}): string {
   const sections: ThemeSection[] = [
     { title: 'Colors', entries: buildColors(result) },
     { title: 'Typography', entries: buildTypography(result) },
@@ -131,7 +131,7 @@ export function generateTailwindTheme(result: TailwindThemeInput): string {
 
   const body = sections.map(renderSection).join('\n\n');
 
-  return `${buildHeader(result)}\n@import "tailwindcss";\n\n@theme {\n${body}\n}\n`;
+  return `${buildHeader(result, options.version ?? result.meta?.dembrandtVersion)}\n@import "tailwindcss";\n\n@theme {\n${body}\n}\n`;
 }
 
 /** Render one section, aligning trailing provenance comments within it. */
@@ -148,9 +148,8 @@ function renderSection(section: ThemeSection): string {
   return `  /* ${section.title} */\n${lines.join('\n')}`;
 }
 
-function buildHeader(result: TailwindThemeInput): string {
+function buildHeader(result: TailwindThemeInput, version?: string): string {
   const source = result.url ?? 'an unknown page';
-  const version = result.meta?.dembrandtVersion;
   const stamp = result.extractedAt ? ` on ${result.extractedAt}` : '';
 
   return [

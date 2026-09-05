@@ -61,8 +61,8 @@ export async function inlineLogoForPdf(data, fetchImpl = fetch) {
  * @param {Object} data - Extraction results from extractBranding()
  * @param {string} outputPath - Path to write the PDF
  */
-export async function generatePDF(data, outputPath, existingBrowser) {
-  const html = buildHTML(await inlineLogoForPdf(data));
+export async function generatePDF(data, outputPath, existingBrowser, options: { version?: string } = {}) {
+  const html = buildHTML(await inlineLogoForPdf(data), options);
   const ownBrowser = !existingBrowser;
   let browser = existingBrowser;
   if (!browser) {
