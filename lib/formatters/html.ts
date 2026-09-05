@@ -72,7 +72,6 @@ function isHttpUrl(u: string): boolean {
   }
 }
 
-/** An <img> src: an http(s) URL, or a data: URI already inlined by extraction. */
 function isSafeImgSrc(u: string): boolean {
   return isHttpUrl(u) || /^data:image\//i.test(u.trim());
 }
@@ -353,7 +352,6 @@ function paletteSection(result: BrandingResult): string {
   return section("Palette", `<div class="colors">${cards}</div>`, undefined, all);
 }
 
-/** The extracted brand mark, plus any favicons. */
 function logoSection(result: BrandingResult): string {
   const logo = result.logo;
   const favicons = result.favicons ?? [];
@@ -556,7 +554,6 @@ function buttonsSection(result: BrandingResult): string {
   return section("Buttons", `<div class="row">${previews}</div>`, undefined, all);
 }
 
-/** A rendered `<input>` preview per style. */
 function inputsSection(result: BrandingResult): string {
   const raw = result.components?.inputs;
   const list: InputStyle[] = Array.isArray(raw) ? raw : raw?.text ?? [];
@@ -581,7 +578,7 @@ function inputsSection(result: BrandingResult): string {
   return section("Inputs", `<div class="row">${previews}</div>`, undefined, all);
 }
 
-/** Link swatches: default + hover colour, so an underline/colour change reads at a glance. */
+/** Hover colour is shown only when it differs, so a real state change stands out. */
 function linksSection(result: BrandingResult): string {
   const links = result.components?.links ?? [];
   if (!links.length) return "";

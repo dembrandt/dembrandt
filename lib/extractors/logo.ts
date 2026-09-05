@@ -416,7 +416,7 @@ export async function extractLogo(page, url) {
           // Bake the resolved color in so `currentColor` fills render standalone.
           if (color) clone.style.color = color;
           if (!clone.getAttribute('xmlns')) clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-          // fill/stroke may be var(--token) from the page's own CSS — bake the computed value in.
+          // fill/stroke may be var(--token) from the page's own CSS; bake the computed value in.
           const origEls = el.querySelectorAll('*');
           const cloneEls = clone.querySelectorAll('*');
           origEls.forEach((orig, i) => {

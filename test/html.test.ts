@@ -101,8 +101,6 @@ test('Mode B renders a drift banner and a Drift gauge', () => {
   assert.match(html, />Drift</);
 });
 
-/* ---------------------------- logo / inputs / links ---------------------------- */
-
 test('the logo section renders the mark, its dimensions and its svg colours', () => {
   const html = generateHtmlReport(fixture({
     logo: {
