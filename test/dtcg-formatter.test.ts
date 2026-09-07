@@ -69,4 +69,12 @@ describe('DTCG formatter output is spec-valid', () => {
     expect(layers[0].spread.value).toBe(-3);
     expect(layers[1].blur.value).toBe(6);
   });
+
+  it('falls back to black for a named shadow colour rather than inventing hex', () => {
+    const tokens = toDtcgTokens({ url: 'https://named.example', shadows: [{ shadow: '0 2px red', confidence: 'high' }] } as any);
+    const value = tokens.shadow['shadow-1'].$value;
+    expect(value.color.hex).toBe('#000000');
+    expect(value.color.components).toHaveLength(3);
+    expect(validateTokensObject(tokens).valid).toBe(true);
+  });
 });

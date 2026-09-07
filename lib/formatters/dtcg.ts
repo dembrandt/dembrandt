@@ -86,8 +86,9 @@ function hexToDtcgColor(color, alpha = 1) {
     }
   }
 
-  // Handle hex format
-  let cleanHex = color.replace('#', '');
+  // Handle hex format. Named colours reach here too, and a three-letter one
+  // expands into six valid-looking characters, so test for hex before shorthand.
+  let cleanHex = /^#?[0-9a-f]{3,8}$/i.test(color) ? color.replace('#', '') : '';
 
   if (cleanHex.length === 3) {
     cleanHex = cleanHex.split('').map(c => c + c).join('');

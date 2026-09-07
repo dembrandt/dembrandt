@@ -618,10 +618,6 @@ function normalizeTracking(value: string | number | null | undefined): string | 
   return length;
 }
 
-/**
- * Largest blur radius across a shadow's layers, used only to order them: a
- * multi-layer shadow reads as deep as its widest layer, not its first.
- */
 function byNumericValue(a: string, b: string): number {
   return parseFloat(a) - parseFloat(b);
 }
