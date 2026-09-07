@@ -239,7 +239,7 @@ export async function extractTypography(page) {
         try {
           for (const rule of sheet.cssRules || []) {
             if (rule instanceof CSSFontFaceRule) {
-              const display = (rule.style as any).fontDisplay;
+              const display = rule.style.getPropertyValue('font-display');
               if (display && display !== 'auto') {
                 fontDisplay = display;
                 break;
@@ -255,15 +255,17 @@ export async function extractTypography(page) {
     // Computed font-size is resolved to px at the capture viewport, so a fluid
     // ramp is invisible there. Collect the selectors that author one instead.
     const fluidSelectors: string[] = [];
-    const isFluidValue = (v) => /clamp\(/i.test(v) || /\d(vw|vh|vmin|vmax)\b/i.test(v);
-    const collectFluid = (rules) => {
+    const isFluidValue = (v: string) => /clamp\(/i.test(v) || /\d(vw|vh|vmin|vmax)\b/i.test(v);
+    const collectFluid = (rules: CSSRuleList | undefined) => {
       for (const rule of rules || []) {
-        const selector = (rule as any).selectorText;
-        const size = (rule as any).style?.fontSize;
-        if (selector && size && isFluidValue(size)) fluidSelectors.push(selector);
+        if (rule instanceof CSSStyleRule) {
+          const size = rule.style.fontSize;
+          if (rule.selectorText && size && isFluidValue(size)) fluidSelectors.push(rule.selectorText);
+        }
         // Style rules carry an empty cssRules list under CSS nesting, so recurse
         // on length rather than presence or every rule looks like a group.
-        if ((rule as any).cssRules?.length) collectFluid((rule as any).cssRules);
+        const nested = (rule as CSSGroupingRule).cssRules;
+        if (nested?.length) collectFluid(nested);
       }
     };
     for (const sheet of document.styleSheets) {
