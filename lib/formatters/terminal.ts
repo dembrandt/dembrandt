@@ -42,6 +42,7 @@ export function displayResults(data: BrandingResult, options: { colorFormat?: Co
     const paths = data.pages.map(p => new URL(p.url).pathname || '/').join(', ');
     console.log(chalk.dim('├─') + ' ' + chalk.dim(`${data.pages.length} pages: ${paths}`));
   }
+  displayCoverage(data.coverage);
   console.log(chalk.dim('│'));
 
   displayLogo(data.logo);
@@ -494,6 +495,22 @@ function displayBorders(borders, colorFormat: ColorFormat = 'hex') {
   }
 
   console.log(chalk.dim('│'));
+}
+
+/**
+ * Consistency across the crawl. Named tokens are the ones a single page
+ * introduced: usage says a token is popular, coverage says the site agrees.
+ */
+function displayCoverage(coverage) {
+  if (!coverage) return;
+
+  const tint = coverage.score >= 80 ? chalk.green : coverage.score >= 55 ? chalk.yellow : chalk.red;
+  console.log(chalk.dim('├─') + ' ' + tint(`${coverage.score}/100 consistent`) + chalk.dim(` across ${coverage.totalPages} pages`));
+
+  if (!coverage.outliers.length) return;
+  const shown = coverage.outliers.slice(0, 4).map(o => `${o.family} ${o.token}`).join(', ');
+  const rest = coverage.outliers.length - 4;
+  console.log(chalk.dim('├─') + ' ' + chalk.dim(`page-local: ${shown}${rest > 0 ? `, +${rest} more` : ''}`));
 }
 
 function displayShadows(shadows) {

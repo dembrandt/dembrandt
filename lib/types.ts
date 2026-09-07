@@ -4,6 +4,8 @@
  * of the (now TypeScript) codebase can import and use them.
  */
 
+import type { CoverageSummary } from './coverage.js';
+
 export type Confidence = 'high' | 'medium' | 'low';
 
 export interface PaletteColor {
@@ -156,6 +158,8 @@ export interface Shadow {
   shadow: string;
   count: number;
   confidence: Confidence;
+  /** Pages that carried this token; present only on a merged crawl. */
+  pageCount?: number;
 }
 
 export interface Gradient {
@@ -433,6 +437,8 @@ export interface BrandingResult {
   borderRadius: BorderRadius;
   borders: Borders;
   shadows: Shadow[];
+  /** Present only on a merged crawl of more than one page. */
+  coverage?: CoverageSummary;
   gradients?: Gradient[];
   motion?: Motion;
   components: Components;
