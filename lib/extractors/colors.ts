@@ -599,6 +599,8 @@ export async function extractColors(page) {
     // candidate set the ML pipeline consumes; the curated `palette` above remains the
     // product default. `usageFrac` counts elements; `areaFrac` is the share of
     // painted background area, so a hero fill is not outranked by small icons.
+    // Nested fills each count their own box, so this is a ranking proxy and not
+    // a fraction of the screen.
     const detectedTotal = Array.from(colorMap.values()).reduce((s, d) => s + (d.count || 0), 0) || 1;
     const detectedArea = Array.from(colorMap.values()).reduce((s, d) => s + (d.bgArea || 0), 0);
     const detected = Array.from(colorMap.entries())

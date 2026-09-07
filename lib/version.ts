@@ -39,6 +39,20 @@
  *  (unversioned) — `voice` / `voiceSkipped` ship behind a hidden, opt-in flag
  *          and deliberately do not bump the contract. Bump when the flag is
  *          documented, not before.
+ *  1.12.0 — colors.detected entries gain areaFrac: the colour's share of painted
+ *          background area, alongside the existing element-count usageFrac, so
+ *          a hero fill is not outranked by sixty icons. BEHAVIOR, and it is a
+ *          shape change in the DTCG export: a shadow token's $value is an array
+ *          of layers when the shadow has more than one, where every earlier
+ *          release emitted a single object built by splitting the string on
+ *          whitespace — which read a computed shadow's leading colour as its
+ *          offsetX and folded multi-layer shadows into one. A consumer reading
+ *          $value.offsetX must branch on Array.isArray. Tailwind's shadow
+ *          ladder is also reordered by depth (blur + |offsetY| + spread)
+ *          instead of blur alone, so --shadow-sm/md/lg/xl can move for an
+ *          unchanged site. typography styles: isFluid is now read from the
+ *          authored declaration rather than the computed px, so clamp() and
+ *          calc(vw) ramps are detected at all.
  *  1.11.0 — meta gains robotsWarnings: human-readable notes on pages robots.txt
  *          disallowed, whether that was the entry URL or a page discovered
  *          during --crawl/--sitemap/MCP pages. The check stays advisory (it
@@ -125,7 +139,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.11.0';
+export const SCHEMA_VERSION = '1.12.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
