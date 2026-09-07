@@ -71,7 +71,9 @@ describe('DTCG formatter output is spec-valid', () => {
   });
 
   it('falls back to black for a named shadow colour rather than inventing hex', () => {
-    const tokens = toDtcgTokens({ url: 'https://named.example', shadows: [{ shadow: '0 2px red', confidence: 'high' }] } as any);
+    const fixture = loadFixture(FIXTURE);
+    fixture.shadows = [{ shadow: '0 2px red', confidence: 'high' }];
+    const tokens = toDtcgTokens(fixture);
     const value = tokens.shadow['shadow-1'].$value;
     expect(value.color.hex).toBe('#000000');
     expect(value.color.components).toHaveLength(3);
