@@ -252,6 +252,27 @@ export async function extractTypography(page) {
     } catch (e) {}
     (sources as any).fontDisplay = fontDisplay;
 
+    // Computed font-size is resolved to px at the capture viewport, so a fluid
+    // ramp is invisible there. Collect the selectors that author one instead.
+    const fluidSelectors: string[] = [];
+    const isFluidValue = (v) => /clamp\(/i.test(v) || /\d(vw|vh|vmin|vmax)\b/i.test(v);
+    const collectFluid = (rules) => {
+      for (const rule of rules || []) {
+        const selector = (rule as any).selectorText;
+        const size = (rule as any).style?.fontSize;
+        if (selector && size && isFluidValue(size)) fluidSelectors.push(selector);
+        // Style rules carry an empty cssRules list under CSS nesting, so recurse
+        // on length rather than presence or every rule looks like a group.
+        if ((rule as any).cssRules?.length) collectFluid((rule as any).cssRules);
+      }
+    };
+    for (const sheet of document.styleSheets) {
+      try { collectFluid(sheet.cssRules); } catch (e) {}
+    }
+    const matchesFluid = (el) => fluidSelectors.some((sel) => {
+      try { return el.matches(sel); } catch (e) { return false; }
+    });
+
     const els = document.querySelectorAll(`
       h1,h2,h3,h4,h5,h6,p,span,a,button,[role="button"],.btn,.button,
       .hero,[class*="title"],[class*="heading"],[class*="text"],nav a
@@ -270,7 +291,7 @@ export async function extractTypography(page) {
       const textTransform = s.textTransform;
       const lineHeight = s.lineHeight;
 
-      const isFluid = s.fontSize.includes('clamp') || s.fontSize.includes('vw') || s.fontSize.includes('vh');
+      const isFluid = matchesFluid(el);
       const fontFeatures = s.fontFeatureSettings !== 'normal' ? s.fontFeatureSettings : null;
       if (fontFeatures) featureSettings.push(fontFeatures);
       if (s.fontVariationSettings && s.fontVariationSettings !== 'normal') {

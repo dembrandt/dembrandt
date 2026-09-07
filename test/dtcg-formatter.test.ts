@@ -51,4 +51,22 @@ describe('DTCG formatter output is spec-valid', () => {
       expect(typeof tokens[group]).toBe('object');
     }
   });
+
+  it('reads a computed shadow instead of mistaking its colour for an offset', () => {
+    const tokens = toDtcgTokens(loadFixture(FIXTURE));
+    const single = tokens.shadow['shadow-1'].$value;
+    expect(single.offsetY.value).toBe(1);
+    expect(single.blur.value).toBe(3);
+    expect(single.color.hex).toBe('#000000');
+    expect(single.color.alpha).toBe(0.2);
+  });
+
+  it('keeps every layer of a multi-layer shadow', () => {
+    const tokens = toDtcgTokens(loadFixture(FIXTURE));
+    const layers = tokens.shadow['shadow-2'].$value;
+    expect(layers).toHaveLength(2);
+    expect(layers[0].offsetY.value).toBe(10);
+    expect(layers[0].spread.value).toBe(-3);
+    expect(layers[1].blur.value).toBe(6);
+  });
 });
