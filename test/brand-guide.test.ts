@@ -177,16 +177,17 @@ test('buildHTML flags timeouts as a data-completeness caveat', () => {
   assert.match(html, /some values may be incomplete/);
 });
 
-test('buildHTML stamps the renderer version when the data carries no meta', () => {
+test('buildHTML falls back to the renderer version only when the data carries none', () => {
   const rendered = buildHTML({ url: 'https://example.com' }, { version: '1.2.3' });
   assert.match(rendered, /v1\.2\.3/);
 
-  const optionWins = buildHTML(
+  // Re-rendering an old snapshot must keep saying which release extracted it.
+  const extractorWins = buildHTML(
     { url: 'https://example.com', meta: { dembrandtVersion: '0.0.1' } },
     { version: '1.2.3' },
   );
-  assert.match(optionWins, /v1\.2\.3/);
-  assert.doesNotMatch(optionWins, /v0\.0\.1/);
+  assert.match(extractorWins, /v0\.0\.1/);
+  assert.doesNotMatch(extractorWins, /v1\.2\.3/);
 
   assert.match(buildHTML({ url: 'https://example.com' }), /Created with <strong>DEMBRANDT/);
 });

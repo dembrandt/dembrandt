@@ -131,7 +131,7 @@ export function generateTailwindTheme(result: TailwindThemeInput, options: { ver
 
   const body = sections.map(renderSection).join('\n\n');
 
-  return `${buildHeader(result, options.version ?? result.meta?.dembrandtVersion)}\n@import "tailwindcss";\n\n@theme {\n${body}\n}\n`;
+  return `${buildHeader(result, result.meta?.dembrandtVersion ?? options.version)}\n@import "tailwindcss";\n\n@theme {\n${body}\n}\n`;
 }
 
 /** Render one section, aligning trailing provenance comments within it. */

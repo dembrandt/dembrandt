@@ -763,7 +763,7 @@ export function generateHtmlReport(result: BrandingResult, options: HtmlReportOp
   } catch {
     /* leave as-is */
   }
-  const version = options.version ?? result.meta?.dembrandtVersion ?? "";
+  const version = result.meta?.dembrandtVersion ?? options.version ?? "";
   const fr = computeFindings(result);
 
   const body = [

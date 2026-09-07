@@ -142,7 +142,9 @@ export function buildHTML(data, options: { version?: string } = {}) {
   // Public entry point: callers may pass adapted/partial token data (e.g. from a
   // parsed design.md), so never assume a fully-formed extraction result.
   if (!data || typeof data !== 'object') data = {};
-  const toolVersion = options.version ?? data.meta?.dembrandtVersion;
+  // The extractor's version owns the stamp: it is the release the token values
+  // came from. The renderer only fills in for data that never carried one.
+  const toolVersion = data.meta?.dembrandtVersion ?? options.version;
 
   let domain;
   try { domain = new URL(data.url).hostname.replace('www.', ''); }

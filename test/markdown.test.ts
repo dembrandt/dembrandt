@@ -163,6 +163,12 @@ test('generateDesignMd ends with a dembrandt attribution comment', () => {
   const rendererVersion = generateDesignMd({ url: 'https://attribution.example' }, { version: '1.2.3' });
   assert.match(rendererVersion, /\n<!-- dembrandt v1\.2\.3 -->\n$/);
 
+  const extractorWins = generateDesignMd(
+    { url: 'https://attribution.example', meta: { dembrandtVersion: '9.9.9' } },
+    { version: '1.2.3' },
+  );
+  assert.match(extractorWins, /\n<!-- dembrandt v9\.9\.9 -->\n$/);
+
   const unversioned = generateDesignMd({ url: 'https://attribution.example' });
   assert.match(unversioned, /\n<!-- dembrandt -->\n$/);
 });

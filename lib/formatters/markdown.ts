@@ -56,7 +56,7 @@ export function generateDesignMd(result: any, options: { version?: string } = {}
     hasComponentEvidence(result) ? buildComponentsSection(result) : null,
   ].filter(Boolean);
 
-  const version = options.version ?? result.meta?.dembrandtVersion;
+  const version = result.meta?.dembrandtVersion ?? options.version;
   const attribution = `<!-- dembrandt${version ? ` v${version}` : ''} -->`;
 
   return `---\n${toYaml(frontMatter)}---\n\n${sections.join('\n\n')}\n\n${attribution}\n`;
