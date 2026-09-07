@@ -1,4 +1,9 @@
-const UA = "Dembrandt";
+/**
+ * The token a site would use to address us in robots.txt. Only the group that
+ * matches the User-Agent we actually send applies to us, so callers that browse
+ * as a plain browser must match "*" instead of this name.
+ */
+export const ROBOTS_AGENT = "Dembrandt";
 
 interface RobotsRule {
   type: "allow" | "disallow";
@@ -24,7 +29,7 @@ export type RobotsRules =
  */
 export async function fetchRobotsRules(
   targetUrl: string,
-  { timeoutMs = 5000 }: { timeoutMs?: number } = {},
+  { timeoutMs = 5000, agent = "*" }: { timeoutMs?: number; agent?: string } = {},
 ): Promise<RobotsRules> {
   const u = new URL(targetUrl);
   const robotsUrl = `${u.protocol}//${u.host}/robots.txt`;
@@ -36,10 +41,14 @@ export async function fetchRobotsRules(
   try {
     const res = await fetch(robotsUrl, {
       signal: controller.signal,
-      headers: { "User-Agent": UA },
+      headers: { "User-Agent": ROBOTS_AGENT },
     });
     if (!res.ok) return { status: "unavailable" };
     body = await res.text();
+    // A bot wall or SPA fallback answers 200 with HTML. Parsed as robots.txt it
+    // yields no rules, which would read as "nothing is disallowed" — the exact
+    // inversion of what the site is saying.
+    if (looksLikeHtml(body)) return { status: "unavailable" };
   } catch {
     return { status: "unavailable" };
   } finally {
@@ -47,7 +56,7 @@ export async function fetchRobotsRules(
   }
 
   const groups = parseRobots(body);
-  const rules = matchGroup(groups, UA) || matchGroup(groups, "*") || [];
+  const rules = matchGroup(groups, agent) || matchGroup(groups, "*") || [];
   return { status: "ok", robotsUrl, rules };
 }
 
@@ -57,7 +66,7 @@ export function evaluatePath(rules: RobotsRule[], path: string): { allowed: bool
 
 export async function checkRobotsTxt(
   targetUrl: string,
-  opts: { timeoutMs?: number } = {},
+  opts: { timeoutMs?: number; agent?: string } = {},
 ): Promise<RobotsResult> {
   const u = new URL(targetUrl);
   const rules = await fetchRobotsRules(targetUrl, opts);
@@ -124,6 +133,10 @@ function parseRobots(text: string): RobotsGroup[] {
     }
   }
   return groups;
+}
+
+function looksLikeHtml(body: string): boolean {
+  return /^\s*(<!doctype html|<html|<head|<body)/i.test(body);
 }
 
 function matchGroup(groups: RobotsGroup[], agent: string): RobotsRule[] | null {

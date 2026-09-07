@@ -49,7 +49,8 @@ test('evaluatePath: wildcard and end-anchor patterns match correctly', () => {
 
 test('fetchRobotsRules: parses the matching user-agent group', async () => {
   const body = 'User-agent: Dembrandt\nDisallow: /private\n\nUser-agent: *\nDisallow: /\n';
-  const rules = await withMockFetch(body, 200, () => fetchRobotsRules('https://example.com/'));
+  const rules = await withMockFetch(body, 200, () =>
+    fetchRobotsRules('https://example.com/', { agent: 'Dembrandt' }));
   assert.equal(rules.status, 'ok');
   if (rules.status === 'ok') {
     assert.deepEqual(rules.rules, [{ type: 'disallow', value: '/private' }]);
@@ -95,4 +96,45 @@ test('filterAllowedUrls: a malformed URL is passed through rather than dropped',
   const { allowed, disallowed } = filterAllowedUrls(['not a url'], rules);
   assert.deepEqual(allowed, ['not a url']);
   assert.deepEqual(disallowed, []);
+});
+
+test('fetchRobotsRules: an HTML body is treated as unavailable, not as an empty rule set', async () => {
+  // Bot walls answer 200 with HTML; parsed as robots.txt it would read as
+  // "nothing disallowed" — the inversion of what the site is saying.
+  const body = '<!DOCTYPE html>\n<html><body>Access denied</body></html>';
+  const result = await withMockFetch(body, 200, () => fetchRobotsRules('https://example.com/'));
+  assert.equal(result.status, 'unavailable');
+});
+
+test('fetchRobotsRules: matches the group for the requested agent', async () => {
+  const body = 'User-agent: Dembrandt\nDisallow: /named\n\nUser-agent: *\nDisallow: /everyone\n';
+  const named = await withMockFetch(body, 200, () =>
+    fetchRobotsRules('https://example.com/', { agent: 'Dembrandt' }));
+  assert.deepEqual(named, {
+    status: 'ok',
+    robotsUrl: 'https://example.com/robots.txt',
+    rules: [{ type: 'disallow', value: '/named' }],
+  });
+});
+
+test('fetchRobotsRules: an unnamed run falls under the wildcard group, not the Dembrandt one', async () => {
+  const body = 'User-agent: Dembrandt\nAllow: /\n\nUser-agent: *\nDisallow: /\n';
+  const result = await withMockFetch(body, 200, () => fetchRobotsRules('https://example.com/'));
+  assert.deepEqual(result, {
+    status: 'ok',
+    robotsUrl: 'https://example.com/robots.txt',
+    rules: [{ type: 'disallow', value: '/' }],
+  });
+});
+
+test('checkRobotsTxt: forwards the agent to the group match', async () => {
+  const body = 'User-agent: Dembrandt\nDisallow: /admin\n\nUser-agent: *\nAllow: /\n';
+  const result = await withMockFetch(body, 200, () =>
+    checkRobotsTxt('https://example.com/admin', { agent: 'Dembrandt' }));
+  assert.deepEqual(result, {
+    status: 'ok',
+    robotsUrl: 'https://example.com/robots.txt',
+    allowed: false,
+    rule: '/admin',
+  });
 });

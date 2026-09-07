@@ -48,7 +48,10 @@ jobs:
 
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The browser cache does not cover `--with-deps`, which installs ~21MB of
+    # font packages from apt on every run; a slow mirror alone has spent 10
+    # minutes there.
+    timeout-minutes: 16
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

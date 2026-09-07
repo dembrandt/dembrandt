@@ -27,7 +27,7 @@ import { mergeResults } from "./lib/merger.js";
 import { writeFileSync, mkdirSync, readFileSync } from "fs";
 import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
-import { checkRobotsTxt, fetchRobotsRules, filterAllowedUrls } from "./lib/robots.js";
+import { checkRobotsTxt, fetchRobotsRules, filterAllowedUrls, ROBOTS_AGENT } from "./lib/robots.js";
 import { EXIT, classifyError } from "./lib/exit-codes.js";
 import { activeFlags, pathSummary } from "./lib/run-summary.js";
 import { consumeCloudHint } from "./lib/cli-state.js";
@@ -36,6 +36,15 @@ import { guardWarnings, voiceNeedsOutputFile } from "./lib/cli-guards.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"));
+
+/**
+ * A run that names itself in its User-Agent is addressable by the site: it can
+ * be allowed or refused by name in robots.txt, and blocked cleanly at the edge.
+ * Used to pick which robots.txt group actually governs the run.
+ */
+function identifiesAsBot(userAgent: string | undefined): boolean {
+  return !!userAgent && userAgent.toLowerCase().includes("dembrandt");
+}
 
 /**
  * ora options for a spinner on the given stream. The spinner animates only on
@@ -127,9 +136,28 @@ program
 
     const spinner = ora({ text: "Starting extraction...", ...spinnerOptions(opts.jsonOnly) }).start();
 
+    // Unattended runs (scheduled CI, any hosted path) have no user deciding what
+    // they have the right to fetch, so there the robots decision has to bind.
+    const enforceRobots = process.env.DEMBRANDT_ENFORCE_ROBOTS === "1";
+    // Only the group matching the User-Agent we actually send applies to us.
+    const robotsAgent = identifiesAsBot(opts.userAgent) ? ROBOTS_AGENT : "*";
+
     let entryRobotsWarning = null;
     try {
-      const robots = await checkRobotsTxt(url);
+      const robots = await checkRobotsTxt(url, { agent: robotsAgent });
+      const refused =
+        (robots.status === "ok" && robots.allowed === false) ||
+        (enforceRobots && robots.status === "unavailable");
+
+      if (enforceRobots && refused) {
+        const why =
+          robots.status === "ok"
+            ? `robots.txt disallows this path (rule: "${robots.rule}")`
+            : "robots.txt could not be read";
+        spinner.fail(`${why}. Skipping ${url} (DEMBRANDT_ENFORCE_ROBOTS=1).`);
+        process.exit(EXIT.ROBOTS_DENIED);
+      }
+
       if (robots.status === "ok" && robots.allowed === false) {
         entryRobotsWarning = `robots.txt disallows ${url} (rule: "${robots.rule}")`;
         spinner.warn(
@@ -281,7 +309,7 @@ program
           delete result._discoveredLinks;
 
           if (additionalUrls.length > 0) {
-            const robotsRules = await fetchRobotsRules(result.url);
+            const robotsRules = await fetchRobotsRules(result.url, { agent: robotsAgent });
             const { allowed, disallowed } = filterAllowedUrls(additionalUrls, robotsRules);
             if (disallowed.length > 0) {
               if (!opts.jsonOnly) {
