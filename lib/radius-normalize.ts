@@ -27,7 +27,8 @@ export function normalizeRadius(value: string): string {
 
   const parts = raw.split(/\s+/).map((part) => {
     const n = parseFloat(part);
-    return Number.isFinite(n) && n >= PILL_THRESHOLD ? PILL_RADIUS : part;
+    // Infinity is the far end of the same case, not an exception to it.
+    return Number.isNaN(n) || n < PILL_THRESHOLD ? part : PILL_RADIUS;
   });
 
   return parts.every((part) => part === PILL_RADIUS) ? PILL_RADIUS : parts.join(' ');

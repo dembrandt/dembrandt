@@ -16,6 +16,10 @@ test('normalizeRadius: the computed maximum length reads as a pill', () => {
   assert.equal(normalizeRadius('9999px'), PILL_RADIUS);
 });
 
+test('normalizeRadius: a value too large to be finite is still a pill', () => {
+  assert.equal(normalizeRadius('1e400px'), PILL_RADIUS);
+});
+
 test('normalizeRadius: real scale steps pass through untouched', () => {
   for (const value of ['0px', '4px', '6px', '128px', '999px', '0.5rem']) {
     assert.equal(normalizeRadius(value), value);
