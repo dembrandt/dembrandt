@@ -60,7 +60,10 @@ export interface Colors {
    * ones carry a CssVariable object, so consumers must handle both.
    */
   cssVariables: Record<string, string | CssVariable>;
+  /** Pre-filter colour set, published only under --raw-colors. */
   rawColors?: PaletteColor[];
+  /** Internal scratch set behind `rawColors`. Never persisted. */
+  _raw?: PaletteColor[];
 }
 
 export interface TypographyStyle {

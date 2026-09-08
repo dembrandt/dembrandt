@@ -9,17 +9,25 @@
  * need these — they live in core so every consumer shares one implementation
  * instead of each repo re-deriving it.
  */
-import type { BrandingResult } from './types.js';
+import type { BrandingResult, Colors } from './types.js';
 
 const TRANSIENT_KEYS = ['_discoveredLinks', '_extractedUrls', '_pageResults'] as const;
 
 /**
  * Remove internal crawl/merge fields that must never be persisted, even if a raw
  * crawl object is fed in. Returns a shallow copy; the input is untouched.
+ * `colors._raw` is the same category one level down.
  */
 export function stripTransient<T extends BrandingResult>(result: T): T {
   const clean = { ...result } as T & Record<string, unknown>;
   for (const key of TRANSIENT_KEYS) delete clean[key];
+
+  const colors: Colors | undefined = clean.colors;
+  if (colors && '_raw' in colors) {
+    const { _raw, ...rest } = colors;
+    (clean as Record<string, unknown>).colors = rest;
+  }
+
   return clean;
 }
 

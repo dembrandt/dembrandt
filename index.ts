@@ -454,11 +454,6 @@ program
         }
       }
 
-      // Strip raw colors unless --raw-colors flag is set
-      if (!opts.rawColors && result.colors && result.colors.rawColors) {
-        delete result.colors.rawColors;
-      }
-
       // Pull the internal payload off the result before it can reach stdout or
       // the normal saved output, and write it to its own sidecar.
       const teachData = (result as any)._teach;

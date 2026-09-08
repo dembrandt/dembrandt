@@ -1495,6 +1495,8 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
     if (options.includeRawColors) {
       result.colors.rawColors = colors._raw || [];
     }
+    // Internal scratch set; `rawColors` above is its published form.
+    delete (result.colors as { _raw?: unknown })._raw;
 
     if (options.discoverLinks) {
       try {
