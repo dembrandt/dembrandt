@@ -143,6 +143,16 @@ export function filterFontUrls(urls: string[]): string[] {
 
 export async function extractTypography(page) {
   const data = await page.evaluate(() => {
+    const glyphlessFamilies = new Set<string>();
+    const coversLatinLetters = (range: string) =>
+      range.split(',').some((part) => {
+        const m = /^\s*u\+([0-9a-f]+)(?:-([0-9a-f]+))?/i.exec(part.trim());
+        if (!m) return true; // wildcards and unparseable ranges: assume coverage
+        const start = parseInt(m[1], 16);
+        const end = m[2] ? parseInt(m[2], 16) : start;
+        return start <= 0x41 && end >= 0x5a; // A-Z
+      });
+
     const seen = new Map();
     const variationSettings: string[] = [];
     const featureSettings: string[] = [];
@@ -218,6 +228,12 @@ export async function extractTypography(page) {
               if (!isThirdParty && (isSameOrigin || src.includes('url(')) && !sources.customFonts.includes(family)) {
                 sources.customFonts.push(family);
               }
+              // A face restricted to digits (tabular-numeral fonts are declared this
+              // way) renders no letters, so the browser falls through to the next
+              // family for text. Such a family must not be reported as the family.
+              const range = rule.style.getPropertyValue('unicode-range');
+              if (range && !coversLatinLetters(range)) glyphlessFamilies.add(family.toLowerCase());
+
               const familyLower = family.toLowerCase();
               if (
                 familyLower.includes('variable') ||
@@ -254,7 +270,8 @@ export async function extractTypography(page) {
 
     const els = document.querySelectorAll(`
       h1,h2,h3,h4,h5,h6,p,span,a,button,[role="button"],.btn,.button,
-      .hero,[class*="title"],[class*="heading"],[class*="text"],nav a
+      .hero,[class*="title"],[class*="heading"],[class*="text"],nav a,
+      code,pre,kbd,samp
     `);
 
     els.forEach((el) => {
@@ -264,8 +281,11 @@ export async function extractTypography(page) {
       const size = parseFloat(s.fontSize);
       const weight = parseInt(s.fontWeight) || 400;
       const fontFamilies = s.fontFamily.split(",").map(f => f.replace(/['"]/g, "").trim());
-      const family = fontFamilies[0];
-      const fallbacks = fontFamilies.slice(1).filter(f => f && f !== 'sans-serif' && f !== 'serif' && f !== 'monospace');
+      const rendered = fontFamilies.findIndex(f => !glyphlessFamilies.has(f.toLowerCase()));
+      const familyIndex = rendered === -1 ? 0 : rendered;
+      const family = fontFamilies[familyIndex];
+      const fallbacks = fontFamilies.filter((_, i) => i !== familyIndex)
+        .filter(f => f && f !== 'sans-serif' && f !== 'serif' && f !== 'monospace');
       const letterSpacing = s.letterSpacing;
       const textTransform = s.textTransform;
       const lineHeight = s.lineHeight;
@@ -280,7 +300,11 @@ export async function extractTypography(page) {
       let context = "body";
       const className = typeof el.className === 'string' ? el.className : ((el as any).className.baseVal || '');
       const headingMatch = el.tagName.match(/^H([1-6])$/);
-      if (
+      if (["CODE", "PRE", "KBD", "SAMP"].includes(el.tagName)) {
+        // Its own role: a mono face is part of the system but is not body copy,
+        // and letting it compete for "body" moves the body token.
+        context = "mono";
+      } else if (
         el.tagName === "BUTTON" ||
         el.getAttribute("role") === "button" ||
         className.includes("btn")
