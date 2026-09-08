@@ -18,6 +18,9 @@ const glyphs = Array.from({ length: 60 }, () =>
 
 const FIXTURE =
   `<!doctype html><html><head><style>` +
+  // The common shape: the ramp lives on a custom property, the rule uses var().
+  `:root { --text-hero: clamp(3rem, 6vw, 5rem); }` +
+  `.hero-title { font-size: var(--text-hero); }` +
   `h1 { font-size: clamp(2rem, 5vw, 4rem); }` +
   `p.lead { font-size: calc(1rem + 0.5vw); }` +
   `p.fixed { font-size: 16px; }` +
@@ -27,6 +30,7 @@ const FIXTURE =
   `</style></head>` +
   `<body style="margin:0"><div class="hero" style="width:1200px;height:700px;background:${SURFACE}">` +
   `<h1>Fluid heading</h1>` +
+  `<h2 class="hero-title">Hero title sized through a custom property</h2>` +
   `<p class="lead">Lead copy that scales with the viewport width.</p>` +
   `<p class="fixed">Body copy pinned to sixteen pixels on every viewport.</p>` +
   `<h2 class="pinned">Subheading a later rule pins to twenty pixels.</h2>` +
@@ -59,7 +63,7 @@ test('clamp() and viewport-relative font sizes are flagged fluid', async (t) => 
   if (browserUnavailable(t)) return;
   const styles = (await extractTypography(page!)).styles as TypographyStyle[];
   const fluid = styles.filter((s) => s.isFluid);
-  assert.equal(fluid.length, 2, `expected the clamp and calc(vw) styles, got ${JSON.stringify(styles)}`);
+  assert.equal(fluid.length, 3, `expected the clamp, calc(vw) and var() styles, got ${JSON.stringify(styles.map((s) => [s.size, s.isFluid]))}`);
 });
 
 test('an element a static rule also reaches is not claimed fluid', async (t) => {

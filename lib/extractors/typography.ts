@@ -256,7 +256,21 @@ export async function extractTypography(page) {
     // ramp is invisible there. Collect the selectors that author one instead.
     const fluidSelectors: string[] = [];
     const staticSelectors: string[] = [];
-    const isFluidValue = (v: string) => /clamp\(/i.test(v) || /\d(vw|vh|vmin|vmax)\b/i.test(v);
+    // A fluid scale is normally declared once as a custom property and used as
+    // `font-size: var(--text-lg)`, so the literal ramp never appears in the rule
+    // that sets the size. Resolve one level of indirection off :root.
+    const rootStyle = getComputedStyle(document.documentElement);
+    const resolveVars = (value: string) => {
+      let out = value;
+      for (let pass = 0; pass < 2 && out.includes('var('); pass++) {
+        out = out.replace(/var\(\s*(--[^,)\s]+)[^)]*\)/g, (_, name) => rootStyle.getPropertyValue(name) || '');
+      }
+      return out;
+    };
+    const isFluidValue = (v: string) => {
+      const resolved = v.includes('var(') ? resolveVars(v) : v;
+      return /clamp\(/i.test(resolved) || /\d(vw|vh|vmin|vmax)\b/i.test(resolved);
+    };
     const collectSizeRules = (rules: CSSRuleList | undefined) => {
       for (const rule of rules || []) {
         if (rule instanceof CSSStyleRule) {
