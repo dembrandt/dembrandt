@@ -150,7 +150,7 @@ program
 
     // One fetch per origin for the whole run: the entry check, the sitemap
     // directives and the crawl filter all read the same file.
-    let entryRobotsRules = await fetchRobotsRules(url, { agent: robotsAgent }).catch(
+    const entryRobotsRules = await fetchRobotsRules(url, { agent: robotsAgent }).catch(
       () => ({ status: "unavailable" }) as RobotsRules,
     );
 
