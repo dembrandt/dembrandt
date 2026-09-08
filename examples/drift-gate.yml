@@ -7,8 +7,9 @@
 # needed to catch that a colour or spacing step quietly changed.
 #
 # This is the GitHub Actions reference. The gate itself is platform-neutral —
-# `--compare` gives an exit code (0 stable / 1 drift / 2 failure) and, with
-# --json-only, the drift report as JSON. Only the surfacing below (annotations,
+# `--compare` gives an exit code and, with --json-only, the drift report as
+# JSON. The full table is in docs/ci.md; this workflow branches on 0 stable,
+# 1 drift, and treats anything else as a failed extraction. Only the surfacing below (annotations,
 # PR comment) is GitHub-specific; the same extract → compare → branch core maps
 # to GitLab CI, Jenkins, or Azure DevOps.
 #
