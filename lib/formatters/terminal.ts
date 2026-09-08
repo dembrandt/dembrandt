@@ -8,6 +8,7 @@ import type { BrandingResult } from '../types.js';
 
 import chalk from 'chalk';
 import { color } from './theme.js';
+import { formatPageList } from '../run-summary.js';
 import { convertColor, formatColor } from '../colors.js';
 import type { ColorFormat } from '../colors.js';
 
@@ -39,7 +40,7 @@ export function displayResults(data: BrandingResult, options: { colorFormat?: Co
   });
   console.log(chalk.dim('├─') + ' ' + chalk.dim(timeString));
   if (data.pages && data.pages.length > 1) {
-    const paths = data.pages.map(p => new URL(p.url).pathname || '/').join(', ');
+    const paths = formatPageList(data.pages.map(p => p.url));
     console.log(chalk.dim('├─') + ' ' + chalk.dim(`${data.pages.length} pages: ${paths}`));
   }
   console.log(chalk.dim('│'));

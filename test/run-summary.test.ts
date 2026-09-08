@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { activeFlags, pathSummary } from '../lib/run-summary.js';
+import { activeFlags, formatPageList, pathSummary } from '../lib/run-summary.js';
 
 /**
  * The closing-summary "what shaped this run" lines (DEM-99): which flags were
@@ -57,4 +57,32 @@ test('pathSummary: crawl/sitemap have no explicit paths, just the merged count',
 test('pathSummary: single page -> nothing (no merge happened)', () => {
   assert.deepEqual(pathSummary(undefined, 1), []);
   assert.deepEqual(pathSummary([], 0), []);
+});
+
+test('formatPageList: a short crawl lists every page', () => {
+  assert.equal(
+    formatPageList(['https://a.com/', 'https://a.com/pricing', 'https://a.com/docs/start']),
+    '/, /pricing, /docs/start',
+  );
+});
+
+test('formatPageList: a long crawl is capped so the summary stays one line', () => {
+  const urls = Array.from({ length: 20 }, (_, i) => `https://a.com/p${i}`);
+  assert.equal(formatPageList(urls), '/p0, /p1, /p2, /p3, /p4, /p5, +14 more');
+});
+
+test('formatPageList: an unparseable URL is kept verbatim, never dropped', () => {
+  // The list has to account for every page, or the count and the list disagree.
+  assert.equal(formatPageList(['https://a.com/x', 'not a url', undefined]), '/x, not a url');
+});
+
+test('pathSummary: a crawl names the pages it took, not just how many', () => {
+  assert.deepEqual(
+    pathSummary(undefined, 3, ['https://a.com/', 'https://a.com/pricing', 'https://a.com/about']),
+    ['(3 pages merged: /, /pricing, /about)'],
+  );
+});
+
+test('pathSummary: the count still stands alone when no URLs are available', () => {
+  assert.deepEqual(pathSummary(undefined, 3), ['(3 pages merged)']);
 });
