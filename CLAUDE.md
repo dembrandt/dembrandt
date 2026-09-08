@@ -40,7 +40,7 @@ hand-labeled gold sites are archived in dembrandt-ml/data/archive/gold-import.
 
 ## Architecture
 
-### Entry Point (`index.js`)
+### Entry Point (`index.ts`)
 
 - CLI argument parsing via Commander.js
 - Browser lifecycle management (headless/headed retry logic)
@@ -49,9 +49,10 @@ hand-labeled gold sites are archived in dembrandt-ml/data/archive/gold-import.
 
 ### Core Extraction Engine (`lib/extractors/`)
 
-**Main function**: `extractBranding(url, spinner, browser, options)` in `lib/extractors/index.js`
+**Main function**: `extractBranding(url, spinner, browser, options)` in `lib/extractors/index.ts`
 
-- Runs 13 parallel extraction tasks via `Promise.all`
+- Runs 17 parallel extraction tasks via `Promise.all`, each wrapped in
+  `guardExtractor` so one failure degrades that section instead of the run
 - `--stealth` enables navigator spoofing and human mouse simulation (opt-in)
 - SPA hydration: 8s wait + 4s stabilization (3x with `--slow`)
 
@@ -69,6 +70,10 @@ hand-labeled gold sites are archived in dembrandt-ml/data/archive/gold-import.
 - `extractBreakpoints()` — responsive breakpoints from CSS
 - `detectIconSystem()` — Font Awesome, Material Icons, SVG
 - `detectFrameworks()` — Tailwind, Bootstrap, MUI, Chakra, etc.
+- `extractBadgeStyles()` — badge/tag/chip variants
+- `extractGradients()` — gradient stops and directions
+- `extractMotion()` — durations, easings, named keyframes
+- `extractSiteName()` — brand name from the document
 
 **Color extraction:**
 - Filters WordPress presets (`--wp--preset`) automatically
@@ -77,16 +82,21 @@ hand-labeled gold sites are archived in dembrandt-ml/data/archive/gold-import.
 - Context scoring: logo=5, brand=5, primary=4, CTA=4, hero=3, button=3
 - Primary color fallback: most chromatic non-gray palette entry if semantic detection fails
 
-### Display Layer (`lib/display.js`)
+### Display Layer (`lib/formatters/terminal.ts`)
 
 - Tree-structured terminal output
 - Confidence indicators: ● green=high, orange=medium, gray=low
 - OSC 8 hyperlinks for terminal links
 
-### QA Test Suite (`test/qa.mjs`)
+### Other surfaces
 
-- Screenshot + color comparison against baseline
-- Sites in `test/sites.json`, uses `--slow` for 3x timeouts
+- `mcp-server.ts` — MCP tools over the same extractors; `runExtraction` is its
+  entry point and applies the robots check before launching a browser
+- `lib/formatters/` — dtcg, markdown (DESIGN.md), tailwind, html, brand-guide,
+  pdf, terminal
+- `docs/ci.md` — exit-code contract and `DEMBRANDT_ENFORCE_ROBOTS`
+- `lib/version.ts` — `SCHEMA_VERSION` and its changelog. A change that moves
+  values for an unchanged site belongs in that log even when no field is added
 
 ## Code Patterns
 
@@ -113,18 +123,21 @@ All extraction functions use `page.evaluate()` to run analysis in browser contex
   url, extractedAt,
   meta: { dembrandtVersion, stealth, locale, timezoneId, ... },
   logo, favicons,
-  colors: { semantic, palette, cssVariables },
+  colors: { semantic, palette, cssVariables, detected },
   typography: { styles, sources },
   spacing: { scaleType, commonValues },
   borderRadius: { values },
   borders: { widths, styles, colors },
-  shadows, components, breakpoints, iconSystem, frameworks
+  shadows, gradients, motion, components, breakpoints, iconSystem, frameworks,
+  logoInstances, manifest, siteName
 }
 ```
 
 ## Dependencies
 
-- `playwright` — browser automation
+- `playwright-core` — browser automation (browsers install separately)
+- `@modelcontextprotocol/sdk`, `zod` — MCP server; both must stay regular
+  dependencies, optional peers broke `npx` installs
 - `chalk` — terminal colors
 - `commander` — CLI parsing
 - `ora` — spinners
