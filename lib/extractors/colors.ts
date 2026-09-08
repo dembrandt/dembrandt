@@ -143,6 +143,15 @@ export async function extractColors(page) {
       return diff > 180 ? 360 - diff : diff;
     }
 
+    // "primary" qualified by a rendering role names a slot on a surface — the
+    // text on the primary button, a border — not the brand primary itself.
+    const ROLE_QUALIFIED_PRIMARY =
+      /(?:foreground|fg|text|ink|label|caption|border|outline|ring|divider|icon|placeholder|muted|hover|active|disabled)[-_ ]?primary|primary[-_ ]?(?:foreground|fg|text|ink|label|border|outline|ring|icon|content|hover|active|disabled)/;
+
+    function isRoleQualified(context) {
+      return ROLE_QUALIFIED_PRIMARY.test(context);
+    }
+
     function isValidColorValue(value) {
       if (!value) return false;
       if (value.includes("calc(") || value.includes("clamp(") || value.includes("var(")) {
@@ -361,7 +370,7 @@ export async function extractColors(page) {
         }
       });
 
-      if (context.includes("primary") || el.matches('[class*="primary"]')) {
+      if ((context.includes("primary") || el.matches('[class*="primary"]')) && !isRoleQualified(context)) {
         const candidate = bgColor !== "rgba(0, 0, 0, 0)" && bgColor !== "transparent" ? bgColor : textColor;
         if (colorAlpha(candidate) >= 0.7 && colorLightness(candidate) <= 0.95) semanticColors.primary = candidate;
       }
