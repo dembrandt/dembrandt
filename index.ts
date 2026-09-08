@@ -27,7 +27,7 @@ import { mergeResults } from "./lib/merger.js";
 import { writeFileSync, mkdirSync, readFileSync } from "fs";
 import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
-import { checkRobotsTxt, fetchRobotsRules, filterAllowedUrls, robotsVerdict, ROBOTS_AGENT } from "./lib/robots.js";
+import { checkAgainstRules, fetchRobotsRules, filterAllowedUrls, robotsVerdict, ROBOTS_AGENT, type RobotsRules } from "./lib/robots.js";
 import { EXIT, classifyError } from "./lib/exit-codes.js";
 import { activeFlags, pathSummary } from "./lib/run-summary.js";
 import { consumeCloudHint } from "./lib/cli-state.js";
@@ -36,6 +36,16 @@ import { guardWarnings, voiceNeedsOutputFile } from "./lib/cli-guards.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"));
+
+function sameOrigin(a: string, b: string): boolean {
+  try { return new URL(a).origin === new URL(b).origin; } catch { return false; }
+}
+
+/** robots.txt Sitemap: directives, but only for the origin they were read from. */
+function sitemapsFrom(rules: RobotsRules, targetUrl: string): string[] {
+  if (rules.status !== "ok" || !sameOrigin(rules.robotsUrl, targetUrl)) return [];
+  return rules.sitemaps;
+}
 
 /** A run that names itself can be allowed or refused by name in robots.txt. */
 function identifiesAsBot(userAgent: string | undefined): boolean {
@@ -138,9 +148,15 @@ program
     // Only the group matching the User-Agent we actually send applies to us.
     const robotsAgent = identifiesAsBot(opts.userAgent) ? ROBOTS_AGENT : "*";
 
+    // One fetch per origin for the whole run: the entry check, the sitemap
+    // directives and the crawl filter all read the same file.
+    let entryRobotsRules = await fetchRobotsRules(url, { agent: robotsAgent }).catch(
+      () => ({ status: "unavailable" }) as RobotsRules,
+    );
+
     let entryRobotsWarning = null;
     try {
-      const robots = await checkRobotsTxt(url, { agent: robotsAgent });
+      const robots = checkAgainstRules(url, entryRobotsRules);
       const verdict = robotsVerdict(robots, { enforce: enforceRobots });
 
       if (verdict.action === "refuse") {
@@ -286,9 +302,9 @@ program
             if (!opts.jsonOnly) spinner.start("Fetching sitemap...");
             const max = crawlN ? crawlN - 1 : 20;
             sitemapMax = max;
-            additionalUrls = await parseSitemap(result.url, max);
+            additionalUrls = await parseSitemap(result.url, max, sitemapsFrom(entryRobotsRules, result.url));
             if (additionalUrls.length === 0 && result.url !== url) {
-              additionalUrls = await parseSitemap(url, max);
+              additionalUrls = await parseSitemap(url, max, sitemapsFrom(entryRobotsRules, url));
             }
           } else if (isAutoCrawl) {
             additionalUrls = result._discoveredLinks || [];
@@ -297,7 +313,11 @@ program
           delete result._discoveredLinks;
 
           if (additionalUrls.length > 0) {
-            const robotsRules = await fetchRobotsRules(result.url, { agent: robotsAgent });
+            // A redirect can land on a different origin, whose robots.txt is a
+            // different file; reuse the entry rules only when the origin holds.
+            const robotsRules = sameOrigin(url, result.url)
+              ? entryRobotsRules
+              : await fetchRobotsRules(result.url, { agent: robotsAgent });
             const { allowed, disallowed } = filterAllowedUrls(additionalUrls, robotsRules);
             if (disallowed.length > 0) {
               if (!opts.jsonOnly) {

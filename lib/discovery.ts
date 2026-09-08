@@ -114,8 +114,11 @@ const FETCH_OPTS = {
  * Discover sitemap URLs by checking robots.txt first, then common paths.
  * Returns the first sitemap XML that responds successfully.
  */
-async function findSitemapUrls(origin) {
-  // 1. Check robots.txt for Sitemap: directives
+async function findSitemapUrls(origin, knownSitemaps: string[] = []) {
+  // 1. Sitemap: directives. The caller has usually already read robots.txt for
+  // the same origin, so re-reading it is a second request for one file.
+  if (knownSitemaps.length > 0) return knownSitemaps;
+
   try {
     const res = await fetch(`${origin}/robots.txt`, {
       ...FETCH_OPTS,
@@ -162,13 +165,14 @@ async function fetchSitemap(url) {
  *
  * @param {string} baseUrl - The starting URL (should be post-redirect)
  * @param {number} maxPages - Maximum number of URLs to return
+ * @param {string[]} knownSitemaps - Sitemap: directives already read from robots.txt
  * @returns {Promise<string[]>} List of URLs from sitemap (excluding homepage)
  */
-export async function parseSitemap(baseUrl, maxPages) {
+export async function parseSitemap(baseUrl, maxPages, knownSitemaps: string[] = []) {
   const base = new URL(baseUrl);
 
   // Find and fetch sitemap(s)
-  const candidates = await findSitemapUrls(base.origin);
+  const candidates = await findSitemapUrls(base.origin, knownSitemaps);
   let xml = '';
   for (const candidate of candidates) {
     xml = await fetchSitemap(candidate);

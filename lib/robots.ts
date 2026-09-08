@@ -17,7 +17,7 @@ export type RobotsResult =
 
 export type RobotsRules =
   | { status: "unavailable" }
-  | { status: "ok"; robotsUrl: string; rules: RobotsRule[] };
+  | { status: "ok"; robotsUrl: string; rules: RobotsRule[]; sitemaps: string[] };
 
 /**
  * Fetch and parse robots.txt for the target's origin once, so a multi-page
@@ -52,7 +52,7 @@ export async function fetchRobotsRules(
 
   const groups = parseRobots(body);
   const rules = matchGroup(groups, agent) || matchGroup(groups, "*") || [];
-  return { status: "ok", robotsUrl, rules };
+  return { status: "ok", robotsUrl, rules, sitemaps: parseSitemapDirectives(body) };
 }
 
 export type RobotsVerdict =
@@ -82,16 +82,20 @@ export function evaluatePath(rules: RobotsRule[], path: string): { allowed: bool
   return evaluate(rules, path);
 }
 
+/** Evaluate a target against rules already fetched for its origin. */
+export function checkAgainstRules(targetUrl: string, rules: RobotsRules): RobotsResult {
+  const u = new URL(targetUrl);
+  if (rules.status !== "ok") {
+    return { status: "unavailable", robotsUrl: `${u.protocol}//${u.host}/robots.txt` };
+  }
+  return { status: "ok", robotsUrl: rules.robotsUrl, ...evaluatePath(rules.rules, u.pathname || "/") };
+}
+
 export async function checkRobotsTxt(
   targetUrl: string,
   opts: { timeoutMs?: number; agent?: string } = {},
 ): Promise<RobotsResult> {
-  const u = new URL(targetUrl);
-  const rules = await fetchRobotsRules(targetUrl, opts);
-  if (rules.status === "unavailable") {
-    return { status: "unavailable", robotsUrl: `${u.protocol}//${u.host}/robots.txt` };
-  }
-  return { status: "ok", robotsUrl: rules.robotsUrl, ...evaluatePath(rules.rules, u.pathname || "/") };
+  return checkAgainstRules(targetUrl, await fetchRobotsRules(targetUrl, opts));
 }
 
 /**
@@ -151,6 +155,13 @@ function parseRobots(text: string): RobotsGroup[] {
     }
   }
   return groups;
+}
+
+/** `Sitemap:` directives are global, not scoped to a user-agent group. */
+function parseSitemapDirectives(body: string): string[] {
+  return [...body.matchAll(/^\s*sitemap:\s*(\S+)/gim)]
+    .map(m => m[1].trim())
+    .filter(u => /^https?:\/\//i.test(u));
 }
 
 function looksLikeHtml(body: string): boolean {
