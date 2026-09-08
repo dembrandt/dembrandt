@@ -12,6 +12,7 @@
  * `tailwind.config.js` emitter would be a second serialization of the same data
  * and is deliberately not written until someone asks for it.
  */
+import { shadowDepth, splitShadowLayers } from '../shadow-parse.js';
 import { convertColor, deltaE } from '../colors.js';
 import type {
   BorderRadius,
@@ -424,7 +425,7 @@ function buildShadows(result: TailwindThemeInput): ThemeEntry[] {
 
   const names = ['sm', 'md', 'lg', 'xl'];
   return [...values]
-    .sort((a, b) => blurOf(a) - blurOf(b))
+    .sort((a, b) => shadowDepth(a) - shadowDepth(b))
     .slice(0, names.length)
     .map((value, i) => ({ name: `--shadow-${names[i]}`, value }));
 }
@@ -530,30 +531,8 @@ function normalizeShadow(raw: string | null | undefined): string | null {
   const shadow = String(raw ?? '').trim();
   if (!shadow || shadow === 'none') return null;
 
-  const painted = splitLayers(shadow).filter(layer => !isTransparentLayer(layer));
+  const painted = splitShadowLayers(shadow).filter(layer => !isTransparentLayer(layer));
   return painted.length ? painted.join(', ') : null;
-}
-
-/** Split a comma-separated CSS list, ignoring commas inside colour functions. */
-function splitLayers(value: string): string[] {
-  const layers: string[] = [];
-  let depth = 0;
-  let current = '';
-
-  for (const char of value) {
-    if (char === '(') depth++;
-    else if (char === ')') depth--;
-
-    if (char === ',' && depth === 0) {
-      layers.push(current.trim());
-      current = '';
-      continue;
-    }
-    current += char;
-  }
-
-  if (current.trim()) layers.push(current.trim());
-  return layers;
 }
 
 /** True when a shadow layer's colour has zero alpha, in any colour notation. */
@@ -637,18 +616,6 @@ function normalizeTracking(value: string | number | null | undefined): string | 
   const length = normalizeLength(value);
   if (!length || parseFloat(length) === 0) return null;
   return length;
-}
-
-/**
- * Largest blur radius across a shadow's layers, used only to order them: a
- * multi-layer shadow reads as deep as its widest layer, not its first.
- */
-function blurOf(shadow: string): number {
-  const blurs = splitLayers(shadow).map(layer => {
-    const lengths = layer.replace(/[a-z]+\([^)]*\)/gi, '').match(/-?\d*\.?\d+px/g) ?? [];
-    return lengths.length >= 3 ? parseFloat(lengths[2]) : 0;
-  });
-  return blurs.length ? Math.max(...blurs) : 0;
 }
 
 function byNumericValue(a: string, b: string): number {

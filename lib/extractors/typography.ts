@@ -264,7 +264,7 @@ export async function extractTypography(page) {
         try {
           for (const rule of sheet.cssRules || []) {
             if (rule instanceof CSSFontFaceRule) {
-              const display = (rule.style as any).fontDisplay;
+              const display = rule.style.getPropertyValue('font-display');
               if (display && display !== 'auto') {
                 fontDisplay = display;
                 break;
@@ -276,6 +276,50 @@ export async function extractTypography(page) {
       }
     } catch (e) {}
     (sources as any).fontDisplay = fontDisplay;
+
+    // Computed font-size is resolved to px at the capture viewport, so a fluid
+    // ramp is invisible there. Collect the selectors that author one instead.
+    const fluidSelectors: string[] = [];
+    const staticSelectors: string[] = [];
+    // A fluid scale is normally declared once as a custom property and used as
+    // `font-size: var(--text-lg)`, so the literal ramp never appears in the rule
+    // that sets the size. Resolve one level of indirection off :root.
+    const rootStyle = getComputedStyle(document.documentElement);
+    const resolveVars = (value: string) => {
+      let out = value;
+      for (let pass = 0; pass < 2 && out.includes('var('); pass++) {
+        out = out.replace(/var\(\s*(--[^,)\s]+)[^)]*\)/g, (_, name) => rootStyle.getPropertyValue(name) || '');
+      }
+      return out;
+    };
+    const isFluidValue = (v: string) => {
+      const resolved = v.includes('var(') ? resolveVars(v) : v;
+      return /clamp\(/i.test(resolved) || /\d(vw|vh|vmin|vmax)\b/i.test(resolved);
+    };
+    const collectSizeRules = (rules: CSSRuleList | undefined) => {
+      for (const rule of rules || []) {
+        if (rule instanceof CSSStyleRule) {
+          const size = rule.style.fontSize;
+          if (rule.selectorText && size) {
+            (isFluidValue(size) ? fluidSelectors : staticSelectors).push(rule.selectorText);
+          }
+        }
+        // Style rules carry an empty cssRules list under CSS nesting, so recurse
+        // on length rather than presence or every rule looks like a group.
+        const nested = (rule as CSSGroupingRule).cssRules;
+        if (nested?.length) collectSizeRules(nested);
+      }
+    };
+    for (const sheet of document.styleSheets) {
+      try { collectSizeRules(sheet.cssRules); } catch (e) {}
+    }
+    const matchesAny = (el, selectors: string[]) => selectors.some((sel) => {
+      try { return el.matches(sel); } catch (e) { return false; }
+    });
+    // Selector evidence cannot say which declaration wins the cascade, so the
+    // claim is only made when every font-size reaching the element is fluid.
+    // Resolving a contested element needs measurement across two viewports.
+    const matchesFluid = (el) => matchesAny(el, fluidSelectors) && !matchesAny(el, staticSelectors);
 
     const els = document.querySelectorAll(`
       h1,h2,h3,h4,h5,h6,p,span,a,button,[role="button"],.btn,.button,
@@ -303,7 +347,7 @@ export async function extractTypography(page) {
       const textTransform = s.textTransform;
       const lineHeight = s.lineHeight;
 
-      const isFluid = s.fontSize.includes('clamp') || s.fontSize.includes('vw') || s.fontSize.includes('vh');
+      const isFluid = matchesFluid(el);
       const fontFeatures = s.fontFeatureSettings !== 'normal' ? s.fontFeatureSettings : null;
       if (fontFeatures) featureSettings.push(fontFeatures);
       if (s.fontVariationSettings && s.fontVariationSettings !== 'normal') {

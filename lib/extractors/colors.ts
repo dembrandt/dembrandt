@@ -354,13 +354,16 @@ export async function extractColors(page) {
       allColors.forEach((color) => {
         if (color && color !== "rgba(0, 0, 0, 0)" && color !== "transparent" && colorAlpha(color) >= 0.3) {
           const normalized = normalizeColor(color);
-          const existing = colorMap.get(normalized) || { original: color, count: 0, bgCount: 0, score: 0, sources: new Set(), statusCount: 0, nonStatusCount: 0, isToken: tokenHexes.has(normalized) };
+          const existing = colorMap.get(normalized) || { original: color, count: 0, bgCount: 0, bgArea: 0, score: 0, sources: new Set(), statusCount: 0, nonStatusCount: 0, isToken: tokenHexes.has(normalized) };
           // The opaque form represents the token; alpha variants of the same
           // normalized colour are usage, not identity.
           if (colorAlpha(color) > colorAlpha(existing.original)) existing.original = color;
           existing.count++;
           if (isStatus) existing.statusCount++; else existing.nonStatusCount++;
-          if (extractColorsFromValue(bgColor).includes(color)) existing.bgCount++;
+          if (extractColorsFromValue(bgColor).includes(color)) {
+            existing.bgCount++;
+            existing.bgArea += rect.width * rect.height;
+          }
           existing.score += score;
           if (score > 1) {
             const source = context.split(" ")[0].substring(0, 30);
@@ -603,8 +606,12 @@ export async function extractColors(page) {
     // frequency threshold and NO perceptual merge, so near-identical shades survive
     // as the design signal they are (six reds stay six reds). This is the high-recall
     // candidate set the ML pipeline consumes; the curated `palette` above remains the
-    // product default. `usageFrac` is an element-count proxy (true pixel area TBD).
+    // product default. `usageFrac` counts elements; `areaFrac` is the share of
+    // painted background area, so a hero fill is not outranked by small icons.
+    // Nested fills each count their own box, so this is a ranking proxy and not
+    // a fraction of the screen.
     const detectedTotal = Array.from(colorMap.values()).reduce((s, d) => s + (d.count || 0), 0) || 1;
+    const detectedArea = Array.from(colorMap.values()).reduce((s, d) => s + (d.bgArea || 0), 0);
     const detected = Array.from(colorMap.entries())
       .filter(([norm]) => typeof norm === 'string' && /^#[0-9a-f]{6}$/i.test(norm))
       .map(([normalized, data]) => ({
@@ -612,6 +619,7 @@ export async function extractColors(page) {
         normalized,
         count: data.count,
         usageFrac: data.count / detectedTotal,
+        areaFrac: detectedArea > 0 ? data.bgArea / detectedArea : 0,
         confidence: data.isToken
           ? (data.score > 5 ? 'high' : 'medium')
           : data.score > 20 ? 'high' : data.score > 5 ? 'medium' : 'low',

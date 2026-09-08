@@ -4,6 +4,7 @@
  * Spec: https://www.designtokens.org/TR/2025.10/format/
  */
 
+import { parseShadow } from '../shadow-parse.js';
 import { buildDembrandtProvenance, EXTENSION_KEY } from '../version.js';
 import type { BrandingResult } from '../types.js';
 
@@ -85,10 +86,19 @@ function hexToDtcgColor(color, alpha = 1) {
     }
   }
 
-  // Handle hex format
-  const cleanHex = color.replace('#', '');
+  // Handle hex format. Named colours reach here too, and a three-letter one
+  // expands into six valid-looking characters, so test for hex before shorthand.
+  let cleanHex = /^#?[0-9a-f]{3,8}$/i.test(color) ? color.replace('#', '') : '';
 
-  // Ensure it's 6 characters
+  if (cleanHex.length === 3) {
+    cleanHex = cleanHex.split('').map(c => c + c).join('');
+  }
+  // #rrggbbaa carries the alpha in its last pair.
+  if (cleanHex.length === 8) {
+    alpha = parseInt(cleanHex.substring(6, 8), 16) / 255;
+    cleanHex = cleanHex.substring(0, 6);
+  }
+
   if (cleanHex.length !== 6) {
     return {
       colorSpace: 'srgb',
@@ -395,33 +405,26 @@ function exportShadows(shadows) {
   }
 
   const shadowTokens: Record<string, any> = {};
+  const zero = { value: 0, unit: 'px' };
+  const dim = (v) => toDtcgDimension(v) || zero;
 
   shadows
     .filter(entry => entry.confidence !== 'low')
     .slice(0, 6)
     .forEach((entry, index) => {
-      const name = `shadow-${index + 1}`;
+      const layers = parseShadow(entry.shadow).map(layer => ({
+        offsetX: dim(layer.offsetX),
+        offsetY: dim(layer.offsetY),
+        blur: dim(layer.blur),
+        spread: dim(layer.spread),
+        color: hexToDtcgColor(layer.color ?? '#000000'),
+        ...(layer.inset ? { inset: true } : {}),
+      }));
+      if (!layers.length) return;
 
-      // Parse shadow string (simplified parsing)
-      // Format: offsetX offsetY blur spread color
-      const parts = entry.shadow.trim().split(/\s+/);
-
-      // Parse shadow (W3C format requires proper color object)
-      const shadowColor = parts[4] && parts[4].match(/^#[0-9a-fA-F]{6}$/)
-        ? parts[4]
-        : '#000000';
-
-      const zero = { value: 0, unit: 'px' };
-      const dim = (v) => toDtcgDimension(v) || zero;
-      shadowTokens[name] = {
+      shadowTokens[`shadow-${index + 1}`] = {
         $type: 'shadow',
-        $value: {
-          offsetX: dim(parts[0]),
-          offsetY: dim(parts[1]),
-          blur: dim(parts[2]),
-          spread: dim(parts[3]),
-          color: hexToDtcgColor(shadowColor)
-        }
+        $value: layers.length === 1 ? layers[0] : layers,
       };
     });
 

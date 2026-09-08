@@ -8,6 +8,7 @@ export interface PaletteEntry {
     oklch?: string | null;
     lch?: string | null;
     usageFrac?: number;
+    areaFrac?: number;
     isToken?: boolean;
 }
 export interface Extraction {

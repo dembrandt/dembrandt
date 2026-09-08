@@ -39,6 +39,37 @@
  *  (unversioned) — `voice` / `voiceSkipped` ship behind a hidden, opt-in flag
  *          and deliberately do not bump the contract. Bump when the flag is
  *          documented, not before.
+ *  1.12.0 — colors.detected entries gain areaFrac: the colour's share of painted
+ *          background area, alongside the existing element-count usageFrac, so
+ *          a hero fill is not outranked by sixty icons. BEHAVIOR, and it is a
+ *          shape change in the DTCG export: a shadow token's $value is an array
+ *          of layers when the shadow has more than one, where every earlier
+ *          release emitted a single object built by splitting the string on
+ *          whitespace — which read a computed shadow's leading colour as its
+ *          offsetX and folded multi-layer shadows into one. A consumer reading
+ *          $value.offsetX must branch on Array.isArray. Tailwind's shadow
+ *          ladder is also reordered by depth (blur + |offsetY| + spread)
+ *          instead of blur alone, so --shadow-sm/md/lg/xl can move for an
+ *          unchanged site. typography styles: isFluid is now read from the
+ *          authored declaration rather than the computed px, so clamp() and
+ *          calc(vw) ramps are detected at all.
+ *          Shipping alongside in the same release, and moving values for an
+ *          unchanged site: borderRadius pill values normalise from the computed
+ *          maximum length (serialised `3.35544e+07px`) to `9999px`, and two raw
+ *          spellings of one pill merge into a single entry with the counts
+ *          added; typography reports the family that actually rendered the text
+ *          rather than the first name in the stack, so a numerals-only face
+ *          moves from `family` to `fallbacks`; `code`/`pre`/`kbd`/`samp` are
+ *          extracted under a new `mono` context, which is a new value of an
+ *          existing string field, not a new field; colors.semantic.primary no
+ *          longer accepts a class where a rendering role qualifies "primary"
+ *          (foreground-primary, text-primary, border-primary). colors._raw, an
+ *          internal scratch set that had shipped in every extraction since at
+ *          least 0.17.0, is removed from the output and dropped at ingest.
+ *          DRIFT: none of these reach the drift engine — radius pills are
+ *          filtered by the ≤500px realism guard on both sides, typography is
+ *          compared on family/size/weight only, and the removed field was never
+ *          compared. No baseline needs re-approval.
  *  1.11.0 — meta gains robotsWarnings: human-readable notes on pages robots.txt
  *          disallowed, whether that was the entry URL or a page discovered
  *          during --crawl/--sitemap/MCP pages. The check stays advisory (it
@@ -125,7 +156,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.11.0';
+export const SCHEMA_VERSION = '1.12.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
