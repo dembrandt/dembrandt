@@ -1,3 +1,4 @@
+import { normalizeRadiusValues } from '../radius-normalize.js';
 export async function extractSpacing(page) {
   return await page.evaluate(() => {
     const spacings = new Map();
@@ -35,7 +36,7 @@ export async function extractSpacing(page) {
 }
 
 export async function extractBorderRadius(page) {
-  return await page.evaluate(() => {
+  const raw = await page.evaluate(() => {
     const radii = new Map();
 
     document.querySelectorAll("*").forEach((el) => {
@@ -80,6 +81,10 @@ export async function extractBorderRadius(page) {
 
     return { values };
   });
+
+  // Normalized in Node, not in the page: the merge is shared with the formatters
+  // and is worth unit-testing away from a browser.
+  return { values: normalizeRadiusValues(raw.values) };
 }
 
 export async function extractBorders(page) {

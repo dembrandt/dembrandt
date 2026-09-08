@@ -719,7 +719,7 @@ program
       // so the summary confirms what was asked for, not just what was extracted.
       const flagBits = activeFlags(opts);
       const flagsLine = flagBits.length ? chalk.dim(`   Flags: ${flagBits.join(' ')}`) : null;
-      const pathBits = pathSummary(paths, result.pages?.length ?? 0);
+      const pathBits = pathSummary(paths, result.pages?.length ?? 0, result.pages?.map((p) => p.url) ?? []);
       const pathsLine = pathBits.length ? chalk.dim(`   Paths: ${pathBits.join(' ')}`) : null;
 
       if (opts.jsonOnly) {

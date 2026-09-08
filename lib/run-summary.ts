@@ -58,13 +58,36 @@ export function activeFlags(opts: RunOpts = {}): string[] {
 }
 
 /**
- * Explicit paths and/or the merged-page count. Explicit paths are positional
- * (not flags) so they would otherwise be invisible; --crawl/--sitemap have no
- * explicit paths but still merge pages, reported by the count alone.
+ * Pathnames of the pages a crawl actually took, capped so a 20-page sitemap run
+ * stays one readable line. Unparseable URLs are kept verbatim rather than
+ * dropped, so the list always accounts for every page.
  */
-export function pathSummary(paths: string[] | undefined, mergedPages = 0): string[] {
+export function formatPageList(urls: (string | undefined)[] = [], max = 6): string {
+  const paths = urls
+    .filter((u): u is string => !!u)
+    .map((u) => {
+      try { return new URL(u).pathname || '/'; } catch { return u; }
+    });
+
+  if (paths.length <= max) return paths.join(', ');
+  return `${paths.slice(0, max).join(', ')}, +${paths.length - max} more`;
+}
+
+/**
+ * Explicit paths and/or the merged pages. Explicit paths are positional (not
+ * flags) so they would otherwise be invisible; --crawl/--sitemap have none, and
+ * a bare count cannot be checked against what the run should have picked.
+ */
+export function pathSummary(
+  paths: string[] | undefined,
+  mergedPages = 0,
+  crawledUrls: (string | undefined)[] = [],
+): string[] {
   const bits: string[] = [];
   if (paths && paths.length) bits.push(...paths);
-  if (mergedPages > 1) bits.push(`(${mergedPages} pages merged)`);
+  if (mergedPages > 1) {
+    const listed = formatPageList(crawledUrls);
+    bits.push(listed ? `(${mergedPages} pages merged: ${listed})` : `(${mergedPages} pages merged)`);
+  }
   return bits;
 }
