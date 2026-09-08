@@ -64,11 +64,13 @@ jobs:
             - Updated CLI version references in skill files
 
             **⚠ Manual check required before merging**
-            This automation only updates version numbers. If this release added or changed CLI flags, update `skills/extract-design/SKILL.md` manually:
-            - Flags reference table
-            - Anti-Bot section if behavior changed
+            This automation only updates version numbers. Read the release notes above, then update `skills/extract-design/SKILL.md` by hand if the release changed any of:
+            - CLI flags, or an environment variable that changes behaviour
+            - The JSON output shape: new keys, renamed keys, or values that moved
+            - MCP tools or their parameters
+            - Anti-bot behaviour
 
-            See full checklist: [dembrandt/CLAUDE.md](https://github.com/dembrandt/dembrandt/blob/main/CLAUDE.md)
+            A release with no new flags can still need every one of these.
           labels: automated
 
   sync-next:
@@ -114,12 +116,12 @@ jobs:
             Updates `dembrandt` npm dependency to latest release (package.json + package-lock.json) and bumps `app/layout.tsx` schema.org `softwareVersion`.
 
             **⚠ Manual check required before merging**
-            This automation bumps the npm version in `package.json` and the schema.org `softwareVersion`. If this release added or changed CLI flags, update these manually before merging:
+            This automation bumps the npm version in `package.json` and the schema.org `softwareVersion`. Read the release notes above: if the release changed CLI flags, an environment variable, or the JSON output shape, these need updating by hand.
             - `app/getting-started/page.tsx` — flags list
             - `app/blackpaper/page.tsx` — flags list
             - `app/page.tsx` — landing page flags (`new: true` for new ones)
-            - `lib/app/extract-types.ts` — `ExtractionMeta` if JSON output shape changed
+            - Consumers of `dembrandt/types` — if the output shape changed. Grep for the type you are reading; there is no single types file
             - `app/api/extractions/route.ts` — if field access needs updating
 
-            See full checklist: [dembrandt/CLAUDE.md](https://github.com/dembrandt/dembrandt/blob/main/CLAUDE.md)
+            A release with no new flags can still need every one of these.
           labels: automated
