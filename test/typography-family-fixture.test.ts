@@ -14,6 +14,10 @@ const FIXTURE =
   // A numerals-only face, declared the way tabular-figure fonts are.
   `@font-face { font-family: 'NumeralsOnly'; src: url(data:font/woff2;base64,AA) format('woff2'); unicode-range: U+30-39; }` +
   `@font-face { font-family: 'BrandSans'; src: url(data:font/woff2;base64,AA) format('woff2'); }` +
+  // Split across subsets the way a font loader emits it: one face has no Latin,
+  // and the family still renders letters through the other.
+  `@font-face { font-family: 'BrandMono'; src: url(data:font/woff2;base64,AA) format('woff2'); unicode-range: U+0460-052F; }` +
+  `@font-face { font-family: 'BrandMono'; src: url(data:font/woff2;base64,AA) format('woff2'); unicode-range: U+0000-00FF; }` +
   `body { font-family: 'NumeralsOnly', 'BrandSans', sans-serif; }` +
   `code, pre { font-family: 'BrandMono', monospace; font-size: 14px; }` +
   `.brand-primary { background: #00dc82; color: #fff; }` +
@@ -69,6 +73,12 @@ test('the family that was skipped is still listed as a fallback, not lost', asyn
   const sans = styles.find((s) => s.family === 'BrandSans');
   assert.ok(sans);
   assert.ok(sans.fallbacks?.includes('NumeralsOnly'));
+});
+
+test('a family is glyphless only when none of its subsets covers letters', async (t) => {
+  if (browserUnavailable(t)) return;
+  const styles = (await extractTypography(page!)).styles as TypographyStyle[];
+  assert.ok(styles.some((s) => s.family === 'BrandMono'), 'a subsetted family must not be skipped');
 });
 
 test('a mono face used only in code blocks is extracted, under its own context', async (t) => {

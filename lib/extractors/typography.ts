@@ -143,7 +143,10 @@ export function filterFontUrls(urls: string[]): string[] {
 
 export async function extractTypography(page) {
   const data = await page.evaluate(() => {
-    const glyphlessFamilies = new Set<string>();
+    // A family is split across faces by subset (latin, cyrillic, greek), so it
+    // renders letters if ANY of its faces covers A-Z, not if every one does.
+    const rangedFamilies = new Set<string>();
+    const latinFamilies = new Set<string>();
     const coversLatinLetters = (range: string) =>
       range.split(',').some((part) => {
         const m = /^\s*u\+([0-9a-f]+)(?:-([0-9a-f]+))?/i.exec(part.trim());
@@ -223,6 +226,7 @@ export async function extractTypography(page) {
               }
               const family = (rule.style.getPropertyValue('font-family') || '').replace(/['"]/g, '').trim();
               if (!family) continue;
+              const familyKey = family.toLowerCase();
               const isThirdParty = thirdPartyHosts.some(h => src.includes(h));
               const isSameOrigin = src.includes(pageHost) || src.startsWith('/') || src.startsWith('./') || (!src.includes('http') && src.includes('url('));
               if (!isThirdParty && (isSameOrigin || src.includes('url(')) && !sources.customFonts.includes(family)) {
@@ -232,9 +236,14 @@ export async function extractTypography(page) {
               // way) renders no letters, so the browser falls through to the next
               // family for text. Such a family must not be reported as the family.
               const range = rule.style.getPropertyValue('unicode-range');
-              if (range && !coversLatinLetters(range)) glyphlessFamilies.add(family.toLowerCase());
+              if (range) {
+                rangedFamilies.add(familyKey);
+                if (coversLatinLetters(range)) latinFamilies.add(familyKey);
+              } else {
+                latinFamilies.add(familyKey);
+              }
 
-              const familyLower = family.toLowerCase();
+              const familyLower = familyKey;
               if (
                 familyLower.includes('variable') ||
                 familyLower.includes(' vf') ||
@@ -281,7 +290,11 @@ export async function extractTypography(page) {
       const size = parseFloat(s.fontSize);
       const weight = parseInt(s.fontWeight) || 400;
       const fontFamilies = s.fontFamily.split(",").map(f => f.replace(/['"]/g, "").trim());
-      const rendered = fontFamilies.findIndex(f => !glyphlessFamilies.has(f.toLowerCase()));
+      const glyphless = (f: string) => {
+        const key = f.toLowerCase();
+        return rangedFamilies.has(key) && !latinFamilies.has(key);
+      };
+      const rendered = fontFamilies.findIndex(f => !glyphless(f));
       const familyIndex = rendered === -1 ? 0 : rendered;
       const family = fontFamilies[familyIndex];
       const fallbacks = fontFamilies.filter((_, i) => i !== familyIndex)
