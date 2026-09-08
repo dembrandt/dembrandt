@@ -2,7 +2,7 @@
 
 ## [0.32.0] - 2026-09-08
 
-Four values the extractor was reading wrong.
+Token accuracy fixes.
 
 ### Fixed
 - Shadows were parsed by splitting the string on whitespace, so a computed shadow's leading colour was read as its `offsetX` and every multi-layer shadow was folded into one. A shared parser now reads both colour positions, `inset`, and omitted blur/spread (#200)
