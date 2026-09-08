@@ -37,11 +37,7 @@ import { guardWarnings, voiceNeedsOutputFile } from "./lib/cli-guards.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"));
 
-/**
- * A run that names itself in its User-Agent is addressable by the site: it can
- * be allowed or refused by name in robots.txt, and blocked cleanly at the edge.
- * Used to pick which robots.txt group actually governs the run.
- */
+/** A run that names itself can be allowed or refused by name in robots.txt. */
 function identifiesAsBot(userAgent: string | undefined): boolean {
   return !!userAgent && userAgent.toLowerCase().includes("dembrandt");
 }

@@ -1,8 +1,4 @@
-/**
- * The token a site would use to address us in robots.txt. Only the group that
- * matches the User-Agent we actually send applies to us, so callers that browse
- * as a plain browser must match "*" instead of this name.
- */
+/** The name a site addresses us by. Only applies when we send it (see `agent`). */
 export const ROBOTS_AGENT = "Dembrandt";
 
 interface RobotsRule {
@@ -45,9 +41,8 @@ export async function fetchRobotsRules(
     });
     if (!res.ok) return { status: "unavailable" };
     body = await res.text();
-    // A bot wall or SPA fallback answers 200 with HTML. Parsed as robots.txt it
-    // yields no rules, which would read as "nothing is disallowed" — the exact
-    // inversion of what the site is saying.
+    // A bot wall answers 200 with HTML, which parses to no rules and would read
+    // as "nothing disallowed" — the inversion of what the site is saying.
     if (looksLikeHtml(body)) return { status: "unavailable" };
   } catch {
     return { status: "unavailable" };

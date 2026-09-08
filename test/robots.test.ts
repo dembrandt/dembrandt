@@ -99,8 +99,6 @@ test('filterAllowedUrls: a malformed URL is passed through rather than dropped',
 });
 
 test('fetchRobotsRules: an HTML body is treated as unavailable, not as an empty rule set', async () => {
-  // Bot walls answer 200 with HTML; parsed as robots.txt it would read as
-  // "nothing disallowed" — the inversion of what the site is saying.
   const body = '<!DOCTYPE html>\n<html><body>Access denied</body></html>';
   const result = await withMockFetch(body, 200, () => fetchRobotsRules('https://example.com/'));
   assert.equal(result.status, 'unavailable');
