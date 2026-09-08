@@ -27,7 +27,7 @@ import { mergeResults } from "./lib/merger.js";
 import { writeFileSync, mkdirSync, readFileSync } from "fs";
 import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
-import { checkRobotsTxt, fetchRobotsRules, filterAllowedUrls, ROBOTS_AGENT } from "./lib/robots.js";
+import { checkRobotsTxt, fetchRobotsRules, filterAllowedUrls, robotsVerdict, ROBOTS_AGENT } from "./lib/robots.js";
 import { EXIT, classifyError } from "./lib/exit-codes.js";
 import { activeFlags, pathSummary } from "./lib/run-summary.js";
 import { consumeCloudHint } from "./lib/cli-state.js";
@@ -141,25 +141,17 @@ program
     let entryRobotsWarning = null;
     try {
       const robots = await checkRobotsTxt(url, { agent: robotsAgent });
-      const refused =
-        (robots.status === "ok" && robots.allowed === false) ||
-        (enforceRobots && robots.status === "unavailable");
+      const verdict = robotsVerdict(robots, { enforce: enforceRobots });
 
-      if (enforceRobots && refused) {
-        const why =
-          robots.status === "ok"
-            ? `robots.txt disallows this path (rule: "${robots.rule}")`
-            : "robots.txt could not be read";
-        spinner.fail(`${why}. Skipping ${url} (DEMBRANDT_ENFORCE_ROBOTS=1).`);
+      if (verdict.action === "refuse") {
+        spinner.fail(`${verdict.reason}. Skipping ${url} (DEMBRANDT_ENFORCE_ROBOTS=1).`);
         process.exit(EXIT.ROBOTS_DENIED);
       }
 
-      if (robots.status === "ok" && robots.allowed === false) {
-        entryRobotsWarning = `robots.txt disallows ${url} (rule: "${robots.rule}")`;
+      if (verdict.action === "warn") {
+        entryRobotsWarning = `robots.txt disallows ${url} (rule: "${verdict.rule}")`;
         spinner.warn(
-          chalk.hex("#FFB86C")(
-            `robots.txt disallows this path (rule: "${robots.rule}"). Proceeding anyway — respect the site's terms.`
-          )
+          chalk.hex("#FFB86C")(`${verdict.reason}. Proceeding anyway — respect the site's terms.`)
         );
         spinner.start("Starting extraction...");
       }

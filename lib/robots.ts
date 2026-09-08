@@ -55,6 +55,29 @@ export async function fetchRobotsRules(
   return { status: "ok", robotsUrl, rules };
 }
 
+export type RobotsVerdict =
+  | { action: 'proceed' }
+  | { action: 'warn'; reason: string; rule: string | null }
+  | { action: 'refuse'; reason: string };
+
+/**
+ * What a run should do with a robots result. Enforcing runs refuse a disallow
+ * and an unreadable robots.txt; a user-driven run is warned and proceeds,
+ * because it is the user, not the tool, who knows what they may fetch.
+ */
+export function robotsVerdict(
+  robots: RobotsResult,
+  { enforce }: { enforce: boolean },
+): RobotsVerdict {
+  if (robots.status === 'unavailable') {
+    return enforce ? { action: 'refuse', reason: 'robots.txt could not be read' } : { action: 'proceed' };
+  }
+  if (robots.allowed) return { action: 'proceed' };
+
+  const reason = `robots.txt disallows this path (rule: "${robots.rule}")`;
+  return enforce ? { action: 'refuse', reason } : { action: 'warn', reason, rule: robots.rule };
+}
+
 export function evaluatePath(rules: RobotsRule[], path: string): { allowed: boolean; rule: string | null } {
   return evaluate(rules, path);
 }
