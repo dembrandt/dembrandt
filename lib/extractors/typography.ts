@@ -255,25 +255,32 @@ export async function extractTypography(page) {
     // Computed font-size is resolved to px at the capture viewport, so a fluid
     // ramp is invisible there. Collect the selectors that author one instead.
     const fluidSelectors: string[] = [];
+    const staticSelectors: string[] = [];
     const isFluidValue = (v: string) => /clamp\(/i.test(v) || /\d(vw|vh|vmin|vmax)\b/i.test(v);
-    const collectFluid = (rules: CSSRuleList | undefined) => {
+    const collectSizeRules = (rules: CSSRuleList | undefined) => {
       for (const rule of rules || []) {
         if (rule instanceof CSSStyleRule) {
           const size = rule.style.fontSize;
-          if (rule.selectorText && size && isFluidValue(size)) fluidSelectors.push(rule.selectorText);
+          if (rule.selectorText && size) {
+            (isFluidValue(size) ? fluidSelectors : staticSelectors).push(rule.selectorText);
+          }
         }
         // Style rules carry an empty cssRules list under CSS nesting, so recurse
         // on length rather than presence or every rule looks like a group.
         const nested = (rule as CSSGroupingRule).cssRules;
-        if (nested?.length) collectFluid(nested);
+        if (nested?.length) collectSizeRules(nested);
       }
     };
     for (const sheet of document.styleSheets) {
-      try { collectFluid(sheet.cssRules); } catch (e) {}
+      try { collectSizeRules(sheet.cssRules); } catch (e) {}
     }
-    const matchesFluid = (el) => fluidSelectors.some((sel) => {
+    const matchesAny = (el, selectors: string[]) => selectors.some((sel) => {
       try { return el.matches(sel); } catch (e) { return false; }
     });
+    // Selector evidence cannot say which declaration wins the cascade, so the
+    // claim is only made when every font-size reaching the element is fluid.
+    // Resolving a contested element needs measurement across two viewports.
+    const matchesFluid = (el) => matchesAny(el, fluidSelectors) && !matchesAny(el, staticSelectors);
 
     const els = document.querySelectorAll(`
       h1,h2,h3,h4,h5,h6,p,span,a,button,[role="button"],.btn,.button,

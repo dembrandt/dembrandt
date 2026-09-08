@@ -21,11 +21,15 @@ const FIXTURE =
   `h1 { font-size: clamp(2rem, 5vw, 4rem); }` +
   `p.lead { font-size: calc(1rem + 0.5vw); }` +
   `p.fixed { font-size: 16px; }` +
+  // Contested: a fluid rule and a static one both reach this element.
+  `h2 { font-size: clamp(1.5rem, 3vw, 2rem); }` +
+  `h2.pinned { font-size: 20px; }` +
   `</style></head>` +
   `<body style="margin:0"><div class="hero" style="width:1200px;height:700px;background:${SURFACE}">` +
   `<h1>Fluid heading</h1>` +
   `<p class="lead">Lead copy that scales with the viewport width.</p>` +
   `<p class="fixed">Body copy pinned to sixteen pixels on every viewport.</p>` +
+  `<h2 class="pinned">Subheading a later rule pins to twenty pixels.</h2>` +
   `${glyphs}</div></body></html>`;
 
 let browser: Browser | null = null;
@@ -56,6 +60,16 @@ test('clamp() and viewport-relative font sizes are flagged fluid', async (t) => 
   const styles = (await extractTypography(page!)).styles as TypographyStyle[];
   const fluid = styles.filter((s) => s.isFluid);
   assert.equal(fluid.length, 2, `expected the clamp and calc(vw) styles, got ${JSON.stringify(styles)}`);
+});
+
+test('an element a static rule also reaches is not claimed fluid', async (t) => {
+  // Selector evidence cannot resolve the cascade, so a contested element stays
+  // unmarked rather than asserting a ramp that never renders.
+  if (browserUnavailable(t)) return;
+  const styles = (await extractTypography(page!)).styles as TypographyStyle[];
+  const pinned = styles.find((s) => s.size.startsWith('20px'));
+  assert.ok(pinned, `expected the 20px style to be extracted, got ${JSON.stringify(styles.map((s) => s.size))}`);
+  assert.ok(!pinned.isFluid);
 });
 
 test('a size authored in px is not flagged fluid', async (t) => {
