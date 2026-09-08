@@ -35,6 +35,25 @@ test('stripTransient removes internal crawl fields and does not mutate input', (
   assert.deepStrictEqual((input as any)._discoveredLinks, [1]);
 });
 
+test('stripTransient drops the extractor scratch set nested under colors', () => {
+  // Every snapshot saved before the producer stripped it carries colors._raw,
+  // so ingest has to drop it too or stored extractions keep the leak forever.
+  const input: any = {
+    ...base,
+    colors: { semantic: {}, palette: [{ normalized: '#fff' }], cssVariables: [], _raw: [1, 2, 3] },
+  };
+  const out: any = stripTransient(input);
+  assert.strictEqual('_raw' in out.colors, false);
+  assert.deepStrictEqual(out.colors.palette, [{ normalized: '#fff' }]);
+  // input untouched
+  assert.deepStrictEqual(input.colors._raw, [1, 2, 3]);
+});
+
+test('stripTransient leaves rawColors alone: it is published output, not scratch', () => {
+  const input: any = { ...base, colors: { semantic: {}, palette: [], cssVariables: [], rawColors: [1] } };
+  assert.deepStrictEqual(stripTransient(input).colors.rawColors, [1]);
+});
+
 test('normalizeExtraction canonicalizes loose unions for diffing', () => {
   const out: any = normalizeExtraction({ ...base, _pageResults: [9] } as any);
   assert.strictEqual(out.typography.styles[0].weight, 700);        // string -> number
