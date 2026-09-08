@@ -524,7 +524,7 @@ program
           const pdfFilename = `${pdfDomain}-brand-guide-${pdfDate}-${pdfTime}.pdf`;
           const pdfPath = join(pdfDir, pdfFilename);
           spinner.start("Generating PDF brand guide...");
-          await generatePDF(result, pdfPath, browser);
+          await generatePDF(result, pdfPath, browser, { version });
           spinner.stop();
           savedNotices.push(
             chalk.dim(
@@ -548,7 +548,7 @@ program
           const mdDir = join(process.cwd(), "output", mdDomain);
           mkdirSync(mdDir, { recursive: true });
           const mdPath = join(mdDir, "DESIGN.md");
-          writeFileSync(mdPath, generateDesignMd(result));
+          writeFileSync(mdPath, generateDesignMd(result, { version }));
           savedNotices.push(
             chalk.dim(
               `💾 DESIGN.md saved (--design-md): ${color.info(
@@ -576,7 +576,7 @@ program
             mkdirSync(twDir, { recursive: true });
             twPath = join(twDir, "theme.css");
           }
-          writeFileSync(twPath, generateTailwindTheme(result));
+          writeFileSync(twPath, generateTailwindTheme(result, { version }));
           const twLabel =
             typeof opts.tailwind === "string" ? opts.tailwind : `output/${twDomain}/theme.css`;
           savedNotices.push(

@@ -167,3 +167,22 @@ test('component sections carry a Copy all payload built from every entry, not ju
   const copy = html.match(/data-copy="([^"]*)"/g) ?? [];
   assert.ok(copy.some((c) => c.includes('#000000') && c.includes('#000014')), 'copy payload must span past the 12 rendered chips');
 });
+
+test('the report stamps the extracting version, falling back to the renderer', () => {
+  const extracted = generateHtmlReport(
+    fixture({ meta: { dembrandtVersion: '0.0.1' } }),
+    { version: '1.2.3' },
+  );
+  assert.match(extracted, /<meta name="generator" content="dembrandt 0\.0\.1">/);
+  assert.doesNotMatch(extracted, /1\.2\.3/);
+
+  const rendered = generateHtmlReport(fixture({ meta: {} }), { version: '1.2.3' });
+  assert.match(rendered, /<meta name="generator" content="dembrandt 1\.2\.3">/);
+
+  // MCP renders stored extractions with no version option at all.
+  assert.match(
+    generateHtmlReport(fixture({ meta: { dembrandtVersion: '0.0.1' } })),
+    /<meta name="generator" content="dembrandt 0\.0\.1">/,
+  );
+  assert.match(generateHtmlReport(fixture({ meta: {} })), /content="dembrandt">/);
+});
