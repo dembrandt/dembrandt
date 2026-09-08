@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.32.0] - 2026-09-08
+
+Four values the extractor was reading wrong.
+
+### Fixed
+- Shadows were parsed by splitting the string on whitespace, so a computed shadow's leading colour was read as its `offsetX` and every multi-layer shadow was folded into one. A shared parser now reads both colour positions, `inset`, and omitted blur/spread (#200)
+- Pill radii reached every output as `3.35544e+07px` and outranked the real radius scale. Normalised to `9999px`, with the counts merged when two spellings collapse (#204)
+- `isFluid` tested the computed font size, already resolved to px at the capture viewport, so `clamp()` and viewport-relative ramps were never detected. Read from the authored declaration, including one level of `var()` indirection, which is how a fluid scale is normally written (#200, #205)
+- Colour dominance counted elements, so many small glyphs outranked a hero fill. Painted background area is tracked alongside the count and exposed as `areaFrac` (#200)
+- Typography reported the first family in the stack, which on a site with a numerals-only face is not the family that rendered the text. The first family whose `@font-face` covers Latin letters is reported instead; the skipped one stays in `fallbacks` (#205)
+- A class where a rendering role qualifies "primary" (`foreground-primary`, `text-primary`) could claim `colors.semantic.primary`, last write winning (#205)
+- The robots.txt check matched the `Dembrandt` group while the browser sent a plain Chrome User-Agent, so a site could allow or disallow by name with no effect. Every refusal also read as permission: an unreachable file was fail-open, and a bot wall answering 200 with HTML parsed into zero rules (#202)
+- `colors._raw`, an internal scratch set, shipped in every extraction. Removed from the output and dropped at ingest, so stored snapshots stop carrying it (#203)
+- Version stamps reported the renderer rather than the release that extracted, which is the release a value came from (#199)
+- The compiled test suite was published inside the npm package: 172 files and 1.5 MB of a 3.4 MB install (#207)
+
+### Added
+- `code`, `pre`, `kbd` and `samp` are extracted under a `mono` context, so a mono face used only in code blocks is no longer invisible (#205)
+- `DEMBRANDT_ENFORCE_ROBOTS=1` makes a disallow, or an unreadable robots.txt, skip the target with exit `4`. For scheduled jobs and server-side use, where nobody is deciding what may be fetched. The default stays advisory (#202)
+- A crawl names the pages it took instead of reporting a count (#204)
+
+### Changed
+- robots.txt is read once per origin instead of up to four times per `--sitemap` run (#202)
+- The Tailwind shadow ladder orders by depth (blur, offset, spread) rather than blur alone, so `--shadow-sm/md/lg/xl` can move for an unchanged site (#200)
+- A DTCG shadow token's `$value` is an array when the shadow has more than one layer. A consumer reading `$value.offsetX` must branch on `Array.isArray` (#200)
+- Schema 1.12.0. Measured churn against 0.31.1 is 7 and 6 against a threshold of 10 on two reference sites, the only difference being the added `mono` context, so no baseline needs re-approval
+
 ## [0.31.1] - 2026-09-02
 
 ### Fixed
