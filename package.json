@@ -82,7 +82,8 @@
     }
   },
   "files": [
-    "dist/"
+    "dist/",
+    "!dist/test/"
   ],
   "scripts": {
     "start": "node dist/index.js",
