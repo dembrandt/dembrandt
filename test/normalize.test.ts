@@ -36,8 +36,7 @@ test('stripTransient removes internal crawl fields and does not mutate input', (
 });
 
 test('stripTransient drops the extractor scratch set nested under colors', () => {
-  // Every snapshot saved before the producer stripped it carries colors._raw,
-  // so ingest has to drop it too or stored extractions keep the leak forever.
+  // Snapshots saved before the producer stripped it still carry colors._raw.
   const input: any = {
     ...base,
     colors: { semantic: {}, palette: [{ normalized: '#fff' }], cssVariables: [], _raw: [1, 2, 3] },

@@ -16,10 +16,7 @@ const TRANSIENT_KEYS = ['_discoveredLinks', '_extractedUrls', '_pageResults'] as
 /**
  * Remove internal crawl/merge fields that must never be persisted, even if a raw
  * crawl object is fed in. Returns a shallow copy; the input is untouched.
- *
- * `colors._raw` is the same category one level down: the extractor's scratch set,
- * published as `colors.rawColors` only under --raw-colors. Every snapshot saved
- * before it was stripped at the producer still carries it, so ingest drops it too.
+ * `colors._raw` is the same category one level down.
  */
 export function stripTransient<T extends BrandingResult>(result: T): T {
   const clean = { ...result } as T & Record<string, unknown>;

@@ -62,10 +62,7 @@ export interface Colors {
   cssVariables: Record<string, string | CssVariable>;
   /** Pre-filter colour set, published only under --raw-colors. */
   rawColors?: PaletteColor[];
-  /**
-   * Internal scratch set behind `rawColors`. Stripped at the producer and again
-   * at ingest; declared only so both strips are typed. Never persisted.
-   */
+  /** Internal scratch set behind `rawColors`. Never persisted. */
   _raw?: PaletteColor[];
 }
 

@@ -1495,9 +1495,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
     if (options.includeRawColors) {
       result.colors.rawColors = colors._raw || [];
     }
-    // `_raw` is the extractor's own scratch set, published as `rawColors` only
-    // when asked for. Stripping it here rather than in the CLI keeps every
-    // consumer — MCP, library, saved JSON — on the same result shape.
+    // Internal scratch set; `rawColors` above is its published form.
     delete (result.colors as { _raw?: unknown })._raw;
 
     if (options.discoverLinks) {
