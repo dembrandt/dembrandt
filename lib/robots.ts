@@ -1,4 +1,5 @@
-const UA = "Dembrandt";
+/** The name a site addresses us by. Only applies when we send it (see `agent`). */
+export const ROBOTS_AGENT = "Dembrandt";
 
 interface RobotsRule {
   type: "allow" | "disallow";
@@ -16,7 +17,7 @@ export type RobotsResult =
 
 export type RobotsRules =
   | { status: "unavailable" }
-  | { status: "ok"; robotsUrl: string; rules: RobotsRule[] };
+  | { status: "ok"; robotsUrl: string; rules: RobotsRule[]; sitemaps: string[] };
 
 /**
  * Fetch and parse robots.txt for the target's origin once, so a multi-page
@@ -24,7 +25,7 @@ export type RobotsRules =
  */
 export async function fetchRobotsRules(
   targetUrl: string,
-  { timeoutMs = 5000 }: { timeoutMs?: number } = {},
+  { timeoutMs = 5000, agent = "*" }: { timeoutMs?: number; agent?: string } = {},
 ): Promise<RobotsRules> {
   const u = new URL(targetUrl);
   const robotsUrl = `${u.protocol}//${u.host}/robots.txt`;
@@ -36,10 +37,13 @@ export async function fetchRobotsRules(
   try {
     const res = await fetch(robotsUrl, {
       signal: controller.signal,
-      headers: { "User-Agent": UA },
+      headers: { "User-Agent": ROBOTS_AGENT },
     });
     if (!res.ok) return { status: "unavailable" };
     body = await res.text();
+    // A bot wall answers 200 with HTML, which parses to no rules and would read
+    // as "nothing disallowed" — the inversion of what the site is saying.
+    if (looksLikeHtml(body)) return { status: "unavailable" };
   } catch {
     return { status: "unavailable" };
   } finally {
@@ -47,24 +51,51 @@ export async function fetchRobotsRules(
   }
 
   const groups = parseRobots(body);
-  const rules = matchGroup(groups, UA) || matchGroup(groups, "*") || [];
-  return { status: "ok", robotsUrl, rules };
+  const rules = matchGroup(groups, agent) || matchGroup(groups, "*") || [];
+  return { status: "ok", robotsUrl, rules, sitemaps: parseSitemapDirectives(body) };
+}
+
+export type RobotsVerdict =
+  | { action: 'proceed' }
+  | { action: 'warn'; reason: string; rule: string | null }
+  | { action: 'refuse'; reason: string };
+
+/**
+ * What a run should do with a robots result. Enforcing runs refuse a disallow
+ * and an unreadable robots.txt; a user-driven run is warned and proceeds,
+ * because it is the user, not the tool, who knows what they may fetch.
+ */
+export function robotsVerdict(
+  robots: RobotsResult,
+  { enforce }: { enforce: boolean },
+): RobotsVerdict {
+  if (robots.status === 'unavailable') {
+    return enforce ? { action: 'refuse', reason: 'robots.txt could not be read' } : { action: 'proceed' };
+  }
+  if (robots.allowed) return { action: 'proceed' };
+
+  const reason = `robots.txt disallows this path (rule: "${robots.rule}")`;
+  return enforce ? { action: 'refuse', reason } : { action: 'warn', reason, rule: robots.rule };
 }
 
 export function evaluatePath(rules: RobotsRule[], path: string): { allowed: boolean; rule: string | null } {
   return evaluate(rules, path);
 }
 
-export async function checkRobotsTxt(
-  targetUrl: string,
-  opts: { timeoutMs?: number } = {},
-): Promise<RobotsResult> {
+/** Evaluate a target against rules already fetched for its origin. */
+export function checkAgainstRules(targetUrl: string, rules: RobotsRules): RobotsResult {
   const u = new URL(targetUrl);
-  const rules = await fetchRobotsRules(targetUrl, opts);
-  if (rules.status === "unavailable") {
+  if (rules.status !== "ok") {
     return { status: "unavailable", robotsUrl: `${u.protocol}//${u.host}/robots.txt` };
   }
   return { status: "ok", robotsUrl: rules.robotsUrl, ...evaluatePath(rules.rules, u.pathname || "/") };
+}
+
+export async function checkRobotsTxt(
+  targetUrl: string,
+  opts: { timeoutMs?: number; agent?: string } = {},
+): Promise<RobotsResult> {
+  return checkAgainstRules(targetUrl, await fetchRobotsRules(targetUrl, opts));
 }
 
 /**
@@ -124,6 +155,17 @@ function parseRobots(text: string): RobotsGroup[] {
     }
   }
   return groups;
+}
+
+/** `Sitemap:` directives are global, not scoped to a user-agent group. */
+function parseSitemapDirectives(body: string): string[] {
+  return [...body.matchAll(/^\s*sitemap:\s*(\S+)/gim)]
+    .map(m => m[1].trim())
+    .filter(u => /^https?:\/\//i.test(u));
+}
+
+function looksLikeHtml(body: string): boolean {
+  return /^\s*(<!doctype html|<html|<head|<body)/i.test(body);
 }
 
 function matchGroup(groups: RobotsGroup[], agent: string): RobotsRule[] | null {

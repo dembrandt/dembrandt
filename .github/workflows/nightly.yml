@@ -1,8 +1,10 @@
-name: Nightly Liveness
+name: Weekly Liveness
 
 on:
   schedule:
-    - cron: "0 3 * * *"
+    # Weekly, not nightly: the engine does not regress in a day, and a daily
+    # scheduled fetch of third-party sites is a pattern their logs notice.
+    - cron: "0 3 * * 3"
   workflow_dispatch:
 
 permissions:
@@ -57,6 +59,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: nightly-liveness-${{ matrix.chunk }}
+          name: weekly-liveness-${{ matrix.chunk }}
           path: test/liveness-report.json
           retention-days: 30

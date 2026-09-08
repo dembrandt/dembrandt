@@ -23,7 +23,7 @@ import { mergeResults } from "./lib/merger.js";
 import { additionalPages, discoveryBudget, extractOptions, isMultiPage, launchArgs } from "./lib/mcp/options.js";
 import type { Extraction, ExtractionRequest } from "./lib/mcp/options.js";
 import { JobQueue, resolveExtraction } from "./lib/mcp/jobs.js";
-import { checkRobotsTxt, fetchRobotsRules, filterAllowedUrls } from "./lib/robots.js";
+import { checkRobotsTxt, fetchRobotsRules, filterAllowedUrls, robotsVerdict } from "./lib/robots.js";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
@@ -72,6 +72,18 @@ const nullSpinner = {
  */
 async function runExtraction(url: string, options: ExtractionRequest = {}) {
   if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+
+  // Checked before the fetch, and before the browser: an enforcing run has to be
+  // able to not make the request, and the warning is only honest if it precedes it.
+  const entryRobots = await checkRobotsTxt(url).catch(() => null);
+  const verdict = entryRobots
+    ? robotsVerdict(entryRobots, { enforce: process.env.DEMBRANDT_ENFORCE_ROBOTS === "1" })
+    : { action: "proceed" as const };
+
+  if (verdict.action === "refuse") {
+    return { ok: false, error: `${verdict.reason}. Skipping ${url} (DEMBRANDT_ENFORCE_ROBOTS=1).` };
+  }
+
   let browser;
   let chromium;
   try {
@@ -99,9 +111,8 @@ async function runExtraction(url: string, options: ExtractionRequest = {}) {
       discoverLinks: discoveryBudget(options),
     });
 
-    const entryRobots = await checkRobotsTxt(url).catch(() => null);
-    if (entryRobots?.status === "ok" && entryRobots.allowed === false && first.meta) {
-      first.meta.robotsWarnings = [`robots.txt disallows ${url} (rule: "${entryRobots.rule}")`];
+    if (verdict.action === "warn" && first.meta) {
+      first.meta.robotsWarnings = [`robots.txt disallows ${url} (rule: "${verdict.rule}")`];
     }
 
     if (!isMultiPage(options)) {

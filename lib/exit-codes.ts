@@ -3,6 +3,7 @@
  * drifted" (review the diff) from "extraction broke" (retry / investigate):
  *   0  success / stable      1  drift detected (--compare)
  *   2  extraction failure    3  cloud sync failed (--key; extraction itself is fine)
+ *   4  skipped: robots.txt refused the target (DEMBRANDT_ENFORCE_ROBOTS=1)
  *   67 navigation/connection timeout (retryable, try --slow)
  *
  * Kept in its own module (not index.ts, which runs the CLI on import) so the
@@ -11,7 +12,7 @@
  * changing one is a breaking change to the gate.
  */
 
-export const EXIT = { OK: 0, DRIFT: 1, RUNTIME: 2, SYNC_FAILED: 3, TIMEOUT: 67 } as const;
+export const EXIT = { OK: 0, DRIFT: 1, RUNTIME: 2, SYNC_FAILED: 3, ROBOTS_DENIED: 4, TIMEOUT: 67 } as const;
 
 /** Stable failure code surfaced to CI alongside the numeric exit. */
 export type ErrorCode = "NAVIGATION_TIMEOUT" | "EXTRACTION_FAILED";

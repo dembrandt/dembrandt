@@ -106,11 +106,31 @@ A pipeline can branch on the exit code; "design drifted" and "extraction broke" 
 | `1` | Drift detected (`--compare`) |
 | `2` | Extraction failure (`EXTRACTION_FAILED`, `BROWSER_UNAVAILABLE`) |
 | `3` | Cloud sync failed under `--key`; the extraction itself succeeded |
+| `4` | Skipped: robots.txt refused the target, under `DEMBRANDT_ENFORCE_ROBOTS=1` |
 | `67` | Navigation/connection timeout (`NAVIGATION_TIMEOUT`), retryable, try `--slow` |
 
 With `--json-only`, a failure also prints a machine-readable `{ "error": { "code", "message" } }` to stdout.
 
 `3` exists so a pipeline can tell "this run was not recorded" apart from "the extractor is broken". Passing `--key` states an intent, and a run that could not meet it has not done what was asked, even though its output is valid: the payload was over the size limit, the key was rejected, or the API was unreachable. Reporting success there means drift tracking stops recording and nothing ever says so.
+
+## Unattended runs: `DEMBRANDT_ENFORCE_ROBOTS=1`
+
+By default a `robots.txt` disallow warns and the run continues. That is right when a person runs the CLI against a site they are responsible for: the tool has no standing to overrule them, and the warning is information rather than a gate.
+
+It is not right where nobody is deciding. Set `DEMBRANDT_ENFORCE_ROBOTS=1` in scheduled jobs, containers and any server-side use, and a disallow — or a `robots.txt` that cannot be read at all — skips the target with exit `4` before the browser is launched. Both the CLI and the MCP server honour it.
+
+Exit `4` is a decision by the site, not a failure of the run, so a job that iterates over URLs should count it separately from `2` rather than failing the build:
+
+```bash
+dembrandt "$url" --json-only || code=$?
+case "${code:-0}" in
+  0) ;;
+  4) echo "skipped by robots.txt: $url" ;;
+  *) failed=1 ;;
+esac
+```
+
+The group that applies is the one matching the User-Agent actually sent. A run that names itself (`--user-agent` containing `Dembrandt`) is matched against a `Dembrandt` group; anything else is matched against `*`, because that is the group governing it.
 
 **Rate limiting is not a sync failure.** Exceeding the account quota (20/hour, 200/day, 500/week) still warns and exits `0`, because hitting a quota is the system working as designed rather than a fault to fix, and a snapshot job should not turn a deploy pipeline red for it. A rejected key, an oversized payload or an unreachable API are the opposite: they need someone to act, and nobody acts on what nobody sees.
 

@@ -27,7 +27,7 @@ import { mergeResults } from "./lib/merger.js";
 import { writeFileSync, mkdirSync, readFileSync } from "fs";
 import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
-import { checkRobotsTxt, fetchRobotsRules, filterAllowedUrls } from "./lib/robots.js";
+import { checkAgainstRules, fetchRobotsRules, filterAllowedUrls, robotsVerdict, ROBOTS_AGENT, type RobotsRules } from "./lib/robots.js";
 import { EXIT, classifyError } from "./lib/exit-codes.js";
 import { activeFlags, pathSummary } from "./lib/run-summary.js";
 import { consumeCloudHint } from "./lib/cli-state.js";
@@ -36,6 +36,21 @@ import { guardWarnings, voiceNeedsOutputFile } from "./lib/cli-guards.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"));
+
+function sameOrigin(a: string, b: string): boolean {
+  try { return new URL(a).origin === new URL(b).origin; } catch { return false; }
+}
+
+/** robots.txt Sitemap: directives, but only for the origin they were read from. */
+function sitemapsFrom(rules: RobotsRules, targetUrl: string): string[] {
+  if (rules.status !== "ok" || !sameOrigin(rules.robotsUrl, targetUrl)) return [];
+  return rules.sitemaps;
+}
+
+/** A run that names itself can be allowed or refused by name in robots.txt. */
+function identifiesAsBot(userAgent: string | undefined): boolean {
+  return !!userAgent && userAgent.toLowerCase().includes("dembrandt");
+}
 
 /**
  * ora options for a spinner on the given stream. The spinner animates only on
@@ -127,15 +142,32 @@ program
 
     const spinner = ora({ text: "Starting extraction...", ...spinnerOptions(opts.jsonOnly) }).start();
 
+    // Unattended runs (scheduled CI, any hosted path) have no user deciding what
+    // they have the right to fetch, so there the robots decision has to bind.
+    const enforceRobots = process.env.DEMBRANDT_ENFORCE_ROBOTS === "1";
+    // Only the group matching the User-Agent we actually send applies to us.
+    const robotsAgent = identifiesAsBot(opts.userAgent) ? ROBOTS_AGENT : "*";
+
+    // One fetch per origin for the whole run: the entry check, the sitemap
+    // directives and the crawl filter all read the same file.
+    const entryRobotsRules = await fetchRobotsRules(url, { agent: robotsAgent }).catch(
+      () => ({ status: "unavailable" }) as RobotsRules,
+    );
+
     let entryRobotsWarning = null;
     try {
-      const robots = await checkRobotsTxt(url);
-      if (robots.status === "ok" && robots.allowed === false) {
-        entryRobotsWarning = `robots.txt disallows ${url} (rule: "${robots.rule}")`;
+      const robots = checkAgainstRules(url, entryRobotsRules);
+      const verdict = robotsVerdict(robots, { enforce: enforceRobots });
+
+      if (verdict.action === "refuse") {
+        spinner.fail(`${verdict.reason}. Skipping ${url} (DEMBRANDT_ENFORCE_ROBOTS=1).`);
+        process.exit(EXIT.ROBOTS_DENIED);
+      }
+
+      if (verdict.action === "warn") {
+        entryRobotsWarning = `robots.txt disallows ${url} (rule: "${verdict.rule}")`;
         spinner.warn(
-          chalk.hex("#FFB86C")(
-            `robots.txt disallows this path (rule: "${robots.rule}"). Proceeding anyway — respect the site's terms.`
-          )
+          chalk.hex("#FFB86C")(`${verdict.reason}. Proceeding anyway — respect the site's terms.`)
         );
         spinner.start("Starting extraction...");
       }
@@ -270,9 +302,9 @@ program
             if (!opts.jsonOnly) spinner.start("Fetching sitemap...");
             const max = crawlN ? crawlN - 1 : 20;
             sitemapMax = max;
-            additionalUrls = await parseSitemap(result.url, max);
+            additionalUrls = await parseSitemap(result.url, max, sitemapsFrom(entryRobotsRules, result.url));
             if (additionalUrls.length === 0 && result.url !== url) {
-              additionalUrls = await parseSitemap(url, max);
+              additionalUrls = await parseSitemap(url, max, sitemapsFrom(entryRobotsRules, url));
             }
           } else if (isAutoCrawl) {
             additionalUrls = result._discoveredLinks || [];
@@ -281,7 +313,11 @@ program
           delete result._discoveredLinks;
 
           if (additionalUrls.length > 0) {
-            const robotsRules = await fetchRobotsRules(result.url);
+            // A redirect can land on a different origin, whose robots.txt is a
+            // different file; reuse the entry rules only when the origin holds.
+            const robotsRules = sameOrigin(url, result.url)
+              ? entryRobotsRules
+              : await fetchRobotsRules(result.url, { agent: robotsAgent });
             const { allowed, disallowed } = filterAllowedUrls(additionalUrls, robotsRules);
             if (disallowed.length > 0) {
               if (!opts.jsonOnly) {

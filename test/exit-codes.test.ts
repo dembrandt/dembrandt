@@ -10,7 +10,7 @@ import { EXIT, classifyError } from '../lib/exit-codes.js';
  */
 
 test('EXIT codes hold their documented values', () => {
-  assert.deepEqual(EXIT, { OK: 0, DRIFT: 1, RUNTIME: 2, SYNC_FAILED: 3, TIMEOUT: 67 });
+  assert.deepEqual(EXIT, { OK: 0, DRIFT: 1, RUNTIME: 2, SYNC_FAILED: 3, ROBOTS_DENIED: 4, TIMEOUT: 67 });
 });
 
 test('drift exit is distinct from every failure exit', () => {
@@ -18,6 +18,7 @@ test('drift exit is distinct from every failure exit', () => {
   // apart from "extraction broke". DRIFT must never collide with a failure code.
   assert.notEqual(EXIT.DRIFT, EXIT.RUNTIME);
   assert.notEqual(EXIT.DRIFT, EXIT.TIMEOUT);
+  assert.notEqual(EXIT.DRIFT, EXIT.ROBOTS_DENIED);
   assert.notEqual(EXIT.DRIFT, EXIT.OK);
   assert.notEqual(EXIT.DRIFT, EXIT.SYNC_FAILED);
 });

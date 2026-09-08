@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { checkRobotsTxt, evaluatePath, fetchRobotsRules, filterAllowedUrls } from '../lib/robots.js';
+import { checkAgainstRules, checkRobotsTxt, evaluatePath, fetchRobotsRules, filterAllowedUrls, robotsVerdict } from '../lib/robots.js';
 
 function withMockFetch<T>(body: string | null, status: number, run: () => Promise<T>): Promise<T> {
   const original = globalThis.fetch;
@@ -49,7 +49,8 @@ test('evaluatePath: wildcard and end-anchor patterns match correctly', () => {
 
 test('fetchRobotsRules: parses the matching user-agent group', async () => {
   const body = 'User-agent: Dembrandt\nDisallow: /private\n\nUser-agent: *\nDisallow: /\n';
-  const rules = await withMockFetch(body, 200, () => fetchRobotsRules('https://example.com/'));
+  const rules = await withMockFetch(body, 200, () =>
+    fetchRobotsRules('https://example.com/', { agent: 'Dembrandt' }));
   assert.equal(rules.status, 'ok');
   if (rules.status === 'ok') {
     assert.deepEqual(rules.rules, [{ type: 'disallow', value: '/private' }]);
@@ -75,7 +76,7 @@ test('checkRobotsTxt: evaluates the target path against the fetched rules', asyn
 });
 
 test('filterAllowedUrls: splits urls by robots decision', () => {
-  const rules = { status: 'ok' as const, robotsUrl: 'https://example.com/robots.txt', rules: [{ type: 'disallow' as const, value: '/admin' }] };
+  const rules = { status: 'ok' as const, robotsUrl: 'https://example.com/robots.txt', sitemaps: [], rules: [{ type: 'disallow' as const, value: '/admin' }] };
   const { allowed, disallowed } = filterAllowedUrls(
     ['https://example.com/pricing', 'https://example.com/admin/users'],
     rules,
@@ -91,8 +92,107 @@ test('filterAllowedUrls: an unavailable robots.txt allows everything through', (
 });
 
 test('filterAllowedUrls: a malformed URL is passed through rather than dropped', () => {
-  const rules = { status: 'ok' as const, robotsUrl: 'https://example.com/robots.txt', rules: [] };
+  const rules = { status: 'ok' as const, robotsUrl: 'https://example.com/robots.txt', sitemaps: [], rules: [] };
   const { allowed, disallowed } = filterAllowedUrls(['not a url'], rules);
   assert.deepEqual(allowed, ['not a url']);
   assert.deepEqual(disallowed, []);
+});
+
+test('fetchRobotsRules: an HTML body is treated as unavailable, not as an empty rule set', async () => {
+  const body = '<!DOCTYPE html>\n<html><body>Access denied</body></html>';
+  const result = await withMockFetch(body, 200, () => fetchRobotsRules('https://example.com/'));
+  assert.equal(result.status, 'unavailable');
+});
+
+test('fetchRobotsRules: matches the group for the requested agent', async () => {
+  const body = 'User-agent: Dembrandt\nDisallow: /named\n\nUser-agent: *\nDisallow: /everyone\n';
+  const named = await withMockFetch(body, 200, () =>
+    fetchRobotsRules('https://example.com/', { agent: 'Dembrandt' }));
+  assert.deepEqual(named, {
+    status: 'ok',
+    robotsUrl: 'https://example.com/robots.txt',
+    sitemaps: [],
+    rules: [{ type: 'disallow', value: '/named' }],
+  });
+});
+
+test('fetchRobotsRules: an unnamed run falls under the wildcard group, not the Dembrandt one', async () => {
+  const body = 'User-agent: Dembrandt\nAllow: /\n\nUser-agent: *\nDisallow: /\n';
+  const result = await withMockFetch(body, 200, () => fetchRobotsRules('https://example.com/'));
+  assert.deepEqual(result, {
+    status: 'ok',
+    robotsUrl: 'https://example.com/robots.txt',
+    sitemaps: [],
+    rules: [{ type: 'disallow', value: '/' }],
+  });
+});
+
+test('checkRobotsTxt: forwards the agent to the group match', async () => {
+  const body = 'User-agent: Dembrandt\nDisallow: /admin\n\nUser-agent: *\nAllow: /\n';
+  const result = await withMockFetch(body, 200, () =>
+    checkRobotsTxt('https://example.com/admin', { agent: 'Dembrandt' }));
+  assert.deepEqual(result, {
+    status: 'ok',
+    robotsUrl: 'https://example.com/robots.txt',
+    allowed: false,
+    rule: '/admin',
+  });
+});
+
+test('robotsVerdict: a user-driven run is warned and proceeds, an enforcing run refuses', () => {
+  const disallowed = { status: 'ok', robotsUrl: 'https://example.com/robots.txt', allowed: false, rule: '/' } as const;
+
+  assert.deepEqual(robotsVerdict(disallowed, { enforce: false }), {
+    action: 'warn',
+    reason: 'robots.txt disallows this path (rule: "/")',
+    rule: '/',
+  });
+  assert.equal(robotsVerdict(disallowed, { enforce: true }).action, 'refuse');
+});
+
+test('robotsVerdict: an unreadable robots.txt fails open for a user and closed when enforcing', () => {
+  const unavailable = { status: 'unavailable', robotsUrl: 'https://example.com/robots.txt' } as const;
+
+  assert.deepEqual(robotsVerdict(unavailable, { enforce: false }), { action: 'proceed' });
+  assert.deepEqual(robotsVerdict(unavailable, { enforce: true }), {
+    action: 'refuse',
+    reason: 'robots.txt could not be read',
+  });
+});
+
+test('robotsVerdict: an allowed path proceeds either way', () => {
+  const allowed = { status: 'ok', robotsUrl: 'https://example.com/robots.txt', allowed: true, rule: null } as const;
+
+  assert.deepEqual(robotsVerdict(allowed, { enforce: false }), { action: 'proceed' });
+  assert.deepEqual(robotsVerdict(allowed, { enforce: true }), { action: 'proceed' });
+});
+
+test('fetchRobotsRules: Sitemap directives come back with the rules, not a second fetch', () => {
+  const body = 'Sitemap: https://example.com/sitemap.xml\nUser-agent: *\nDisallow: /admin\nSitemap: /relative-is-not-a-url\n';
+  return withMockFetch(body, 200, async () => {
+    const rules = await fetchRobotsRules('https://example.com/');
+    assert.equal(rules.status, 'ok');
+    if (rules.status === 'ok') {
+      assert.deepEqual(rules.sitemaps, ['https://example.com/sitemap.xml']);
+      assert.deepEqual(rules.rules, [{ type: 'disallow', value: '/admin' }]);
+    }
+  });
+});
+
+test('checkAgainstRules: evaluates a path against rules already fetched', () => {
+  const rules = {
+    status: 'ok' as const,
+    robotsUrl: 'https://example.com/robots.txt',
+    sitemaps: [],
+    rules: [{ type: 'disallow' as const, value: '/admin' }],
+  };
+
+  assert.deepEqual(checkAgainstRules('https://example.com/admin/users', rules), {
+    status: 'ok',
+    robotsUrl: 'https://example.com/robots.txt',
+    allowed: false,
+    rule: '/admin',
+  });
+  assert.equal(checkAgainstRules('https://example.com/pricing', rules).status === 'ok', true);
+  assert.equal(checkAgainstRules('https://example.com/x', { status: 'unavailable' }).status, 'unavailable');
 });
