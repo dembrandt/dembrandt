@@ -12,10 +12,13 @@ interface RobotsGroup {
 }
 
 export type RobotsResult =
+  | { status: "absent"; robotsUrl: string }
   | { status: "unavailable"; robotsUrl: string }
   | { status: "ok"; robotsUrl: string; allowed: boolean; rule: string | null };
 
 export type RobotsRules =
+  /** `absent`: no robots.txt to read (4xx). `unavailable`: it exists but we could not read it. */
+  | { status: "absent" }
   | { status: "unavailable" }
   | { status: "ok"; robotsUrl: string; rules: RobotsRule[]; sitemaps: string[] };
 
@@ -39,6 +42,9 @@ export async function fetchRobotsRules(
       signal: controller.signal,
       headers: { "User-Agent": ROBOTS_AGENT },
     });
+    // RFC 9309: 4xx means there are no rules, 5xx means treat everything as
+    // disallowed. Collapsing the two skips a site that simply has no file.
+    if (res.status >= 400 && res.status < 500 && res.status !== 429) return { status: "absent" };
     if (!res.ok) return { status: "unavailable" };
     body = await res.text();
     // A bot wall answers 200 with HTML, which parses to no rules and would read
@@ -69,6 +75,7 @@ export function robotsVerdict(
   robots: RobotsResult,
   { enforce }: { enforce: boolean },
 ): RobotsVerdict {
+  if (robots.status === 'absent') return { action: 'proceed' };
   if (robots.status === 'unavailable') {
     return enforce ? { action: 'refuse', reason: 'robots.txt could not be read' } : { action: 'proceed' };
   }
@@ -86,7 +93,7 @@ export function evaluatePath(rules: RobotsRule[], path: string): { allowed: bool
 export function checkAgainstRules(targetUrl: string, rules: RobotsRules): RobotsResult {
   const u = new URL(targetUrl);
   if (rules.status !== "ok") {
-    return { status: "unavailable", robotsUrl: `${u.protocol}//${u.host}/robots.txt` };
+    return { status: rules.status, robotsUrl: `${u.protocol}//${u.host}/robots.txt` };
   }
   return { status: "ok", robotsUrl: rules.robotsUrl, ...evaluatePath(rules.rules, u.pathname || "/") };
 }
