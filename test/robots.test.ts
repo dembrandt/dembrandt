@@ -66,6 +66,7 @@ test('fetchRobotsRules: falls back to * when there is no Dembrandt-specific grou
 
 test('fetchRobotsRules: absent on 4xx, unavailable on 5xx or a network failure', async () => {
   assert.deepEqual(await withMockFetch('', 404, () => fetchRobotsRules('https://example.com/')), { status: 'absent' });
+  assert.deepEqual(await withMockFetch('', 410, () => fetchRobotsRules('https://example.com/')), { status: 'absent' });
   assert.deepEqual(await withMockFetch('', 500, () => fetchRobotsRules('https://example.com/')), { status: 'unavailable' });
   assert.deepEqual(await withMockFetch(null, 0, () => fetchRobotsRules('https://example.com/')), { status: 'unavailable' });
 });
@@ -214,7 +215,7 @@ test('a missing robots.txt is not the same as one we could not read', async () =
 });
 
 test('a refusal or a rate limit is unreadable, not absent', async () => {
-  for (const status of [401, 403, 429]) {
+  for (const status of [401, 403, 418, 429]) {
     const refused = await withMockFetch('', status, () => fetchRobotsRules('https://example.com/'));
     assert.equal(refused.status, 'unavailable', `status ${status}`);
     assert.equal(

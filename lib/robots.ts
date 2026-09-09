@@ -11,7 +11,7 @@ interface RobotsGroup {
   rules: RobotsRule[];
 }
 
-const REFUSAL_STATUSES = new Set([401, 403, 429]);
+const ABSENT_STATUSES = new Set([404, 410]);
 
 export type RobotsResult =
   | { status: "absent"; robotsUrl: string }
@@ -43,7 +43,7 @@ export async function fetchRobotsRules(
       signal: controller.signal,
       headers: { "User-Agent": ROBOTS_AGENT },
     });
-    if (res.status >= 400 && res.status < 500 && !REFUSAL_STATUSES.has(res.status)) return { status: "absent" };
+    if (ABSENT_STATUSES.has(res.status)) return { status: "absent" };
     if (!res.ok) return { status: "unavailable" };
     body = await res.text();
     // A bot wall answers 200 with HTML, which parses to no rules and would read
