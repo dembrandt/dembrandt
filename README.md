@@ -62,7 +62,7 @@ Default is formatted terminal output only. Full flag reference in **[docs/usage.
 Extract a preview deployment, compare against a committed baseline, fail the job when tokens moved:
 
 ```yaml
-- uses: dembrandt/dembrandt@v0.32.0
+- uses: dembrandt/dembrandt@v0.32.1
   with:
     url: https://preview.example.com
     baseline: .dembrandt/baseline.json

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.1] - 2026-09-09
+
+A missing robots.txt is not a refusal.
+
+### Fixed
+- `DEMBRANDT_ENFORCE_ROBOTS=1` skipped a site that has no `robots.txt` at all. A `404` or `410` means there are no rules to honour and the run proceeds; a refusal, a rate limit, a bot wall or a `5xx` is an answer we could not read and still skips (#209)
+
 ## [0.32.0] - 2026-09-08
 
 Token accuracy fixes.
