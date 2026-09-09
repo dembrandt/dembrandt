@@ -23,7 +23,7 @@ import { mergeResults } from "./lib/merger.js";
 import { additionalPages, discoveryBudget, extractOptions, isMultiPage, launchArgs } from "./lib/mcp/options.js";
 import type { Extraction, ExtractionRequest } from "./lib/mcp/options.js";
 import { JobQueue, resolveExtraction } from "./lib/mcp/jobs.js";
-import { checkRobotsTxt, fetchRobotsRules, filterAllowedUrls, robotsVerdict } from "./lib/robots.js";
+import { checkRobotsTxt, fetchRobotsRules, filterAllowedUrls, robotsAgentFor, robotsVerdict } from "./lib/robots.js";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
@@ -75,9 +75,12 @@ async function runExtraction(url: string, options: ExtractionRequest = {}) {
 
   // Checked before the fetch, and before the browser: an enforcing run has to be
   // able to not make the request, and the warning is only honest if it precedes it.
-  const entryRobots = await checkRobotsTxt(url).catch(() => null);
+  const enforceRobots = process.env.DEMBRANDT_ENFORCE_ROBOTS === "1";
+  // Only the group matching the User-Agent we actually send applies to us.
+  const robotsAgent = robotsAgentFor(options.userAgent);
+  const entryRobots = await checkRobotsTxt(url, { agent: robotsAgent }).catch(() => null);
   const verdict = entryRobots
-    ? robotsVerdict(entryRobots, { enforce: process.env.DEMBRANDT_ENFORCE_ROBOTS === "1" })
+    ? robotsVerdict(entryRobots, { enforce: enforceRobots })
     : { action: "proceed" as const };
 
   if (verdict.action === "refuse") {
@@ -124,8 +127,8 @@ async function runExtraction(url: string, options: ExtractionRequest = {}) {
     delete first._discoveredLinks;
 
     if (extraUrls.length > 0) {
-      const robotsRules = await fetchRobotsRules(first.url);
-      const { allowed, disallowed } = filterAllowedUrls(extraUrls, robotsRules);
+      const robotsRules = await fetchRobotsRules(first.url, { agent: robotsAgent });
+      const { allowed, disallowed } = filterAllowedUrls(extraUrls, robotsRules, { enforce: enforceRobots });
       if (disallowed.length > 0) {
         extraUrls = allowed;
         if (first.meta) {

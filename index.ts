@@ -27,7 +27,7 @@ import { mergeResults } from "./lib/merger.js";
 import { writeFileSync, mkdirSync, readFileSync } from "fs";
 import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
-import { checkAgainstRules, fetchRobotsRules, filterAllowedUrls, robotsVerdict, ROBOTS_AGENT, type RobotsRules } from "./lib/robots.js";
+import { checkAgainstRules, fetchRobotsRules, filterAllowedUrls, robotsAgentFor, robotsVerdict, type RobotsRules } from "./lib/robots.js";
 import { EXIT, classifyError } from "./lib/exit-codes.js";
 import { activeFlags, pathSummary } from "./lib/run-summary.js";
 import { consumeCloudHint } from "./lib/cli-state.js";
@@ -45,11 +45,6 @@ function sameOrigin(a: string, b: string): boolean {
 function sitemapsFrom(rules: RobotsRules, targetUrl: string): string[] {
   if (rules.status !== "ok" || !sameOrigin(rules.robotsUrl, targetUrl)) return [];
   return rules.sitemaps;
-}
-
-/** A run that names itself can be allowed or refused by name in robots.txt. */
-function identifiesAsBot(userAgent: string | undefined): boolean {
-  return !!userAgent && userAgent.toLowerCase().includes("dembrandt");
 }
 
 /**
@@ -146,7 +141,7 @@ program
     // they have the right to fetch, so there the robots decision has to bind.
     const enforceRobots = process.env.DEMBRANDT_ENFORCE_ROBOTS === "1";
     // Only the group matching the User-Agent we actually send applies to us.
-    const robotsAgent = identifiesAsBot(opts.userAgent) ? ROBOTS_AGENT : "*";
+    const robotsAgent = robotsAgentFor(opts.userAgent);
 
     // One fetch per origin for the whole run: the entry check, the sitemap
     // directives and the crawl filter all read the same file.
@@ -283,8 +278,40 @@ program
             _version: version,
           });
 
-          if (entryRobotsWarning && result.meta) {
-            result.meta.robotsWarnings = [entryRobotsWarning];
+          // A redirect can land on another origin, whose robots.txt is a
+          // different file and has not been consulted for this page yet.
+          const landedElsewhere = !sameOrigin(url, result.url);
+          const landingRobotsRules = landedElsewhere
+            ? await fetchRobotsRules(result.url, { agent: robotsAgent }).catch(
+                () => ({ status: "unavailable" }) as RobotsRules,
+              )
+            : entryRobotsRules;
+
+          let redirectRobotsWarning = null;
+          if (landedElsewhere) {
+            const verdict = robotsVerdict(checkAgainstRules(result.url, landingRobotsRules), {
+              enforce: enforceRobots,
+            });
+            if (verdict.action === "refuse") {
+              spinner.fail(
+                `${verdict.reason}. Skipping ${result.url}, redirected from ${url} (DEMBRANDT_ENFORCE_ROBOTS=1).`
+              );
+              process.exit(EXIT.ROBOTS_DENIED);
+            }
+            if (verdict.action === "warn") {
+              redirectRobotsWarning = `robots.txt disallows ${result.url} (rule: "${verdict.rule}")`;
+              if (!opts.jsonOnly) {
+                spinner.warn(
+                  chalk.hex("#FFB86C")(`${verdict.reason}. Proceeding anyway — respect the site's terms.`)
+                );
+                spinner.start("Continuing...");
+              }
+            }
+          }
+
+          const robotsWarnings = [entryRobotsWarning, redirectRobotsWarning].filter(Boolean);
+          if (robotsWarnings.length > 0 && result.meta) {
+            result.meta.robotsWarnings = robotsWarnings;
           }
 
           // Build list of additional URLs to extract
@@ -313,12 +340,9 @@ program
           delete result._discoveredLinks;
 
           if (additionalUrls.length > 0) {
-            // A redirect can land on a different origin, whose robots.txt is a
-            // different file; reuse the entry rules only when the origin holds.
-            const robotsRules = sameOrigin(url, result.url)
-              ? entryRobotsRules
-              : await fetchRobotsRules(result.url, { agent: robotsAgent });
-            const { allowed, disallowed } = filterAllowedUrls(additionalUrls, robotsRules);
+            const { allowed, disallowed } = filterAllowedUrls(additionalUrls, landingRobotsRules, {
+              enforce: enforceRobots,
+            });
             if (disallowed.length > 0) {
               if (!opts.jsonOnly) {
                 spinner.warn(
