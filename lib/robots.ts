@@ -11,13 +11,14 @@ interface RobotsGroup {
   rules: RobotsRule[];
 }
 
+const REFUSAL_STATUSES = new Set([401, 403, 429]);
+
 export type RobotsResult =
   | { status: "absent"; robotsUrl: string }
   | { status: "unavailable"; robotsUrl: string }
   | { status: "ok"; robotsUrl: string; allowed: boolean; rule: string | null };
 
 export type RobotsRules =
-  /** `absent`: no robots.txt to read (4xx). `unavailable`: it exists but we could not read it. */
   | { status: "absent" }
   | { status: "unavailable" }
   | { status: "ok"; robotsUrl: string; rules: RobotsRule[]; sitemaps: string[] };
@@ -42,9 +43,7 @@ export async function fetchRobotsRules(
       signal: controller.signal,
       headers: { "User-Agent": ROBOTS_AGENT },
     });
-    // RFC 9309: 4xx means there are no rules, 5xx means treat everything as
-    // disallowed. Collapsing the two skips a site that simply has no file.
-    if (res.status >= 400 && res.status < 500 && res.status !== 429) return { status: "absent" };
+    if (res.status >= 400 && res.status < 500 && !REFUSAL_STATUSES.has(res.status)) return { status: "absent" };
     if (!res.ok) return { status: "unavailable" };
     body = await res.text();
     // A bot wall answers 200 with HTML, which parses to no rules and would read

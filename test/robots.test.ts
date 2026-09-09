@@ -199,9 +199,6 @@ test('checkAgainstRules: evaluates a path against rules already fetched', () => 
 });
 
 test('a missing robots.txt is not the same as one we could not read', async () => {
-  // RFC 9309: 4xx means there are no rules to honour, 5xx means honour all of
-  // them. Collapsing the two makes an enforcing run skip a site that simply has
-  // no file.
   const absent = await withMockFetch('', 404, () => fetchRobotsRules('https://example.com/'));
   assert.equal(absent.status, 'absent');
   assert.deepEqual(robotsVerdict(checkAgainstRules('https://example.com/', absent), { enforce: true }), {
@@ -216,7 +213,13 @@ test('a missing robots.txt is not the same as one we could not read', async () =
   );
 });
 
-test('a rate-limited robots.txt is unreadable, not absent', async () => {
-  const limited = await withMockFetch('', 429, () => fetchRobotsRules('https://example.com/'));
-  assert.equal(limited.status, 'unavailable');
+test('a refusal or a rate limit is unreadable, not absent', async () => {
+  for (const status of [401, 403, 429]) {
+    const refused = await withMockFetch('', status, () => fetchRobotsRules('https://example.com/'));
+    assert.equal(refused.status, 'unavailable', `status ${status}`);
+    assert.equal(
+      robotsVerdict(checkAgainstRules('https://example.com/', refused), { enforce: true }).action,
+      'refuse',
+    );
+  }
 });
