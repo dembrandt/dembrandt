@@ -10,6 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import { deltaE } from './colors.js';
 import { applyBudget, computeMetrics, totalWords, WORD_FLOOR } from './voice/metrics.js';
+import { coverageEntry, summarizeCoverage, type CoverageEntry } from './coverage.js';
 
 /**
  * Meta for a merged snapshot. The merged artifact is a distinct snapshot, so it
@@ -240,19 +241,26 @@ function mergeComponents(results) {
 
 function mergeValueArrays(results, getter, valueKey = 'value') {
   const map = new Map();
-  results.forEach(r => {
+  results.forEach((r, pageIdx) => {
     (getter(r) || []).forEach(item => {
       const key = item[valueKey];
       if (!map.has(key)) {
-        map.set(key, { ...item });
+        map.set(key, { ...item, _pages: new Set([pageIdx]) });
       } else {
         const e = map.get(key);
         e.count = (e.count || 0) + (item.count || 1);
         e.frequency = (e.frequency || 0) + (item.frequency || 0);
+        e._pages.add(pageIdx);
       }
     });
   });
-  return [...map.values()].sort((a, b) => (b.count || b.frequency || 0) - (a.count || a.frequency || 0));
+  return withPageCount([...map.values()])
+    .sort((a, b) => (b.count || b.frequency || 0) - (a.count || a.frequency || 0));
+}
+
+/** Turn the merge-time page set into a plain count the output can carry. */
+function withPageCount(entries) {
+  return entries.map(({ _pages, ...entry }) => ({ ...entry, pageCount: _pages ? _pages.size : 1 }));
 }
 
 function mergeSpacing(results) {
@@ -274,35 +282,38 @@ function mergeBorderRadius(results) {
 
 function mergeBorders(results) {
   const map = new Map();
-  results.forEach(r => {
+  results.forEach((r, pageIdx) => {
     (r.borders?.combinations || []).forEach(item => {
       const key = `${item.width}|${item.style}|${item.color}`;
       if (!map.has(key)) {
-        map.set(key, { ...item, elements: [...(item.elements || [])] });
+        map.set(key, { ...item, elements: [...(item.elements || [])], _pages: new Set([pageIdx]) });
       } else {
         const e = map.get(key);
         e.count += (item.count || 1);
         const elementSet = new Set([...(e.elements || []), ...(item.elements || [])]);
         e.elements = [...elementSet].slice(0, 5);
+        e._pages.add(pageIdx);
         if (e.count > 10) e.confidence = 'high';
         else if (e.count > 3) e.confidence = 'medium';
       }
     });
   });
   return {
-    combinations: [...map.values()].sort((a, b) => b.count - a.count),
+    combinations: withPageCount([...map.values()]).sort((a, b) => b.count - a.count),
   };
 }
 
 function mergeShadows(results) {
   const map = new Map();
-  results.forEach(r => {
+  results.forEach((r, pageIdx) => {
     (r.shadows || []).forEach(s => {
       const key = s.shadow || s.value || JSON.stringify(s);
       if (!map.has(key)) {
-        map.set(key, { ...s, count: s.count || 1 });
+        map.set(key, { ...s, count: s.count || 1, _pages: new Set([pageIdx]) });
       } else {
-        map.get(key).count += (s.count || 1);
+        const e = map.get(key);
+        e.count += (s.count || 1);
+        e._pages.add(pageIdx);
       }
     });
   });
@@ -311,7 +322,24 @@ function mergeShadows(results) {
     if (s.count > 10) s.confidence = 'high';
     else if (s.count > 3) s.confidence = 'medium';
   }
-  return [...map.values()].sort((a, b) => b.count - a.count);
+  return withPageCount([...map.values()]).sort((a, b) => b.count - a.count);
+}
+
+/** Every merged token family that carries page provenance, flattened for scoring. */
+function collectCoverage(merged, totalPages): CoverageEntry[] {
+  const families: [string, { key: unknown; pages: unknown }[]][] = [
+    ['color', (merged.colors?.palette ?? []).map(c => ({ key: c.normalized ?? c.color, pages: c.pageCount }))],
+    ['spacing', (merged.spacing?.commonValues ?? []).map(v => ({ key: v.px, pages: v.pageCount }))],
+    ['radius', (merged.borderRadius?.values ?? []).map(v => ({ key: v.value, pages: v.pageCount }))],
+    ['border', (merged.borders?.combinations ?? []).map(b => ({ key: `${b.width} ${b.style} ${b.color}`, pages: b.pageCount }))],
+    ['shadow', (merged.shadows ?? []).map(s => ({ key: s.shadow, pages: s.pageCount }))],
+  ];
+
+  return families.flatMap(([family, tokens]) =>
+    tokens
+      .filter(t => t.key != null)
+      .map(t => coverageEntry(family, String(t.key), Number(t.pages) || 1, totalPages))
+  );
 }
 
 function mergeByName(results, getter) {
@@ -465,7 +493,7 @@ export function mergeResults(results) {
 
   const home = results[0];
 
-  return {
+  const merged = {
     url: home.url,
     extractedAt: home.extractedAt,
     ...mergeMeta(results),
@@ -508,4 +536,7 @@ export function mergeResults(results) {
       ...(r.voiceSkipped ? { voiceSkipped: r.voiceSkipped } : {}),
     })),
   };
+
+  const coverage = summarizeCoverage(collectCoverage(merged, results.length), results.length);
+  return coverage ? { ...merged, coverage } : merged;
 }
