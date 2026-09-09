@@ -7,7 +7,7 @@ function withMockFetch<T>(body: string | null, status: number, run: () => Promis
   globalThis.fetch = (async () =>
     body === null
       ? Promise.reject(new Error('network error'))
-      : { ok: status >= 200 && status < 300, text: async () => body }) as unknown as typeof fetch;
+      : { ok: status >= 200 && status < 300, status, text: async () => body }) as unknown as typeof fetch;
   return run().finally(() => {
     globalThis.fetch = original;
   });
@@ -64,8 +64,10 @@ test('fetchRobotsRules: falls back to * when there is no Dembrandt-specific grou
   if (rules.status === 'ok') assert.deepEqual(rules.rules, [{ type: 'disallow', value: '/admin' }]);
 });
 
-test('fetchRobotsRules: unavailable on a non-2xx response or network failure', async () => {
-  assert.deepEqual(await withMockFetch('', 404, () => fetchRobotsRules('https://example.com/')), { status: 'unavailable' });
+test('fetchRobotsRules: absent on 4xx, unavailable on 5xx or a network failure', async () => {
+  assert.deepEqual(await withMockFetch('', 404, () => fetchRobotsRules('https://example.com/')), { status: 'absent' });
+  assert.deepEqual(await withMockFetch('', 410, () => fetchRobotsRules('https://example.com/')), { status: 'absent' });
+  assert.deepEqual(await withMockFetch('', 500, () => fetchRobotsRules('https://example.com/')), { status: 'unavailable' });
   assert.deepEqual(await withMockFetch(null, 0, () => fetchRobotsRules('https://example.com/')), { status: 'unavailable' });
 });
 
@@ -195,4 +197,30 @@ test('checkAgainstRules: evaluates a path against rules already fetched', () => 
   });
   assert.equal(checkAgainstRules('https://example.com/pricing', rules).status === 'ok', true);
   assert.equal(checkAgainstRules('https://example.com/x', { status: 'unavailable' }).status, 'unavailable');
+});
+
+test('a missing robots.txt is not the same as one we could not read', async () => {
+  const absent = await withMockFetch('', 404, () => fetchRobotsRules('https://example.com/'));
+  assert.equal(absent.status, 'absent');
+  assert.deepEqual(robotsVerdict(checkAgainstRules('https://example.com/', absent), { enforce: true }), {
+    action: 'proceed',
+  });
+
+  const unreadable = await withMockFetch('', 503, () => fetchRobotsRules('https://example.com/'));
+  assert.equal(unreadable.status, 'unavailable');
+  assert.equal(
+    robotsVerdict(checkAgainstRules('https://example.com/', unreadable), { enforce: true }).action,
+    'refuse',
+  );
+});
+
+test('a refusal or a rate limit is unreadable, not absent', async () => {
+  for (const status of [401, 403, 418, 429]) {
+    const refused = await withMockFetch('', status, () => fetchRobotsRules('https://example.com/'));
+    assert.equal(refused.status, 'unavailable', `status ${status}`);
+    assert.equal(
+      robotsVerdict(checkAgainstRules('https://example.com/', refused), { enforce: true }).action,
+      'refuse',
+    );
+  }
 });

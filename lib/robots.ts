@@ -11,11 +11,15 @@ interface RobotsGroup {
   rules: RobotsRule[];
 }
 
+const ABSENT_STATUSES = new Set([404, 410]);
+
 export type RobotsResult =
+  | { status: "absent"; robotsUrl: string }
   | { status: "unavailable"; robotsUrl: string }
   | { status: "ok"; robotsUrl: string; allowed: boolean; rule: string | null };
 
 export type RobotsRules =
+  | { status: "absent" }
   | { status: "unavailable" }
   | { status: "ok"; robotsUrl: string; rules: RobotsRule[]; sitemaps: string[] };
 
@@ -39,6 +43,7 @@ export async function fetchRobotsRules(
       signal: controller.signal,
       headers: { "User-Agent": ROBOTS_AGENT },
     });
+    if (ABSENT_STATUSES.has(res.status)) return { status: "absent" };
     if (!res.ok) return { status: "unavailable" };
     body = await res.text();
     // A bot wall answers 200 with HTML, which parses to no rules and would read
@@ -69,6 +74,7 @@ export function robotsVerdict(
   robots: RobotsResult,
   { enforce }: { enforce: boolean },
 ): RobotsVerdict {
+  if (robots.status === 'absent') return { action: 'proceed' };
   if (robots.status === 'unavailable') {
     return enforce ? { action: 'refuse', reason: 'robots.txt could not be read' } : { action: 'proceed' };
   }
@@ -86,7 +92,7 @@ export function evaluatePath(rules: RobotsRule[], path: string): { allowed: bool
 export function checkAgainstRules(targetUrl: string, rules: RobotsRules): RobotsResult {
   const u = new URL(targetUrl);
   if (rules.status !== "ok") {
-    return { status: "unavailable", robotsUrl: `${u.protocol}//${u.host}/robots.txt` };
+    return { status: rules.status, robotsUrl: `${u.protocol}//${u.host}/robots.txt` };
   }
   return { status: "ok", robotsUrl: rules.robotsUrl, ...evaluatePath(rules.rules, u.pathname || "/") };
 }
