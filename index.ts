@@ -296,6 +296,8 @@ program
               spinner.fail(
                 `${verdict.reason}. Skipping ${result.url}, redirected from ${url} (DEMBRANDT_ENFORCE_ROBOTS=1).`
               );
+              // process.exit skips the finally that owns the browser.
+              if (browser) await browser.close();
               process.exit(EXIT.ROBOTS_DENIED);
             }
             if (verdict.action === "warn") {
