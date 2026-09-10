@@ -84,6 +84,11 @@ export function robotsVerdict(
   return enforce ? { action: 'refuse', reason } : { action: 'warn', reason, rule: robots.rule };
 }
 
+/** A run that names itself can be allowed or refused by name in robots.txt. */
+export function robotsAgentFor(userAgent: string | undefined): string {
+  return userAgent && userAgent.toLowerCase().includes("dembrandt") ? ROBOTS_AGENT : "*";
+}
+
 export function evaluatePath(rules: RobotsRule[], path: string): { allowed: boolean; rule: string | null } {
   return evaluate(rules, path);
 }
@@ -106,13 +111,18 @@ export async function checkRobotsTxt(
 
 /**
  * Split discovered crawl URLs into those robots.txt allows and those it
- * doesn't, using an already-fetched rule set. Unavailable robots.txt allows
- * everything through, matching checkRobotsTxt's fail-open behaviour.
+ * doesn't, using an already-fetched rule set. Follows the same truth table as
+ * robotsVerdict: an unreadable robots.txt allows everything through unless the
+ * run enforces, and an absent one always does.
  */
 export function filterAllowedUrls(
   urls: string[],
   robotsRules: RobotsRules,
+  { enforce = false }: { enforce?: boolean } = {},
 ): { allowed: string[]; disallowed: { url: string; rule: string | null }[] } {
+  if (robotsRules.status === "unavailable" && enforce) {
+    return { allowed: [], disallowed: urls.map((url) => ({ url, rule: null })) };
+  }
   if (robotsRules.status !== "ok") return { allowed: urls, disallowed: [] };
   const allowed: string[] = [];
   const disallowed: { url: string; rule: string | null }[] = [];

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { checkAgainstRules, checkRobotsTxt, evaluatePath, fetchRobotsRules, filterAllowedUrls, robotsVerdict } from '../lib/robots.js';
+import { checkAgainstRules, checkRobotsTxt, evaluatePath, fetchRobotsRules, filterAllowedUrls, robotsAgentFor, robotsVerdict } from '../lib/robots.js';
 
 function withMockFetch<T>(body: string | null, status: number, run: () => Promise<T>): Promise<T> {
   const original = globalThis.fetch;
@@ -222,5 +222,46 @@ test('a refusal or a rate limit is unreadable, not absent', async () => {
       robotsVerdict(checkAgainstRules('https://example.com/', refused), { enforce: true }).action,
       'refuse',
     );
+  }
+});
+
+test('robotsAgentFor: the group we match follows the User-Agent we send', () => {
+  assert.equal(robotsAgentFor(undefined), '*');
+  assert.equal(robotsAgentFor('Mozilla/5.0 (X11) Chrome/136.0.0.0 Safari/537.36'), '*');
+  assert.equal(robotsAgentFor('Mozilla/5.0 Chrome/136 Dembrandt/0.32.1 (+https://dembrandt.com/bot)'), 'Dembrandt');
+  assert.equal(robotsAgentFor('custom dembrandt runner'), 'Dembrandt');
+});
+
+test('filterAllowedUrls: an unreadable robots.txt allows nothing when the run enforces', () => {
+  const urls = ['https://example.com/a', 'https://example.com/b'];
+
+  assert.deepEqual(filterAllowedUrls(urls, { status: 'unavailable' }, { enforce: true }), {
+    allowed: [],
+    disallowed: [{ url: urls[0], rule: null }, { url: urls[1], rule: null }],
+  });
+  assert.deepEqual(filterAllowedUrls(urls, { status: 'unavailable' }, { enforce: false }), {
+    allowed: urls,
+    disallowed: [],
+  });
+  // The default is the advisory posture, so an omitted option never enforces.
+  assert.deepEqual(filterAllowedUrls(urls, { status: 'unavailable' }), { allowed: urls, disallowed: [] });
+  assert.deepEqual(filterAllowedUrls(urls, { status: 'absent' }, { enforce: true }), {
+    allowed: urls,
+    disallowed: [],
+  });
+});
+
+test('filterAllowedUrls and robotsVerdict answer the same question the same way', () => {
+  const url = 'https://example.com/x';
+  for (const enforce of [true, false]) {
+    for (const rules of [{ status: 'absent' } as const, { status: 'unavailable' } as const]) {
+      const verdict = robotsVerdict(checkAgainstRules(url, rules), { enforce });
+      const { allowed } = filterAllowedUrls([url], rules, { enforce });
+      assert.equal(
+        allowed.length === 1,
+        verdict.action !== 'refuse',
+        `${rules.status} under enforce=${enforce}`,
+      );
+    }
   }
 });
