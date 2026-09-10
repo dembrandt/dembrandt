@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.32.2] - 2026-09-10
+
+The robots decision follows the page.
+
+### Fixed
+- A redirect to another origin was extracted against the entry origin's rules. The decision now runs after navigation, on the URL the run landed on: an enforcing run exits `4` there instead of keeping a result the site refused (#210)
+- The crawl filter allowed every discovered page through whenever robots.txt could not be read, including under `DEMBRANDT_ENFORCE_ROBOTS=1`. It now follows the same rules as the entry check (#210)
+- The MCP server matched the `*` group even when the browser announced itself, so a site could refuse it by name with no effect (#210)
+
 ## [0.32.1] - 2026-09-09
 
 A missing robots.txt is not a refusal.

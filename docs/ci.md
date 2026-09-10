@@ -12,7 +12,7 @@ Extract a live URL, compare it against a baseline, fail the job when the design 
 The official action wraps extract → compare → gate into one step: it installs a matching Chromium, runs a pinned CLI version, fails the job on drift, and renders the drifted tokens as inline annotations on the PR. This is the supported path; the sections below are for runners it does not cover.
 
 ```yaml
-- uses: dembrandt/dembrandt@v0.32.1
+- uses: dembrandt/dembrandt@v0.32.2
   with:
     url: https://preview.example.com
     baseline: .dembrandt/baseline.json
@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dembrandt/dembrandt@v0.32.1
+      - uses: dembrandt/dembrandt@v0.32.2
         with:
           url: ${{ github.event.deployment_status.environment_url }}
           baseline: .dembrandt/baseline.json
