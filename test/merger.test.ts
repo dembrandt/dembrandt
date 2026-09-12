@@ -348,6 +348,29 @@ test('wcag pairs dedup order-insensitively and state pairs stay separate', () =>
   assert.equal(merged.wcag[merged.wcag.length - 1].source, 'state', 'state pairs are appended last');
 });
 
+test('a colour pair used as body text and as a heading stays two pairs across pages', () => {
+  const body = { fg: '#767676', bg: '#ffffff', ratio: 4.54, aa: true, count: 4, large: false, requiredAA: 4.5, passAA: true, fontSize: 16, fontWeight: 400 };
+  const head = { fg: '#767676', bg: '#ffffff', ratio: 4.54, aa: true, count: 1, large: true, requiredAA: 3, passAA: true, fontSize: 32, fontWeight: 700 };
+  const merged = mergeResults([
+    page('https://a.com/', { wcag: [{ ...body }, { ...head }] }),
+    page('https://a.com/x', { wcag: [{ ...body, count: 2, fontSize: 13 }] }),
+  ]);
+  const statics = merged.wcag.filter(p => !p.source);
+  assert.equal(statics.length, 2, 'body and large carry different thresholds');
+  const small = statics.find(p => !p.large);
+  assert.equal(small.count, 6);
+  assert.equal(small.fontSize, 13, 'the smallest occurrence across pages is the one at risk');
+  assert.equal(small.fontWeight, 400);
+});
+
+test('pairs from an extraction with no observed size still merge on colour alone', () => {
+  const merged = mergeResults([
+    page('https://a.com/', { wcag: [{ fg: '#fff', bg: '#000', ratio: 21, aa: true, count: 2 }] }),
+    page('https://a.com/x', { wcag: [{ fg: '#000', bg: '#fff', ratio: 21, aa: true, count: 3 }] }),
+  ]);
+  assert.equal(merged.wcag.filter(p => !p.source).length, 1);
+});
+
 test('gradients union on the gradient string', () => {
   const g = { gradient: 'linear-gradient(#000, #fff)', type: 'linear-gradient', count: 1 };
   const merged = mergeResults([

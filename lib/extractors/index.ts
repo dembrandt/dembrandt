@@ -1013,7 +1013,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
             return null;
           }
           const computed = getComputedStyle(el);
-          return { color: computed.color, backgroundColor: computed.backgroundColor, resolvedBg: findBg(el), borderColor: computed.borderColor, tag: el.tagName.toLowerCase() };
+          return { color: computed.color, backgroundColor: computed.backgroundColor, resolvedBg: findBg(el), borderColor: computed.borderColor, tag: el.tagName.toLowerCase(), fontSize: parseFloat(computed.fontSize), fontWeight: parseInt(computed.fontWeight, 10) };
         });
 
         const hovered = await element.hover({ timeout: 1000 * timeoutMultiplier }).then(() => true).catch(() => false);
@@ -1054,7 +1054,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         const hoverFg = afterHover.color;
         const hoverBg = afterHover.resolvedBg;
         if (hovered && hoverFg && hoverBg && (hoverFg !== beforeState.color || hoverBg !== beforeState.resolvedBg)) {
-          interactiveStatePairs.push({ fg: hoverFg, bg: hoverBg, state: 'hover', tag: beforeState.tag });
+          interactiveStatePairs.push({ fg: hoverFg, bg: hoverBg, state: 'hover', tag: beforeState.tag, fontSize: beforeState.fontSize, fontWeight: beforeState.fontWeight });
         }
 
         if (['input', 'textarea', 'select', 'button', 'a'].includes(beforeState.tag)) {
@@ -1091,7 +1091,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
             const focusFg = afterFocus.color;
             const focusBg = afterFocus.resolvedBg;
             if (focusFg && focusBg && (focusFg !== beforeState.color || focusBg !== beforeState.resolvedBg)) {
-              interactiveStatePairs.push({ fg: focusFg, bg: focusBg, state: 'focus', tag: beforeState.tag });
+              interactiveStatePairs.push({ fg: focusFg, bg: focusBg, state: 'focus', tag: beforeState.tag, fontSize: beforeState.fontSize, fontWeight: beforeState.fontWeight });
             }
           } catch (e) {}
         }
@@ -1349,7 +1349,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
     if (options.wcag) {
       spinner.start("Analyzing WCAG contrast pairs...");
       try {
-        const { relativeLuminance } = await import('../colors.js');
+        const { relativeLuminance, wcagVerdict, isLargeScale } = await import('../colors.js');
 
         function calcPair(fgRaw: string, bgRaw: string, extra: Partial<WcagPair> = {}): WcagPair | null {
           const toHex = (c: string) => {
@@ -1366,25 +1366,29 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
           const lighter = Math.max(l1, l2);
           const darker = Math.min(l1, l2);
           const ratio = Math.round((lighter + 0.05) / (darker + 0.05) * 100) / 100;
-          return { fg, bg, ratio, aa: ratio >= 4.5, aaLarge: ratio >= 3, aaa: ratio >= 7, ...extra };
+          const large = extra.fontSize === undefined
+            ? undefined
+            : isLargeScale(extra.fontSize, extra.fontWeight ?? 400);
+          return { fg, bg, ratio, aa: ratio >= 4.5, aaLarge: ratio >= 3, aaa: ratio >= 7, ...wcagVerdict(ratio, large), ...extra };
         }
 
         wcag = await extractWcagPairs(page);
 
         // Deduplicate and score interactive state pairs
         const seenState = new Set();
-        for (const { fg, bg, state, tag } of interactiveStatePairs) {
+        for (const { fg, bg, state, tag, fontSize, fontWeight } of interactiveStatePairs) {
           const key = `${state}/${fg}/${bg}`;
           if (seenState.has(key)) continue;
           seenState.add(key);
-          const pair = calcPair(fg, bg, { state, tag, source: 'state' });
+          const pair = calcPair(fg, bg, { state, tag, source: 'state', fontSize, fontWeight });
           if (pair) wcag.push(pair);
         }
 
         spinner.stop();
-        const staticPassing = wcag.filter(p => !p.source && p.aa).length;
+        const passes = (p: WcagPair) => p.passAA ?? p.aa;
+        const staticPassing = wcag.filter(p => !p.source && passes(p)).length;
         const staticTotal = wcag.filter(p => !p.source).length;
-        const statesFailing = wcag.filter(p => p.source === 'state' && !p.aa).length;
+        const statesFailing = wcag.filter(p => p.source === 'state' && !passes(p)).length;
         log(color.success(`  ✓ WCAG: ${staticPassing}/${staticTotal} pairs pass AA`) +
           (statesFailing ? color.warning(` · ${statesFailing} state pair(s) fail`) : ''));
       } catch {

@@ -387,14 +387,22 @@ function mergeWcag(results) {
   const map = new Map();
   for (const r of results) {
     for (const p of r.wcag || []) {
+      // Size class is part of the identity: the same colour pair carries a
+      // different threshold as body text and as a heading.
+      const size = p.large === undefined ? '' : `|${p.large ? 'lg' : 'sm'}`;
       const key = p.source === 'state'
-        ? `state|${p.state}|${p.tag}|${p.fg}|${p.bg}`
-        : `static|${[p.fg, p.bg].sort().join('/')}`;
+        ? `state|${p.state}|${p.tag}|${p.fg}|${p.bg}${size}`
+        : `static|${[p.fg, p.bg].sort().join('/')}${size}`;
       const entry = map.get(key);
-      if (entry) {
-        if (p.count != null) entry.count = (entry.count ?? 0) + p.count;
-      } else {
+      if (!entry) {
         map.set(key, { ...p });
+      } else {
+        if (p.count != null) entry.count = (entry.count ?? 0) + p.count;
+        // Report the smallest occurrence across pages: it is closest to failing.
+        if (p.fontSize != null && (entry.fontSize == null || p.fontSize < entry.fontSize)) {
+          entry.fontSize = p.fontSize;
+          entry.fontWeight = p.fontWeight;
+        }
       }
     }
   }

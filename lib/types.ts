@@ -324,8 +324,11 @@ export interface WcagPair {
   fg: string;
   bg: string;
   ratio: number;
+  /** @deprecated Fixed 4.5:1 test, ignores text size. Read passAA instead. */
   aa: boolean;
+  /** @deprecated Fixed 3:1 test, says nothing about whether the text is large. */
   aaLarge: boolean;
+  /** @deprecated Fixed 7:1 test, ignores text size. Read passAAA instead. */
   aaa: boolean;
   count?: number;
   state?: string;

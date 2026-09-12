@@ -914,7 +914,8 @@ export async function extractWcagPairs(page) {
           const fg = toHexFromRgb(effR, effG, effB);
           const bg = toHexFromRgb(bgRgb.r, bgRgb.g, bgRgb.b);
           if (fg === bg) continue;
-          const fontSize = parseFloat(s.fontSize) || 16;
+          const parsedSize = parseFloat(s.fontSize);
+          const fontSize = Number.isFinite(parsedSize) && parsedSize > 0 ? parsedSize : 16;
           const weight = parseInt(s.fontWeight, 10) || 400;
           const large = isLargeScale(fontSize, weight);
           const key = [fg, bg].sort().join('/') + (large ? '/lg' : '');
@@ -937,13 +938,10 @@ export async function extractWcagPairs(page) {
 
   const { relativeLuminance, wcagVerdict } = await import('../colors.js');
   const pairs = [];
-  const seen = new Set();
 
+  // rawPairs arrive already deduped by the same key, built in the page context.
   for (const { fg, bg, count, fontSize, fontWeight, large } of rawPairs) {
     try {
-      const key = [fg, bg].sort().join('/') + (large ? '/lg' : '');
-      if (seen.has(key)) continue;
-      seen.add(key);
       const l1 = relativeLuminance(fg);
       const l2 = relativeLuminance(bg);
       if (l1 === null || l2 === null) continue;
