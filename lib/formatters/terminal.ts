@@ -1078,12 +1078,14 @@ function displayWcag(wcag) {
     };
     const fgSwatch = swatch(pair.fg);
     const bgSwatch = swatch(pair.bg);
-    const grade = pair.aaa
-      ? color.success('AAA')
-      : pair.aa
-        ? color.success('AA ')
-        : pair.aaLarge
-          ? color.warning('AA-Large')
+    // Only a pair whose observed text size is known can be graded against the
+    // threshold that governs it; older extractions fall back to the flags.
+    const grade = pair.passAA === undefined
+      ? (pair.aaa ? color.success('AAA') : pair.aa ? color.success('AA ') : pair.aaLarge ? color.warning('AA-Large') : color.error('fail'))
+      : pair.passAAA
+        ? color.success('AAA')
+        : pair.passAA
+          ? color.success(pair.large ? 'AA large' : 'AA ')
           : color.error('fail');
     const ratio = chalk.bold(`${pair.ratio}:1`);
     const stateTag = pair.state ? chalk.dim(` [${pair.state}]`) : '';

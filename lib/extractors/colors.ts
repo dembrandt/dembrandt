@@ -868,6 +868,30 @@ export async function extractWcagPairs(page) {
         return compositeBackgroundLayers(layers);
       }
 
+      // WCAG 2.1 1.4.3 exempts logotypes, inactive components, and text not
+      // visible to anyone. Reporting those as failures is a false positive.
+      function isExempt(el) {
+        if (el.closest('[aria-hidden="true"]')) return true;
+        if (el.closest('[disabled], [aria-disabled="true"], fieldset[disabled]')) return true;
+        return !!el.closest('[class*="logo" i], [id*="logo" i], [class*="wordmark" i]');
+      }
+
+      // Only elements rendering their own text: a wrapper whose text lives in a
+      // child would otherwise be counted again with the child's own colours.
+      function hasOwnText(el) {
+        for (const node of el.childNodes) {
+          if (node.nodeType === 3 && node.nodeValue.trim()) return true;
+        }
+        return false;
+      }
+
+      // 1.4.3 "large scale": 18pt, or 14pt bold. Points, not pixels.
+      const PT = 96 / 72;
+      function isLargeScale(fontSizePx, weight) {
+        if (fontSizePx >= 18 * PT) return true;
+        return weight >= 700 && fontSizePx >= 14 * PT;
+      }
+
       const seen = new Map();
       let checked = 0;
       const els = document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, a, button, label, span, li, td, th, [role="button"]');
@@ -879,6 +903,7 @@ export async function extractWcagPairs(page) {
           if (s.display === 'none' || s.visibility === 'hidden' || s.opacity === '0') continue;
           const rect = el.getBoundingClientRect();
           if (rect.width === 0 || rect.height === 0) continue;
+          if (!hasOwnText(el) || isExempt(el)) continue;
           const fgRgba = parseRgba(s.color);
           if (!fgRgba || fgRgba.a < 0.1) continue;
           const bgRgb = effectiveBackground(el);
@@ -889,9 +914,19 @@ export async function extractWcagPairs(page) {
           const fg = toHexFromRgb(effR, effG, effB);
           const bg = toHexFromRgb(bgRgb.r, bgRgb.g, bgRgb.b);
           if (fg === bg) continue;
-          const key = [fg, bg].sort().join('/');
+          const fontSize = parseFloat(s.fontSize) || 16;
+          const weight = parseInt(s.fontWeight, 10) || (s.fontWeight === 'bold' ? 700 : 400);
+          const large = isLargeScale(fontSize, weight);
+          // Size is part of the identity: the same pair carries a 4.5:1
+          // requirement as body text and 3:1 as a heading.
+          const key = [fg, bg].sort().join('/') + (large ? '/lg' : '');
           const entry = seen.get(key);
-          if (entry) { entry.count++; } else { seen.set(key, { fg, bg, count: 1 }); }
+          if (entry) {
+            entry.count++;
+            entry.fontSize = Math.min(entry.fontSize, fontSize);
+          } else {
+            seen.set(key, { fg, bg, count: 1, fontSize, fontWeight: weight, large });
+          }
         } catch { /* skip any element that throws */ }
       }
 
@@ -901,13 +936,13 @@ export async function extractWcagPairs(page) {
     return [];
   }
 
-  const { relativeLuminance } = await import('../colors.js');
+  const { relativeLuminance, wcagVerdict } = await import('../colors.js');
   const pairs = [];
   const seen = new Set();
 
-  for (const { fg, bg, count } of rawPairs) {
+  for (const { fg, bg, count, fontSize, fontWeight, large } of rawPairs) {
     try {
-      const key = [fg, bg].sort().join('/');
+      const key = [fg, bg].sort().join('/') + (large ? '/lg' : '');
       if (seen.has(key)) continue;
       seen.add(key);
       const l1 = relativeLuminance(fg);
@@ -916,7 +951,13 @@ export async function extractWcagPairs(page) {
       const lighter = Math.max(l1, l2);
       const darker = Math.min(l1, l2);
       const ratio = Math.round((lighter + 0.05) / (darker + 0.05) * 100) / 100;
-      pairs.push({ fg, bg, ratio, aa: ratio >= 4.5, aaLarge: ratio >= 3, aaa: ratio >= 7, count });
+      pairs.push({
+        fg, bg, ratio, count,
+        aa: ratio >= 4.5, aaLarge: ratio >= 3, aaa: ratio >= 7,
+        ...wcagVerdict(ratio, large),
+        fontSize: fontSize === undefined ? undefined : Math.round(fontSize * 10) / 10,
+        fontWeight,
+      });
     } catch { /* skip malformed pair */ }
   }
 

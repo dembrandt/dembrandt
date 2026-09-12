@@ -365,6 +365,21 @@ export function relativeLuminance(hex) {
 }
 
 /**
+ * Apply the WCAG 2.1 threshold that actually governs a text pair. 1.4.3 requires
+ * 4.5:1, or 3:1 for large-scale text; 1.4.6 requires 7:1, or 4.5:1 large.
+ * `large` undefined means the text size was not observed, so no verdict is given.
+ */
+export function wcagVerdict(ratio: number, large?: boolean) {
+  if (large === undefined) return {};
+  return {
+    large,
+    requiredAA: large ? 3 : 4.5,
+    passAA: ratio >= (large ? 3 : 4.5),
+    passAAA: ratio >= (large ? 4.5 : 7),
+  };
+}
+
+/**
  * Compute WCAG contrast ratios for all pairs in a color palette.
  * @param {Array<{color: string, normalized: string, confidence: string}>} palette
  * @returns {Array<{fg: string, bg: string, ratio: number, aa: boolean, aaLarge: boolean, aaa: boolean}>}

@@ -331,6 +331,15 @@ export interface WcagPair {
   state?: string;
   tag?: string;
   source?: string;
+  /** Observed text size of the smallest occurrence, in CSS px. */
+  fontSize?: number;
+  fontWeight?: number;
+  /** WCAG 1.4.3 large scale: >= 18pt, or >= 14pt bold. */
+  large?: boolean;
+  /** Threshold 1.4.3 actually applies to this pair: 3 when large, else 4.5. */
+  requiredAA?: number;
+  passAA?: boolean;
+  passAAA?: boolean;
 }
 
 /** Metadata block on the native extraction output. */

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { hexToRgb, relativeLuminance, computeWcag, convertColor, deltaE, deltaE2000 } from '../lib/colors.js';
+import { hexToRgb, relativeLuminance, computeWcag, wcagVerdict, convertColor, deltaE, deltaE2000 } from '../lib/colors.js';
 import { capConfidenceByUsage, bindContrastToPalette, extractWcagPairs, extractColors } from '../lib/extractors/colors.js';
 
 test('hexToRgb parses 6, 3, and 8 digit hex', () => {
@@ -229,4 +229,23 @@ test('the page-context deltaE numerically matches lib/colors.ts deltaE', () => {
       `deltaE(${a}, ${b}): inline=${inlineDeltaE(a, b)} canonical=${deltaE(a, b)}`,
     );
   }
+});
+
+test('wcagVerdict: 3.2:1 fails as body text but passes as large text', () => {
+  assert.equal(wcagVerdict(3.2, false).passAA, false);
+  assert.equal(wcagVerdict(3.2, true).passAA, true);
+});
+
+test('wcagVerdict: AAA threshold relaxes to 4.5 for large text', () => {
+  assert.equal(wcagVerdict(5, false).passAAA, false);
+  assert.equal(wcagVerdict(5, true).passAAA, true);
+});
+
+test('wcagVerdict: names the threshold it applied', () => {
+  assert.equal(wcagVerdict(1, false).requiredAA, 4.5);
+  assert.equal(wcagVerdict(1, true).requiredAA, 3);
+});
+
+test('wcagVerdict: no verdict when the text size was not observed', () => {
+  assert.deepEqual(wcagVerdict(3.2, undefined), {});
 });

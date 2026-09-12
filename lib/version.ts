@@ -39,6 +39,15 @@
  *  (unversioned) — `voice` / `voiceSkipped` ship behind a hidden, opt-in flag
  *          and deliberately do not bump the contract. Bump when the flag is
  *          documented, not before.
+ *  1.13.0 — wcag pairs gain fontSize, fontWeight, large, requiredAA, passAA and
+ *          passAAA: the observed text size decides which 1.4.3 / 1.4.6
+ *          threshold governs a pair, so passAA is a verdict where aa was only
+ *          a fixed 4.5:1 test. BEHAVIOR: pairs are now keyed by size class, so
+ *          one colour pair can appear twice (body and large), and text that
+ *          1.4.3 exempts (logotypes, disabled controls, aria-hidden) plus
+ *          wrappers whose text is rendered by a child are no longer reported.
+ *          Values move for an unchanged site.
+ *
  *  1.12.0 — colors.detected entries gain areaFrac: the colour's share of painted
  *          background area, alongside the existing element-count usageFrac, so
  *          a hero fill is not outranked by sixty icons. BEHAVIOR, and it is a
@@ -156,7 +165,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.12.0';
+export const SCHEMA_VERSION = '1.13.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
