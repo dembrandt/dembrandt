@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { hexToRgb, relativeLuminance, computeWcag, wcagVerdict, convertColor, deltaE, deltaE2000 } from '../lib/colors.js';
+import { hexToRgb, relativeLuminance, computeWcag, wcagVerdict, isLargeScale, convertColor, deltaE, deltaE2000 } from '../lib/colors.js';
 import { capConfidenceByUsage, bindContrastToPalette, extractWcagPairs, extractColors } from '../lib/extractors/colors.js';
 
 test('hexToRgb parses 6, 3, and 8 digit hex', () => {
@@ -248,4 +248,16 @@ test('wcagVerdict: names the threshold it applied', () => {
 
 test('wcagVerdict: no verdict when the text size was not observed', () => {
   assert.deepEqual(wcagVerdict(3.2, undefined), {});
+});
+
+test('isLargeScale: 18pt is 24px, not 18px', () => {
+  assert.equal(isLargeScale(18, 400), false);
+  assert.equal(isLargeScale(23, 400), false);
+  assert.equal(isLargeScale(24, 400), true);
+});
+
+test('isLargeScale: 14pt bold is 18.67px, and only when bold', () => {
+  assert.equal(isLargeScale(19, 400), false);
+  assert.equal(isLargeScale(19, 700), true);
+  assert.equal(isLargeScale(18, 700), false);
 });

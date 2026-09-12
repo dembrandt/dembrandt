@@ -364,15 +364,19 @@ export function relativeLuminance(hex) {
   return 0.2126 * srgbToLinear(rgb.r) + 0.7152 * srgbToLinear(rgb.g) + 0.0722 * srgbToLinear(rgb.b);
 }
 
+/** 1.4.3 large scale is 18pt, or 14pt bold. Points, not pixels. */
+export function isLargeScale(fontSizePx: number, weight: number): boolean {
+  const pt = 96 / 72;
+  if (fontSizePx >= 18 * pt) return true;
+  return weight >= 700 && fontSizePx >= 14 * pt;
+}
+
 /** Grade a text pair at the threshold its size earns. Undefined `large`: no verdict. */
 export function wcagVerdict(ratio: number, large?: boolean) {
   if (large === undefined) return {};
-  return {
-    large,
-    requiredAA: large ? 3 : 4.5,
-    passAA: ratio >= (large ? 3 : 4.5),
-    passAAA: ratio >= (large ? 4.5 : 7),
-  };
+  const requiredAA = large ? 3 : 4.5;
+  const requiredAAA = large ? 4.5 : 7;
+  return { large, requiredAA, passAA: ratio >= requiredAA, passAAA: ratio >= requiredAAA };
 }
 
 /**

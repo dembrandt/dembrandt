@@ -1058,6 +1058,18 @@ function displayMotion(motion) {
   console.log(chalk.dim('│'));
 }
 
+// Extractions predating the observed-size fields carry only the fixed flags.
+function gradeOf(pair) {
+  if (pair.passAA === undefined) {
+    if (pair.aaa) return color.success('AAA');
+    if (pair.aa) return color.success('AA ');
+    return pair.aaLarge ? color.warning('AA-Large') : color.error('fail');
+  }
+  if (pair.passAAA) return color.success('AAA');
+  if (pair.passAA) return color.success(pair.large ? 'AA large' : 'AA ');
+  return color.error('fail');
+}
+
 function displayWcag(wcag) {
   if (!wcag || wcag.length === 0) return;
 
@@ -1078,13 +1090,7 @@ function displayWcag(wcag) {
     };
     const fgSwatch = swatch(pair.fg);
     const bgSwatch = swatch(pair.bg);
-    const grade = pair.passAA === undefined
-      ? (pair.aaa ? color.success('AAA') : pair.aa ? color.success('AA ') : pair.aaLarge ? color.warning('AA-Large') : color.error('fail'))
-      : pair.passAAA
-        ? color.success('AAA')
-        : pair.passAA
-          ? color.success(pair.large ? 'AA large' : 'AA ')
-          : color.error('fail');
+    const grade = gradeOf(pair);
     const ratio = chalk.bold(`${pair.ratio}:1`);
     const stateTag = pair.state ? chalk.dim(` [${pair.state}]`) : '';
     console.log(chalk.dim(`│  ${branch}`) + ' ' + `${fgSwatch} ${bgSwatch}  ${ratio}  ${grade}${stateTag}  ${chalk.dim(pair.fg + ' / ' + pair.bg)}`);

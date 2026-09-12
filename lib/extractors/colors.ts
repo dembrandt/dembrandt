@@ -868,10 +868,13 @@ export async function extractWcagPairs(page) {
         return compositeBackgroundLayers(layers);
       }
 
+      // "logo" as a whole word: [class*=logo] alone also matches "logout".
+      const LOGO_NAME = /(^|[^a-z])(logo|wordmark)([^a-z]|$)/i;
       function isExempt(el) {
-        if (el.closest('[aria-hidden="true"]')) return true;
-        if (el.closest('[disabled], [aria-disabled="true"], fieldset[disabled]')) return true;
-        return !!el.closest('[class*="logo" i], [id*="logo" i], [class*="wordmark" i]');
+        const hit = el.closest('[aria-hidden="true"], [disabled], [aria-disabled="true"], fieldset[disabled], [class*="logo" i], [id*="logo" i], [class*="wordmark" i]');
+        if (!hit) return false;
+        if (!hit.matches('[class*="logo" i], [id*="logo" i], [class*="wordmark" i]')) return true;
+        return LOGO_NAME.test(hit.className + ' ' + hit.id);
       }
 
       function hasOwnText(el) {
@@ -881,11 +884,12 @@ export async function extractWcagPairs(page) {
         return false;
       }
 
-      // 1.4.3 large scale is 18pt, or 14pt bold. Points, not pixels.
-      const PT = 96 / 72;
+      // Mirror of isLargeScale (lib/colors.ts) — kept inline because
+      // page.evaluate runs in an isolated realm and cannot import.
       function isLargeScale(fontSizePx, weight) {
-        if (fontSizePx >= 18 * PT) return true;
-        return weight >= 700 && fontSizePx >= 14 * PT;
+        const pt = 96 / 72;
+        if (fontSizePx >= 18 * pt) return true;
+        return weight >= 700 && fontSizePx >= 14 * pt;
       }
 
       const seen = new Map();
@@ -911,15 +915,16 @@ export async function extractWcagPairs(page) {
           const bg = toHexFromRgb(bgRgb.r, bgRgb.g, bgRgb.b);
           if (fg === bg) continue;
           const fontSize = parseFloat(s.fontSize) || 16;
-          const weight = parseInt(s.fontWeight, 10) || (s.fontWeight === 'bold' ? 700 : 400);
+          const weight = parseInt(s.fontWeight, 10) || 400;
           const large = isLargeScale(fontSize, weight);
           const key = [fg, bg].sort().join('/') + (large ? '/lg' : '');
           const entry = seen.get(key);
-          if (entry) {
-            entry.count++;
-            entry.fontSize = Math.min(entry.fontSize, fontSize);
-          } else {
+          if (!entry) {
             seen.set(key, { fg, bg, count: 1, fontSize, fontWeight: weight, large });
+          } else {
+            entry.count++;
+            // Report the smallest occurrence: it is the one closest to failing.
+            if (fontSize < entry.fontSize) { entry.fontSize = fontSize; entry.fontWeight = weight; }
           }
         } catch { /* skip any element that throws */ }
       }
