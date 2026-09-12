@@ -484,3 +484,28 @@ test('voiceAllPages is null when every page skipped voice, even though the run u
 
   assert.equal(merged.voiceAllPages, null);
 });
+
+test('coverage tags a token by how many pages carry it, not by how often it is used', () => {
+  const everywhere = { px: '8px', count: 40 };
+  const oneOff = { px: '11px', count: 400 };
+
+  const merged = mergeResults([
+    page('https://a.com/', { spacing: { commonValues: [everywhere, oneOff] } }),
+    page('https://a.com/pricing', { spacing: { commonValues: [everywhere] } }),
+    page('https://a.com/docs', { spacing: { commonValues: [everywhere] } }),
+  ]);
+
+  const spacing = merged.spacing.commonValues;
+  assert.equal(spacing.find((v) => v.px === '8px').pageCount, 3);
+  assert.equal(spacing.find((v) => v.px === '11px').pageCount, 1);
+
+  // The heavily-used value is the outlier: usage is a page-local opinion,
+  // coverage is the site's agreement.
+  assert.deepEqual(merged.coverage.outliers.map((o) => o.token), ['11px']);
+  assert.equal(merged.coverage.totalPages, 3);
+});
+
+test('coverage is absent for a single-page extraction', () => {
+  const merged = mergeResults([page('https://a.com/', { shadows: [{ shadow: '0 1px 2px', count: 3 }] })]);
+  assert.equal(merged.coverage, undefined);
+});
