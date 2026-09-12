@@ -868,16 +868,12 @@ export async function extractWcagPairs(page) {
         return compositeBackgroundLayers(layers);
       }
 
-      // WCAG 2.1 1.4.3 exempts logotypes, inactive components, and text not
-      // visible to anyone. Reporting those as failures is a false positive.
       function isExempt(el) {
         if (el.closest('[aria-hidden="true"]')) return true;
         if (el.closest('[disabled], [aria-disabled="true"], fieldset[disabled]')) return true;
         return !!el.closest('[class*="logo" i], [id*="logo" i], [class*="wordmark" i]');
       }
 
-      // Only elements rendering their own text: a wrapper whose text lives in a
-      // child would otherwise be counted again with the child's own colours.
       function hasOwnText(el) {
         for (const node of el.childNodes) {
           if (node.nodeType === 3 && node.nodeValue.trim()) return true;
@@ -885,7 +881,7 @@ export async function extractWcagPairs(page) {
         return false;
       }
 
-      // 1.4.3 "large scale": 18pt, or 14pt bold. Points, not pixels.
+      // 1.4.3 large scale is 18pt, or 14pt bold. Points, not pixels.
       const PT = 96 / 72;
       function isLargeScale(fontSizePx, weight) {
         if (fontSizePx >= 18 * PT) return true;
@@ -917,8 +913,6 @@ export async function extractWcagPairs(page) {
           const fontSize = parseFloat(s.fontSize) || 16;
           const weight = parseInt(s.fontWeight, 10) || (s.fontWeight === 'bold' ? 700 : 400);
           const large = isLargeScale(fontSize, weight);
-          // Size is part of the identity: the same pair carries a 4.5:1
-          // requirement as body text and 3:1 as a heading.
           const key = [fg, bg].sort().join('/') + (large ? '/lg' : '');
           const entry = seen.get(key);
           if (entry) {

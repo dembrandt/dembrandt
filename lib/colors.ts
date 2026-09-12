@@ -364,11 +364,7 @@ export function relativeLuminance(hex) {
   return 0.2126 * srgbToLinear(rgb.r) + 0.7152 * srgbToLinear(rgb.g) + 0.0722 * srgbToLinear(rgb.b);
 }
 
-/**
- * Apply the WCAG 2.1 threshold that actually governs a text pair. 1.4.3 requires
- * 4.5:1, or 3:1 for large-scale text; 1.4.6 requires 7:1, or 4.5:1 large.
- * `large` undefined means the text size was not observed, so no verdict is given.
- */
+/** Grade a text pair at the threshold its size earns. Undefined `large`: no verdict. */
 export function wcagVerdict(ratio: number, large?: boolean) {
   if (large === undefined) return {};
   return {

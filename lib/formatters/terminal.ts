@@ -1078,8 +1078,6 @@ function displayWcag(wcag) {
     };
     const fgSwatch = swatch(pair.fg);
     const bgSwatch = swatch(pair.bg);
-    // Only a pair whose observed text size is known can be graded against the
-    // threshold that governs it; older extractions fall back to the flags.
     const grade = pair.passAA === undefined
       ? (pair.aaa ? color.success('AAA') : pair.aa ? color.success('AA ') : pair.aaLarge ? color.warning('AA-Large') : color.error('fail'))
       : pair.passAAA
