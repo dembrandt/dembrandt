@@ -47,6 +47,14 @@ test('renders a self-contained document with no external resources', () => {
   assert.doesNotMatch(html, /@import/i);
 });
 
+test('a logo and favicons never become external resources either', () => {
+  const html = generateHtmlReport(fixture({
+    logo: { source: 'img', url: 'https://example.com/logo.png' },
+    favicons: [{ type: 'icon', url: 'https://example.com/favicon.png', sizes: null }],
+  }));
+  assert.doesNotMatch(html, /src="https?:/i);
+});
+
 test('escapes untrusted extracted strings (no breakout into the document)', () => {
   const evil = '</style><img src=x onerror=alert(1)>';
   const html = generateHtmlReport(fixture({
@@ -132,12 +140,12 @@ test('non-http logo and favicon sources are refused as image srcs', () => {
     logo: { source: 'img', url: 'javascript:alert(1)', width: 10, height: 10 },
     favicons: [
       { type: 'icon', url: 'file:///etc/passwd', sizes: null },
-      { type: 'apple-touch-icon', url: 'https://example.com/apple.png', sizes: '180x180' },
+      { type: 'apple-touch-icon', url: 'https://example.com/apple.png', sizes: '180x180', dataUri: 'data:image/png;base64,iVBORw0KGgo=' },
     ],
   }));
   assert.doesNotMatch(html, /javascript:alert/);
   assert.doesNotMatch(html, /file:\/\/\//);
-  assert.match(html, /src="https:\/\/example\.com\/apple\.png"/);
+  assert.match(html, /src="data:image\/png;base64,iVBORw0KGgo="/);
 });
 
 test('inputs render from either the array or the { text } shape', () => {

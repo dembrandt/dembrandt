@@ -873,15 +873,22 @@ export async function extractLogo(page, url) {
       }
     });
 
+    // An empty or "/" og:image resolves to the page itself, which is a document,
+    // not an image: bmw.de ships one.
+    const asImageUrl = (raw) => {
+      try {
+        const u = new URL(raw, baseUrl);
+        return u.pathname === '/' ? null : u.href;
+      } catch { return null; }
+    };
+
     const ogImage = document.querySelector('meta[property="og:image"]') as any;
-    if (ogImage?.getAttribute('content')) {
-      try { favicons.push({ type: 'og:image', url: new URL(ogImage.getAttribute('content'), baseUrl).href, sizes: null }); } catch {}
-    }
+    const ogUrl = ogImage?.getAttribute('content') ? asImageUrl(ogImage.getAttribute('content')) : null;
+    if (ogUrl) favicons.push({ type: 'og:image', url: ogUrl, sizes: null });
 
     const twitterImage = document.querySelector('meta[name="twitter:image"]') as any;
-    if (twitterImage?.getAttribute('content')) {
-      try { favicons.push({ type: 'twitter:image', url: new URL(twitterImage.getAttribute('content'), baseUrl).href, sizes: null }); } catch {}
-    }
+    const twitterUrl = twitterImage?.getAttribute('content') ? asImageUrl(twitterImage.getAttribute('content')) : null;
+    if (twitterUrl) favicons.push({ type: 'twitter:image', url: twitterUrl, sizes: null });
 
     // Only synthesize the /favicon.ico fallback when the page declares no icon at
     // all. Sites that ship their icon under another name (e.g. favicon-purple.ico)

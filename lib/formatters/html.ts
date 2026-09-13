@@ -73,7 +73,8 @@ function isHttpUrl(u: string): boolean {
   }
 }
 
-function isSafeImgSrc(u: string): boolean {
+function isSafeImgSrc(u?: string | null): boolean {
+  if (!u) return false;
   return isHttpUrl(u) || /^data:image\//i.test(u.trim());
 }
 
@@ -358,7 +359,9 @@ function logoSection(result: BrandingResult): string {
   const favicons = result.favicons ?? [];
   const parts: string[] = [];
   if (logo) {
-    const src = logo.dataUri || logo.url;
+    // The report must stay standalone: an asset whose bytes could not be
+    // inlined is dropped, never hotlinked back to the audited site.
+    const src = logo.dataUri;
     const img = src && isSafeImgSrc(src) ? `<img src="${esc(src)}" alt="${esc(logo.alt || logo.ariaLabel || "logo")}" style="max-height:48px;max-width:220px;object-fit:contain;background:${safeCss(logo.background) || "transparent"}">` : "";
     const meta: string[] = [];
     if (logo.width && logo.height) meta.push(`${logo.width}×${logo.height}`);
@@ -374,8 +377,12 @@ function logoSection(result: BrandingResult): string {
     }
   }
   if (favicons.length) {
+    // og:/twitter: share images are 1200x630 brand assets, not icons: at 24px
+    // they say nothing, and they are too large to inline, so they would be the
+    // only hotlink left in the file. They stay in the JSON.
     const icons = favicons
-      .map((f) => ({ ...f, src: f.dataUri || f.url }))
+      .filter((f) => !/^(og|twitter):/i.test(f.type ?? ""))
+      .map((f) => ({ ...f, src: f.dataUri }))
       .filter((f) => isSafeImgSrc(f.src))
       .map((f) => `<img src="${esc(f.src)}" alt="${esc(f.type)}" title="${esc(f.type)}${f.sizes ? ` ${esc(f.sizes)}` : ""}" style="width:24px;height:24px;object-fit:contain">`)
       .join("");
