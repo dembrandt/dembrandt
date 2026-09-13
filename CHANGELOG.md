@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.33.0] - 2026-09-13
+
+The artifact is correct on its own.
+
+### Fixed
+- The contrast check graded every pair at 4.5:1 regardless of text size, and a pair that failed it was still labelled AA-Large. Each pair now carries the size its text actually had and is graded at the threshold WCAG 1.4.3 gives that size, through one shared verdict every surface calls (#211)
+- Logotypes, disabled controls and `aria-hidden` text were reported as contrast failures, and a wrapper was counted again for text its child renders. Both are out; `[class*=logo]` no longer exempts a container merely named after the mark (#211)
+- A saved HTML report loaded the audited site's logo and favicons over the network, which a `file://` origin cannot do against any site sending `Cross-Origin-Resource-Policy: same-origin` — the images simply did not appear. Assets are inlined at extraction, and one that cannot be inlined is dropped instead of left broken (#211)
+- An `og:image` pointing at the site root was recorded as an image and rendered as a 24px icon (#211)
+- The SVG-colour fetch had no timeout, so one stalled asset held a run for that asset's full response time. Every asset fetch is now bounded, with a budget over the phase (#211)
+
+### Added
+- Drift compares the logo, at the strongest identity both snapshots carry: inline markup, then inlined bytes, then a URL normalised of the `w`/`q`/`dpl`/`dpr`/`s` params an image optimizer rewrites on every deploy (#211)
+- `wcag` pairs carry `fontSize`, `fontWeight`, `large`, `requiredAA`, `passAA` and `passAAA`. `aa`, `aaLarge` and `aaa` still ship, deprecated, and go in 2.0.0 (#211)
+
+### Changed
+- Schema 1.13.0. The same site reports different contrast numbers than it did on 0.32.2: one colour pair can now appear twice, once per size class. Measured on dembrandt.com against a 0.32.2 extraction, static pairs went 47 to 43 and AA passes 38 to 39, with no verdict reversed. The drift gate does not read `wcag`, so it scores this release `stable 0` — the movement is real and the gate is blind to it (#211)
+- MCP responses replace inlined asset bytes with a marker. An agent cannot use base64 pixels and they would cost it hundreds of kilobytes of context (#211)
+
 ## [0.32.2] - 2026-09-10
 
 The robots decision follows the page.
