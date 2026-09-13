@@ -51,6 +51,13 @@
  *          and they are removed in 2.0.0. Every surface grades through
  *          gradeWcagPair()/passesAA(); read passAA, not aa.
  *          Values move for an unchanged site.
+ *          Also in 1.13.0: logo.dataUri is emitted for img and css-background
+ *          logos, not only inline SVG, and favicons gain dataUri. Bytes are
+ *          fetched at extraction time (in the page, then from node), capped at
+ *          100KB for a logo and 25KB for a favicon, and the field stays absent
+ *          when the fetch fails. Exports stop hotlinking the audited site: a
+ *          saved report or PDF no longer breaks offline, rots when the asset
+ *          URL changes, or re-requests the site's server when opened.
  *
  *  1.12.0 — colors.detected entries gain areaFrac: the colour's share of painted
  *          background area, alongside the existing element-count usageFrac, so

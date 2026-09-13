@@ -34,6 +34,68 @@ export async function extractSiteName(page) {
   });
 }
 
+const LOGO_MAX_BYTES = 100_000;
+const FAVICON_MAX_BYTES = 25_000;
+const FAVICON_INLINE_LIMIT = 6;
+
+/**
+ * Fetch each URL as a data URI, in the page first so the session's cookies and
+ * referer apply (CDN-signed and hotlink-protected assets check them), then from
+ * node for anything the page could not read: a cross-origin asset without CORS
+ * headers is unreadable in the page but fine from node.
+ */
+async function inlineAssets(page, urls: string[], maxBytes: number): Promise<Record<string, string>> {
+  if (!urls.length) return {};
+  const out = await inlineInPage(page, urls, maxBytes);
+  for (const u of urls) {
+    if (out[u]) continue;
+    const fromNode = await inlineInNode(u, maxBytes);
+    if (fromNode) out[u] = fromNode;
+  }
+  return out;
+}
+
+async function inlineInNode(url: string, maxBytes: number): Promise<string | null> {
+  try {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!resp.ok) return null;
+    const type = (resp.headers.get('content-type') || '').split(';')[0].trim();
+    if (type && !type.startsWith('image/')) return null;
+    const buf = Buffer.from(await resp.arrayBuffer());
+    if (!buf.length || buf.length > maxBytes) return null;
+    return `data:${type || 'image/png'};base64,${buf.toString('base64')}`;
+  } catch {
+    return null;
+  }
+}
+
+async function inlineInPage(page, urls: string[], maxBytes: number): Promise<Record<string, string>> {
+  try {
+    return await page.evaluate(async ([list, cap]) => {
+      const out = {};
+      for (const u of list) {
+        try {
+          const resp = await fetch(u, { credentials: 'include' });
+          if (!resp.ok) continue;
+          const blob = await resp.blob();
+          if (!blob.size || blob.size > cap) continue;
+          const type = (blob.type || '').split(';')[0].trim();
+          if (type && !type.startsWith('image/')) continue;
+          out[u] = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch { /* asset stays a remote url */ }
+      }
+      return out;
+    }, [urls, maxBytes] as const);
+  } catch {
+    return {};
+  }
+}
+
 export async function extractLogo(page, url) {
   // Extract manifest.json for PWA icons
   const manifestIcons = await page.evaluate((baseUrl) => {
@@ -834,6 +896,30 @@ export async function extractLogo(page, url) {
   // Merge PWA icons into favicons
   result.favicons = [...result.favicons, ...pwaIcons];
   result.manifest = Object.keys(manifestMeta).length > 0 ? manifestMeta : null;
+
+  // A logo that is only a remote URL makes every export a hotlink: it breaks
+  // offline, rots when the URL changes, and re-requests the audited site's
+  // server each time a saved report is opened.
+  const needsBytes: string[] = ([result.logo, ...result.instances] as { url?: string; dataUri?: string; source?: string }[])
+    .filter(i => i && !i.dataUri && i.url && /^https?:/i.test(i.url) && i.source !== 'svg')
+    .map(i => i.url as string);
+  if (needsBytes.length) {
+    const inlined = await inlineAssets(page, [...new Set(needsBytes)], LOGO_MAX_BYTES);
+    for (const inst of [result.logo, ...result.instances]) {
+      if (inst && !inst.dataUri && inlined[inst.url]) inst.dataUri = inlined[inst.url];
+    }
+  }
+
+  const faviconUrls: string[] = (result.favicons as { url?: string; dataUri?: string }[])
+    .filter(f => f && !f.dataUri && f.url && /^https?:/i.test(f.url))
+    .slice(0, FAVICON_INLINE_LIMIT)
+    .map(f => f.url as string);
+  if (faviconUrls.length) {
+    const inlined = await inlineAssets(page, [...new Set(faviconUrls)], FAVICON_MAX_BYTES);
+    for (const f of result.favicons) {
+      if (f && !f.dataUri && inlined[f.url]) f.dataUri = inlined[f.url];
+    }
+  }
 
   // Collect logo colors: inline SVG fill/stroke (already extracted above) + fetched img SVG
   const inlineSvgColors: string[] = [

@@ -375,8 +375,9 @@ function logoSection(result: BrandingResult): string {
   }
   if (favicons.length) {
     const icons = favicons
-      .filter((f) => isSafeImgSrc(f.url))
-      .map((f) => `<img src="${esc(f.url)}" alt="${esc(f.type)}" title="${esc(f.type)}${f.sizes ? ` ${esc(f.sizes)}` : ""}" style="width:24px;height:24px;object-fit:contain">`)
+      .map((f) => ({ ...f, src: f.dataUri || f.url }))
+      .filter((f) => isSafeImgSrc(f.src))
+      .map((f) => `<img src="${esc(f.src)}" alt="${esc(f.type)}" title="${esc(f.type)}${f.sizes ? ` ${esc(f.sizes)}` : ""}" style="width:24px;height:24px;object-fit:contain">`)
       .join("");
     if (icons) parts.push(`<div class="row" style="margin-top:12px">${icons}</div>`);
   }

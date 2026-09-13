@@ -1000,8 +1000,7 @@ export function getLogoImageUrl(data) {
     return false;
   };
 
-  // Inline SVG logos carry their own self-contained data URI.
-  if (data.logo?.inline && data.logo.dataUri) {
+  if (data.logo?.dataUri) {
     return data.logo.dataUri;
   }
 
@@ -1012,7 +1011,7 @@ export function getLogoImageUrl(data) {
   if (!data.favicons?.length) return null;
 
   const appleTouch = data.favicons.find(f => f.type === 'apple-touch-icon');
-  if (appleTouch) return appleTouch.url;
+  if (appleTouch) return appleTouch.dataUri || appleTouch.url;
 
   const svg = data.favicons.find(f => f.url?.endsWith('.svg'));
   if (svg) return svg.url;

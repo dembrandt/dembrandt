@@ -241,7 +241,7 @@ export interface Framework {
 }
 
 export interface Logo {
-  source: 'img' | 'svg';
+  source: 'img' | 'svg' | 'css-background';
   url: string;
   width?: number;
   height?: number;
@@ -260,6 +260,8 @@ export interface Favicon {
   type: string;
   url: string;
   sizes: string | null;
+  /** Bytes inlined at extraction time so exports do not hotlink the source. */
+  dataUri?: string | null;
 }
 
 /** PWA web app manifest fields consumed during extraction (theme/name seeding). */
