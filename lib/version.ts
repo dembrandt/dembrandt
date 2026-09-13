@@ -57,7 +57,9 @@
  *          100KB for a logo and 25KB for a favicon, and the field stays absent
  *          when the fetch fails. Exports stop hotlinking the audited site: a
  *          saved report or PDF no longer breaks offline, rots when the asset
- *          URL changes, or re-requests the site's server when opened.
+ *          URL changes, or re-requests the site's server when opened. MCP
+ *          responses replace the bytes with a marker: an agent cannot use
+ *          them and they would cost it hundreds of kilobytes of context.
  *
  *  1.12.0 — colors.detected entries gain areaFrac: the colour's share of painted
  *          background area, alongside the existing element-count usageFrac, so

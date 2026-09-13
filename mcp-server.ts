@@ -16,6 +16,7 @@ import { loadBrowserEngines, PlaywrightMissingError } from "./lib/browser.js";
 import { extractBranding } from "./lib/extractors/index.js";
 import { computeDrift } from "./lib/drift.js";
 import { computeFindings } from "./lib/findings.js";
+import { stripAssetBytes } from "./lib/mcp/assets.js";
 import { generateHtmlReport } from "./lib/formatters/html.js";
 import { toDtcgTokens } from "./lib/formatters/dtcg.js";
 import { generateDesignMd } from "./lib/formatters/markdown.js";
@@ -171,7 +172,7 @@ async function runExtraction(url: string, options: ExtractionRequest = {}) {
 }
 
 function jsonResult(data) {
-  return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+  return { content: [{ type: "text", text: JSON.stringify(stripAssetBytes(data), null, 2) }] };
 }
 
 function errorResult(message) {
