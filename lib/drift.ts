@@ -30,7 +30,7 @@ export interface DriftConfig {
   /** Percent change at or below this (and above dimPct): "shifted". Beyond: removed/added. */
   dimShiftPct: number;
   /** Relative weight of each category in the overall score. */
-  weights: { color: number; typography: number; spacing: number; radius: number; shadow: number };
+  weights: { color: number; typography: number; spacing: number; radius: number; shadow: number; logo: number };
   /** score > failThreshold => fail. */
   failThreshold: number;
 }
@@ -40,12 +40,12 @@ export const DEFAULT_DRIFT_CONFIG: DriftConfig = {
   colorShift: 15,
   dimPct: 4,
   dimShiftPct: 25,
-  weights: { color: 1, typography: 1, spacing: 0.8, radius: 0.6, shadow: 0.6 },
+  weights: { color: 1, typography: 1, spacing: 0.8, radius: 0.6, shadow: 0.6, logo: 0.8 },
   failThreshold: 10,
 };
 
 export type DriftKind = "changed" | "added" | "removed";
-export type DriftCategory = "color" | "typography" | "spacing" | "radius" | "shadow";
+export type DriftCategory = "color" | "typography" | "spacing" | "radius" | "shadow" | "logo";
 
 export interface DriftChange {
   category: DriftCategory;
@@ -531,6 +531,63 @@ function compareShadows(base: string[], cand: string[]): { changes: DriftChange[
   return { changes, result: { category: "shadow", score: categoryScore(penalty, base.length, cand.length), changed: 0, added, removed } };
 }
 
+
+/**
+ * A logo's identity at each tier, strongest first. Comparison uses the
+ * strongest tier both sides carry: a baseline taken before the extractor
+ * inlined asset bytes has only a url, and must not read as a changed logo.
+ * The url tier is normalised because an image optimizer rewrites w/q/dpl/dpr
+ * on every deploy while serving the same mark.
+ */
+export function logoIdentity(e: ExtractionResult): { markup?: string; bytes?: string; url?: string } | null {
+  const logo = e.logo;
+  if (!logo) return null;
+  const id: { markup?: string; bytes?: string; url?: string } = {};
+  if (logo.markup) id.markup = logo.markup;
+  if (logo.dataUri) id.bytes = logo.dataUri;
+  if (logo.url) {
+    try {
+      const u = new URL(logo.url);
+      for (const p of ["w", "q", "dpl", "dpr", "s"]) u.searchParams.delete(p);
+      id.url = `${u.origin}${u.pathname}${u.search}`;
+    } catch {
+      id.url = logo.url;
+    }
+  }
+  return Object.keys(id).length ? id : null;
+}
+
+type LogoId = NonNullable<ReturnType<typeof logoIdentity>>;
+
+function sameLogo(base: LogoId, cand: LogoId): boolean | null {
+  for (const tier of ["markup", "bytes", "url"] as const) {
+    if (base[tier] !== undefined && cand[tier] !== undefined) return base[tier] === cand[tier];
+  }
+  return null;
+}
+
+function compareLogo(base: LogoId | null, cand: LogoId | null): { changes: DriftChange[]; result: CategoryResult } {
+  const label = "logo";
+  const none = { changes: [], result: { category: "logo" as const, score: 0, changed: 0, added: 0, removed: 0 } };
+  const short = (id: LogoId) => {
+    const v = id.url ?? id.bytes ?? id.markup ?? "";
+    return v.length > 60 ? `${v.slice(0, 57)}…` : v;
+  };
+  if (base && !cand) {
+    return { changes: [{ category: "logo", kind: "removed", label, before: short(base) }], result: { category: "logo", score: 1, changed: 0, added: 0, removed: 1 } };
+  }
+  if (!base && cand) {
+    return { changes: [{ category: "logo", kind: "added", label, after: short(cand) }], result: { category: "logo", score: 0.5, changed: 0, added: 1, removed: 0 } };
+  }
+  if (!base || !cand) return none;
+  // No shared tier: the two snapshots describe the logo differently, which is
+  // not evidence that the mark changed.
+  if (sameLogo(base, cand) === false) {
+    return { changes: [{ category: "logo", kind: "changed", label, before: short(base), after: short(cand) }], result: { category: "logo", score: 1, changed: 1, added: 0, removed: 0 } };
+  }
+  return none;
+}
+
 /* ------------------------------- entry -------------------------------- */
 
 /** Map the palette to weighted entries: keep usage count, and attach a brand
@@ -668,6 +725,7 @@ const STAGE_CATEGORY: Record<string, DriftCategory> = {
   spacing: "spacing",
   borderRadius: "radius",
   shadows: "shadow",
+  logo: "logo",
   "dark-mode": "color",
   mobile: "color",
   reveal: "color",
@@ -708,6 +766,8 @@ export function computeDrift(
   const candSpacing = (candidate.spacing?.commonValues ?? []).map((s) => String(s.px)).filter(isRealisticDimension);
   const baseRadius = (baseline.borderRadius?.values ?? []).filter(notLowConfidence).map((r) => r.value).filter(isRealisticDimension);
   const candRadius = (candidate.borderRadius?.values ?? []).filter(notLowConfidence).map((r) => r.value).filter(isRealisticDimension);
+  const baseLogo = logoIdentity(baseline);
+  const candLogo = logoIdentity(candidate);
   const baseShadows = (baseline.shadows ?? []).filter(notLowConfidence).map((s) => s.shadow).filter(isSupportedShadow);
   const candShadows = (candidate.shadows ?? []).filter(notLowConfidence).map((s) => s.shadow).filter(isSupportedShadow);
 
@@ -747,6 +807,11 @@ export function computeDrift(
       ...compareShadows(baseShadows, candShadows),
       w: cfg.weights.shadow,
       comparable: comparable(baseShadows, candShadows),
+    },
+    {
+      ...compareLogo(baseLogo, candLogo),
+      w: cfg.weights.logo,
+      comparable: Boolean(baseLogo || candLogo),
     },
   ];
 

@@ -60,6 +60,11 @@
  *          URL changes, or re-requests the site's server when opened. MCP
  *          responses replace the bytes with a marker: an agent cannot use
  *          them and they would cost it hundreds of kilobytes of context.
+ *          Drift gains a `logo` category (weight 0.8): the mark is compared at
+ *          the strongest identity both snapshots carry (inline markup, then
+ *          inlined bytes, then a url normalised of w/q/dpl/dpr/s), so an image
+ *          optimizer's rewritten url, and a pre-1.13.0 baseline that has no
+ *          bytes, are not reported as a changed logo.
  *
  *  1.12.0 — colors.detected entries gain areaFrac: the colour's share of painted
  *          background area, alongside the existing element-count usageFrac, so
