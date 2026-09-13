@@ -46,8 +46,10 @@
  *          one colour pair can appear twice (body and large), and text that
  *          1.4.3 exempts (logotypes, disabled controls, aria-hidden) plus
  *          wrappers whose text is rendered by a child are no longer reported.
- *          Hover/focus pairs carry the same fields. aa/aaLarge/aaa are kept but
- *          deprecated: they test fixed ratios and ignore text size.
+ *          Hover/focus pairs carry the same fields. aa/aaLarge/aaa are still
+ *          written but deprecated: they test fixed ratios and ignore text size,
+ *          and they are removed in 2.0.0. Every surface grades through
+ *          gradeWcagPair()/passesAA(); read passAA, not aa.
  *          Values move for an unchanged site.
  *
  *  1.12.0 — colors.detected entries gain areaFrac: the colour's share of painted

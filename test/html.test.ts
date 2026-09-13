@@ -186,3 +186,19 @@ test('the report stamps the extracting version, falling back to the renderer', (
   );
   assert.match(generateHtmlReport(fixture({ meta: {} })), /content="dembrandt">/);
 });
+
+test('the report grades a pair at the threshold its text size earns', () => {
+  const large = { fg: '#767676', bg: '#ffffff', ratio: 3.5, aa: false, aaLarge: true, aaa: false, large: true, requiredAA: 3, passAA: true, passAAA: false, fontSize: 32, fontWeight: 700 };
+  const body = { ...large, fg: '#8a8a8a', large: false, requiredAA: 4.5, passAA: false, fontSize: 16, fontWeight: 400 };
+  const html = generateHtmlReport(fixture({ wcag: [large, body] }));
+  assert.match(html, /b-good">AA Large/);
+  assert.match(html, /b-bad">Fail/);
+  assert.match(html, /WCAG contrast \(1 pass · 1 fail\)/);
+});
+
+test('a pair predating the size fields keeps the AA-Large middle tier', () => {
+  const legacy = { fg: '#767676', bg: '#ffffff', ratio: 3.5, aa: false, aaLarge: true, aaa: false };
+  const html = generateHtmlReport(fixture({ wcag: [legacy] }));
+  assert.match(html, /b-warn">AA Large/);
+  assert.match(html, /· 1 AA Large/);
+});

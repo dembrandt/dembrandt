@@ -6,6 +6,7 @@
  */
 
 import { parseCssColor } from './color-parse.js';
+import type { WcagPair } from './types.js';
 
 /**
  * Convert sRGB to linear RGB
@@ -377,6 +378,24 @@ export function wcagVerdict(ratio: number, large?: boolean) {
   const requiredAA = large ? 3 : 4.5;
   const requiredAAA = large ? 4.5 : 7;
   return { large, requiredAA, passAA: ratio >= requiredAA, passAAA: ratio >= requiredAAA };
+}
+
+export type WcagGrade = 'AAA' | 'AA' | 'AA-large' | 'fail';
+
+/** On a pair without passAA, 'AA-large' means 3:1 with the size unknown. */
+export function gradeWcagPair(pair: Partial<WcagPair>): WcagGrade {
+  if (pair.passAA === undefined) {
+    if (pair.aaa) return 'AAA';
+    if (pair.aa) return 'AA';
+    return pair.aaLarge ? 'AA-large' : 'fail';
+  }
+  if (pair.passAAA) return 'AAA';
+  if (!pair.passAA) return 'fail';
+  return pair.large ? 'AA-large' : 'AA';
+}
+
+export function passesAA(pair: Partial<WcagPair>): boolean {
+  return pair.passAA ?? pair.aa ?? false;
 }
 
 /**

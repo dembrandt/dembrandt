@@ -14,6 +14,8 @@ const BOLD = '#949494';     // on 14px bold: large only if the threshold is read
 const LOGOUT = '#8a8a8a';   // on .logout, which [class*=logo] would wrongly exempt
 const WRAP = '#999999';     // on a wrapper whose text lives in a child
 const EXEMPT = '#aaaaaa';   // only ever inside markup 1.4.3 exempts
+const INBAR = '#8f8f8f';    // a nav link inside a .logo-bar wrapper, not a logotype
+const BARLOGO = '#8d8d8d';  // the actual logotype inside that wrapper, exempt
 
 const FIXTURE =
   `<!doctype html><html><body style="margin:0;background:#ffffff">` +
@@ -25,6 +27,8 @@ const FIXTURE =
   `<p aria-hidden="true" style="color:${EXEMPT};font-size:16px">hidden</p>` +
   `<a class="logout" style="color:${LOGOUT};font-size:16px">Log out</a>` +
   `<div style="color:${WRAP};font-size:16px"><span>wrapped</span></div>` +
+  `<div class="logo-bar"><a class="logo" style="color:${BARLOGO};font-size:16px">Acme</a>` +
+  `<a style="color:${INBAR};font-size:16px">Pricing</a></div>` +
   `</body></html>`;
 
 let browser: Browser | null = null;
@@ -97,4 +101,11 @@ test('a wrapper whose text is rendered by a child is counted once', async (t) =>
   const wrapped = of(pairs, WRAP);
   assert.equal(wrapped.length, 1);
   assert.equal(wrapped[0].count, 1, 'the inner span only, not the div that wraps it');
+});
+
+test('a container named after the logo does not exempt the nav inside it', async (t) => {
+  if (browserUnavailable(t)) return;
+  const pairs = await extractWcagPairs(page!) as Pair[];
+  assert.equal(of(pairs, INBAR).length, 1, 'a .logo-bar wrapper is not a logotype');
+  assert.deepEqual(of(pairs, BARLOGO), [], 'the .logo element inside it still is');
 });

@@ -870,11 +870,14 @@ export async function extractWcagPairs(page) {
 
       // "logo" as a whole word: [class*=logo] alone also matches "logout".
       const LOGO_NAME = /(^|[^a-z])(logo|wordmark)([^a-z]|$)/i;
+      const LOGO_SEL = '[class*="logo" i], [id*="logo" i], [class*="wordmark" i]';
       function isExempt(el) {
-        const hit = el.closest('[aria-hidden="true"], [disabled], [aria-disabled="true"], fieldset[disabled], [class*="logo" i], [id*="logo" i], [class*="wordmark" i]');
-        if (!hit) return false;
-        if (!hit.matches('[class*="logo" i], [id*="logo" i], [class*="wordmark" i]')) return true;
-        return LOGO_NAME.test(hit.className + ' ' + hit.id);
+        if (el.closest('[aria-hidden="true"], [disabled], [aria-disabled="true"], fieldset[disabled]')) return true;
+        const hit = el.closest(LOGO_SEL);
+        if (!hit || !LOGO_NAME.test(hit.className + ' ' + hit.id)) return false;
+        // 1.4.3 exempts the logotype, not a container named after it: a
+        // ".logo-bar" header holding nav links is not a logotype.
+        return hit.textContent.trim() === el.textContent.trim();
       }
 
       function hasOwnText(el) {
@@ -882,14 +885,6 @@ export async function extractWcagPairs(page) {
           if (node.nodeType === 3 && node.nodeValue.trim()) return true;
         }
         return false;
-      }
-
-      // Mirror of isLargeScale (lib/colors.ts) — kept inline because
-      // page.evaluate runs in an isolated realm and cannot import.
-      function isLargeScale(fontSizePx, weight) {
-        const pt = 96 / 72;
-        if (fontSizePx >= 18 * pt) return true;
-        return weight >= 700 && fontSizePx >= 14 * pt;
       }
 
       const seen = new Map();
@@ -917,30 +912,43 @@ export async function extractWcagPairs(page) {
           const parsedSize = parseFloat(s.fontSize);
           const fontSize = Number.isFinite(parsedSize) && parsedSize > 0 ? parsedSize : 16;
           const weight = parseInt(s.fontWeight, 10) || 400;
-          const large = isLargeScale(fontSize, weight);
-          const key = [fg, bg].sort().join('/') + (large ? '/lg' : '');
+          const key = [fg, bg].sort().join('/') + '|' + fontSize + '|' + weight;
           const entry = seen.get(key);
           if (!entry) {
-            seen.set(key, { fg, bg, count: 1, fontSize, fontWeight: weight, large });
+            seen.set(key, { fg, bg, count: 1, fontSize, fontWeight: weight });
           } else {
             entry.count++;
-            // Report the smallest occurrence: it is the one closest to failing.
-            if (fontSize < entry.fontSize) { entry.fontSize = fontSize; entry.fontWeight = weight; }
           }
         } catch { /* skip any element that throws */ }
       }
 
-      return Array.from(seen.values()).sort((a, b) => b.count - a.count).slice(0, 50);
+      return Array.from(seen.values()).sort((a, b) => b.count - a.count).slice(0, 200);
     });
   } catch {
     return [];
   }
 
-  const { relativeLuminance, wcagVerdict } = await import('../colors.js');
-  const pairs = [];
+  const { relativeLuminance, wcagVerdict, isLargeScale } = await import('../colors.js');
 
-  // rawPairs arrive already deduped by the same key, built in the page context.
-  for (const { fg, bg, count, fontSize, fontWeight, large } of rawPairs) {
+  const byPair = new Map();
+  for (const { fg, bg, count, fontSize, fontWeight } of rawPairs) {
+    const large = fontSize === undefined ? undefined : isLargeScale(fontSize, fontWeight ?? 400);
+    const key = [fg, bg].sort().join('/') + (large === undefined ? '' : large ? '/lg' : '/sm');
+    const entry = byPair.get(key);
+    if (!entry) {
+      byPair.set(key, { fg, bg, count, fontSize, fontWeight, large });
+    } else {
+      entry.count += count;
+      // Report the smallest occurrence: it is the one closest to failing.
+      if (fontSize != null && (entry.fontSize == null || fontSize < entry.fontSize)) {
+        entry.fontSize = fontSize;
+        entry.fontWeight = fontWeight;
+      }
+    }
+  }
+
+  const pairs = [];
+  for (const { fg, bg, count, fontSize, fontWeight, large } of byPair.values()) {
     try {
       const l1 = relativeLuminance(fg);
       const l2 = relativeLuminance(bg);
@@ -958,7 +966,7 @@ export async function extractWcagPairs(page) {
     } catch { /* skip malformed pair */ }
   }
 
-  return pairs.sort((a, b) => b.count - a.count);
+  return pairs.sort((a, b) => b.count - a.count).slice(0, 50);
 }
 
 /**

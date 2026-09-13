@@ -26,6 +26,7 @@ import type {
 } from "../types.js";
 import type { DriftReport, DriftChange } from "../drift.js";
 import { computeFindings } from "../findings.js";
+import { gradeWcagPair } from "../colors.js";
 import type { FindingsReport, Finding } from "../findings.js";
 
 export interface HtmlReportOptions {
@@ -624,23 +625,22 @@ function wcagSection(result: BrandingResult): string {
   if (!pairs.length) return "";
   const rows = pairs
     .slice(0, 60)
-    .map((p: WcagPair & { aaa?: boolean }) => {
+    .map((p: WcagPair) => {
       // Tiered verdict incl. AAA (App parity); fg AND bg swatches as a pair.
-      const verdict = p.aaa
-        ? `<span class="badge b-good">AAA</span>`
-        : p.aa
-          ? `<span class="badge b-good">AA</span>`
-          : p.aaLarge
-            ? `<span class="badge b-warn">AA Large</span>`
-            : `<span class="badge b-bad">Fail</span>`;
+      const grade = gradeWcagPair(p);
+      const verdict = grade === "fail"
+        ? `<span class="badge b-bad">Fail</span>`
+        : grade === "AA-large"
+          ? `<span class="badge ${p.passAA === undefined ? "b-warn" : "b-good"}">AA Large</span>`
+          : `<span class="badge b-good">${grade}</span>`;
       const swatches = `<span class="swpair"><span style="background:${safeCss(p.fg) || "transparent"}"></span><span style="background:${safeCss(p.bg) || "transparent"}"></span></span>`;
       return `<tr><td>${swatches}</td><td class="mono" data-copy="${esc(p.fg)}">${esc(p.fg)}</td><td class="mono" data-copy="${esc(p.bg)}">${esc(p.bg)}</td><td class="mono">${esc(p.ratio?.toFixed ? p.ratio.toFixed(2) : p.ratio)}</td><td>${verdict}</td></tr>`;
     })
     .join("");
-  // Tiers must agree with the header gauge, which counts strict AA: AA-Large-only
-  // pairs are the middle tier, not passes.
-  const failed = pairs.filter((p) => !p.aa && !p.aaLarge).length;
-  const aaLargeOnly = pairs.filter((p) => !p.aa && p.aaLarge).length;
+  // An ungraded 3:1 pair is the middle tier, not a pass; a graded large one is.
+  const grades = pairs.map((p) => ({ grade: gradeWcagPair(p), graded: p.passAA !== undefined }));
+  const failed = grades.filter((g) => g.grade === "fail").length;
+  const aaLargeOnly = grades.filter((g) => g.grade === "AA-large" && !g.graded).length;
   const passed = pairs.length - failed - aaLargeOnly;
   const title = failed || aaLargeOnly
     ? `WCAG contrast (${passed} pass${aaLargeOnly ? ` · ${aaLargeOnly} AA Large` : ""}${failed ? ` · ${failed} fail` : ""})`

@@ -1349,7 +1349,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
     if (options.wcag) {
       spinner.start("Analyzing WCAG contrast pairs...");
       try {
-        const { relativeLuminance, wcagVerdict, isLargeScale } = await import('../colors.js');
+        const { relativeLuminance, wcagVerdict, isLargeScale, passesAA } = await import('../colors.js');
 
         function calcPair(fgRaw: string, bgRaw: string, extra: Partial<WcagPair> = {}): WcagPair | null {
           const toHex = (c: string) => {
@@ -1385,10 +1385,9 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         }
 
         spinner.stop();
-        const passes = (p: WcagPair) => p.passAA ?? p.aa;
-        const staticPassing = wcag.filter(p => !p.source && passes(p)).length;
+        const staticPassing = wcag.filter(p => !p.source && passesAA(p)).length;
         const staticTotal = wcag.filter(p => !p.source).length;
-        const statesFailing = wcag.filter(p => p.source === 'state' && !passes(p)).length;
+        const statesFailing = wcag.filter(p => p.source === 'state' && !passesAA(p)).length;
         log(color.success(`  ✓ WCAG: ${staticPassing}/${staticTotal} pairs pass AA`) +
           (statesFailing ? color.warning(` · ${statesFailing} state pair(s) fail`) : ''));
       } catch {

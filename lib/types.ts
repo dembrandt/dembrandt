@@ -324,11 +324,11 @@ export interface WcagPair {
   fg: string;
   bg: string;
   ratio: number;
-  /** @deprecated Fixed 4.5:1 test, ignores text size. Read passAA instead. */
+  /** @deprecated Removed in SCHEMA_VERSION 2.0.0. Fixed 4.5:1 test, ignores text size. Read passAA. */
   aa: boolean;
-  /** @deprecated Fixed 3:1 test, says nothing about whether the text is large. */
+  /** @deprecated Removed in SCHEMA_VERSION 2.0.0. Fixed 3:1 test, says nothing about text size. */
   aaLarge: boolean;
-  /** @deprecated Fixed 7:1 test, ignores text size. Read passAAA instead. */
+  /** @deprecated Removed in SCHEMA_VERSION 2.0.0. Fixed 7:1 test, ignores text size. Read passAAA. */
   aaa: boolean;
   count?: number;
   state?: string;

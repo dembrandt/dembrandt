@@ -9,7 +9,7 @@ import type { BrandingResult } from '../types.js';
 import chalk from 'chalk';
 import { color } from './theme.js';
 import { formatPageList } from '../run-summary.js';
-import { convertColor, formatColor } from '../colors.js';
+import { convertColor, formatColor, gradeWcagPair } from '../colors.js';
 import type { ColorFormat } from '../colors.js';
 
 /**
@@ -1058,16 +1058,11 @@ function displayMotion(motion) {
   console.log(chalk.dim('│'));
 }
 
-// Extractions predating the observed-size fields carry only the fixed flags.
 function gradeOf(pair) {
-  if (pair.passAA === undefined) {
-    if (pair.aaa) return color.success('AAA');
-    if (pair.aa) return color.success('AA ');
-    return pair.aaLarge ? color.warning('AA-Large') : color.error('fail');
-  }
-  if (pair.passAAA) return color.success('AAA');
-  if (pair.passAA) return color.success(pair.large ? 'AA large' : 'AA ');
-  return color.error('fail');
+  const grade = gradeWcagPair(pair);
+  if (grade === 'fail') return color.error('fail');
+  if (grade === 'AA-large') return pair.passAA === undefined ? color.warning('AA-Large') : color.success('AA large');
+  return color.success(grade === 'AA' ? 'AA ' : grade);
 }
 
 function displayWcag(wcag) {
