@@ -38,6 +38,7 @@ const LOGO_MAX_BYTES = 100_000;
 const FAVICON_MAX_BYTES = 25_000;
 const FAVICON_INLINE_LIMIT = 6;
 const ASSET_FETCH_TIMEOUT_MS = 5000;
+const ASSET_PHASE_BUDGET_MS = 8000;
 // Both paths must negotiate the same encoding, or an image optimizer answers
 // the page (Accept: avif,webp) and node (Accept: */*) with different bytes for
 // the same logo, which reads downstream as "the logo changed".
@@ -51,9 +52,10 @@ const ASSET_ACCEPT = 'image/png,image/jpeg,image/svg+xml,image/*;q=0.8';
  */
 async function inlineAssets(page, urls: string[], maxBytes: number): Promise<Record<string, string>> {
   if (!urls.length) return {};
+  const deadline = Date.now() + ASSET_PHASE_BUDGET_MS;
   const out = await inlineInPage(page, urls, maxBytes);
   for (const u of urls) {
-    if (out[u]) continue;
+    if (out[u] || Date.now() > deadline) continue;
     const fromNode = await inlineInNode(u, maxBytes);
     if (fromNode) out[u] = fromNode;
   }
@@ -953,7 +955,7 @@ export async function extractLogo(page, url) {
   }
   if (svgSrcUrls.size > 0) {
     try {
-      const fetched = await page.evaluate(async (urls: string[]) => {
+      const fetched = await page.evaluate(async ([urls, timeoutMs]: [string[], number]) => {
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = 1;
         const ctx = canvas.getContext('2d');
@@ -981,7 +983,7 @@ export async function extractLogo(page, url) {
         const colors: string[] = [];
         for (const u of urls) {
           try {
-            const resp = await fetch(u, { credentials: 'omit' });
+            const resp = await fetch(u, { credentials: 'omit', signal: AbortSignal.timeout(timeoutMs) });
             if (!resp.ok) continue;
             const text = await resp.text();
             const parser = new DOMParser();
@@ -998,7 +1000,7 @@ export async function extractLogo(page, url) {
           } catch {}
         }
         return [...new Set(colors)].filter(c => /^#[0-9a-f]{6}$/i.test(c));
-      }, [...svgSrcUrls]);
+      }, [[...svgSrcUrls], ASSET_FETCH_TIMEOUT_MS] as const);
       svgImgColors.push(...fetched);
     } catch {}
   }
