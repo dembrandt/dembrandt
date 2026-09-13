@@ -37,6 +37,11 @@ export async function extractSiteName(page) {
 const LOGO_MAX_BYTES = 100_000;
 const FAVICON_MAX_BYTES = 25_000;
 const FAVICON_INLINE_LIMIT = 6;
+const ASSET_FETCH_TIMEOUT_MS = 5000;
+// Both paths must negotiate the same encoding, or an image optimizer answers
+// the page (Accept: avif,webp) and node (Accept: */*) with different bytes for
+// the same logo, which reads downstream as "the logo changed".
+const ASSET_ACCEPT = 'image/png,image/jpeg,image/svg+xml,image/*;q=0.8';
 
 /**
  * Fetch each URL as a data URI, in the page first so the session's cookies and
@@ -57,7 +62,7 @@ async function inlineAssets(page, urls: string[], maxBytes: number): Promise<Rec
 
 async function inlineInNode(url: string, maxBytes: number): Promise<string | null> {
   try {
-    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const resp = await fetch(url, { headers: { accept: ASSET_ACCEPT }, signal: AbortSignal.timeout(ASSET_FETCH_TIMEOUT_MS) });
     if (!resp.ok) return null;
     const type = (resp.headers.get('content-type') || '').split(';')[0].trim();
     if (type && !type.startsWith('image/')) return null;
@@ -71,11 +76,15 @@ async function inlineInNode(url: string, maxBytes: number): Promise<string | nul
 
 async function inlineInPage(page, urls: string[], maxBytes: number): Promise<Record<string, string>> {
   try {
-    return await page.evaluate(async ([list, cap]) => {
+    return await page.evaluate(async ([list, cap, timeoutMs, accept]) => {
       const out = {};
       for (const u of list) {
         try {
-          const resp = await fetch(u, { credentials: 'include' });
+          const resp = await fetch(u, {
+            credentials: 'include',
+            headers: { accept },
+            signal: AbortSignal.timeout(timeoutMs),
+          });
           if (!resp.ok) continue;
           const blob = await resp.blob();
           if (!blob.size || blob.size > cap) continue;
@@ -90,7 +99,7 @@ async function inlineInPage(page, urls: string[], maxBytes: number): Promise<Rec
         } catch { /* asset stays a remote url */ }
       }
       return out;
-    }, [urls, maxBytes] as const);
+    }, [urls, maxBytes, ASSET_FETCH_TIMEOUT_MS, ASSET_ACCEPT] as const);
   } catch {
     return {};
   }
