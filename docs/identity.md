@@ -2,6 +2,11 @@
 
 Status: proposal. Implemented in `lib/identity.ts`; not yet stamped on output.
 
+**Site is the stable baseline identity; a name is presentation.** Storage and
+baselines key on `siteId`, which never changes. A name is a label the UI shows
+and a human edits, so renaming a site can never move blobs or orphan its drift
+history.
+
 Today everything is keyed by hostname. An extraction belongs to a domain, a domain
 is a brand, and the portfolio is the list of domains. That one level cannot say
 that staging and production are the same brand at two stages, that `docs.` and
@@ -24,8 +29,7 @@ classDiagram
     +string name
     +string id
     +string brand
-    +string[] scope
-    +string environment
+    +ScopeEntry[] scope
   }
   class Environment {
     +string name
@@ -34,10 +38,11 @@ classDiagram
   class Identity {
     +string brand
     +string site
+    +string market
     +string environment
     +string profile
     +string siteId
-    +IdentitySource source
+    +IdentitySources source
   }
   class RunProfile {
     +string name
@@ -52,6 +57,7 @@ classDiagram
   }
 
   Brand "1" o-- "many" SiteConfig : names
+  SiteConfig "1" o-- "many" Market : sells in
   SiteConfig "1" o-- "many" Environment : has
   SiteConfig "1" *-- "many" Scope : owns
   Environment "1" o-- "many" Baseline : one per profile
@@ -64,6 +70,11 @@ classDiagram
     +string host
     +string pathPrefix
     +bool wildcard
+    +string market
+    +string environment
+  }
+  class Market {
+    +string name
   }
   class Baseline {
     +string snapshotId
@@ -83,6 +94,40 @@ nothing.
 A leading `*.` covers every subdomain for the case where one design system spans
 all of them; a named subdomain elsewhere still wins over the wildcard.
 
+A scope entry is more than a pattern: it maps a region of URL space to the
+variant coordinates that region implies.
+
+```json
+{ "name": "marketing", "scope": [
+  "acme.com",
+  { "pattern": "staging.acme.com", "environment": "staging" },
+  { "pattern": "acme.de", "market": "de" },
+  { "pattern": "staging.acme.de", "market": "de", "environment": "staging" }
+]}
+```
+
+Country sites are why market exists as its own coordinate. `acme.de` and
+`acme.fr` are one site, because they must be comparable to each other against a
+common brand, and they hold separate baselines, because they drift apart on
+their own. That is exactly the shape of staging against production, but it is
+not the same axis: a country site has a staging of its own, so folding market
+into the environment name would smuggle a composite key into a string.
+
+Baselines therefore key on `(siteId, market, environment, profile)`. A site with
+one market leaves `market` null and nothing changes for it.
+
+## Scope precedence
+
+For a given url, entries rank by:
+
+1. an exact host beats any wildcard host,
+2. among equals, the longer path prefix wins,
+3. among those, the site configured first wins, and the tie is reported.
+
+A path prefix matches only on a segment boundary, so a site owning `/app` does
+not claim `/application`. A tie between two sites is a configuration error worth
+surfacing, not something to break silently.
+
 ## Resolution
 
 ```mermaid
@@ -98,6 +143,12 @@ flowchart TD
   C --> I
   D --> I
 ```
+
+Precedence is per field. A flag beats config, config beats derivation, and each
+field is decided on its own, so a run can take its site and market from config
+while a flag sets the environment. `source` records the winner per field for the
+same reason: one summary value would have to lie about the fields it did not
+describe. Only `brand` can end up `unset`, since nothing derives it.
 
 Flags beat config so an ad hoc run can override a repo's committed identity.
 Config beats derivation. Derivation is the floor and reproduces today's hostname
@@ -141,7 +192,9 @@ not match its profile is warned about, the same false-drift problem `drift.ts`
 already reports for `--dark-mode` and `--mobile` mismatches.
 
 A profile also carries its target paths, since that is what separates the two
-runs above as much as the flags do.
+runs above as much as the flags do. Those paths must fall inside the site's
+scope: both list paths, so both can disagree, and a profile pointing outside its
+site would file a measurement of one site under another.
 
 ## Placement in the output
 
@@ -192,5 +245,6 @@ product word for a list the App renders, not a type.
   identity ships rather than restricted afterwards.
 - Whether `client` becomes a real entity on the ownership axis, or an account
   stays the only boundary. Needed once one account manages brands it does not own.
-- Validating a profile's `paths` against its site's `scope`. Both list paths, so
-  both can disagree.
+- Whether `market` should also cover language editions on one host, e.g.
+  `acme.com/de`. The path form already expresses it; what is undecided is
+  whether that is the same concept.

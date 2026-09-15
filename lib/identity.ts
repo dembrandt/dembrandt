@@ -1,23 +1,55 @@
 /**
- * Who an extraction is about: brand, site, environment.
+ * Who an extraction is about: brand, site, market, environment.
+ *
+ * Site is the stable baseline identity; a name is presentation. Storage and
+ * baselines key on `siteId`, which never changes, so renaming a site in the UI
+ * can never move blobs or orphan its drift history.
  *
  * Identity is the only block in the output a human writes. Everything else is
- * measured. It is therefore stated, never inferred from the hostname beyond the
- * `derived` fallback, and `source` says which of the two produced it.
+ * measured. It is therefore stated, never inferred beyond the `derived` fallback,
+ * and `source` says per field which of the two produced it.
  */
 
-export type IdentitySource = 'config' | 'flag' | 'derived';
+/** `unset` marks a field nothing supplied, which only `brand` can be. */
+export type IdentitySource = 'flag' | 'config' | 'derived' | 'unset';
+
+/**
+ * Where each field came from. Per field, not per identity: a run can take its
+ * site from config and its environment from a flag, and one summary value would
+ * have to lie about one of them.
+ */
+export interface IdentitySources {
+  brand: IdentitySource;
+  site: IdentitySource;
+  market: IdentitySource;
+  environment: IdentitySource;
+}
 
 export interface Identity {
   brand: string | null;
   site: string;
+  /** Country or language edition, null when the site has only one. */
+  market: string | null;
   environment: string;
   /** Null when the run declared no profile: it is then its own one-off. */
   profile: string | null;
-  source: IdentitySource;
+  source: IdentitySources;
   /** Stable key for storage and baselines. Names are labels and may be edited. */
   siteId: string;
 }
+
+/**
+ * One region of URL space a site owns, and the variant coordinates it implies.
+ *
+ * A bare string is the common case. The object form is what makes country sites
+ * expressible: `acme.de` and `acme.fr` are one site because they must be
+ * comparable to each other, but they hold separate baselines because they drift
+ * apart on their own. Market and environment are independent, since a country
+ * site has a staging of its own.
+ */
+export type ScopeEntry =
+  | string
+  | { pattern: string; market?: string; environment?: string };
 
 export interface SiteConfig {
   name: string;
@@ -28,9 +60,7 @@ export interface SiteConfig {
    * leading `*.` covers every subdomain, so one design system spanning
    * app/docs/www is one entry; a named subdomain elsewhere still wins over it.
    */
-  scope: string[];
-  /** Defaults to "production" when a scope match does not name one. */
-  environment?: string;
+  scope: ScopeEntry[];
 }
 
 /**
@@ -43,7 +73,7 @@ export interface SiteConfig {
  */
 export interface RunProfile {
   name: string;
-  /** Paths to extract, relative to the site's scope. Defaults to the entry URL. */
+  /** Paths to extract, which must fall inside the site's scope. */
   paths?: string[];
   /** Flags the run is expected to carry, e.g. { crawl: 5, voice: true }. */
   flags?: Record<string, unknown>;
@@ -58,6 +88,7 @@ export interface IdentityConfig {
 export interface IdentityOverrides {
   brand?: string;
   site?: string;
+  market?: string;
   environment?: string;
   profile?: string;
 }
@@ -85,10 +116,15 @@ interface Scope {
   host: string;
   path: string;
   wildcard: boolean;
+  market: string | null;
+  environment: string | null;
 }
 
-function normalizeScope(entry: string): Scope | null {
-  let trimmed = entry.trim();
+function normalizeScope(entry: ScopeEntry): Scope | null {
+  const { pattern, market = null, environment = null } =
+    typeof entry === 'string' ? { pattern: entry } as { pattern: string; market?: string; environment?: string } : entry;
+
+  let trimmed = (pattern || '').trim();
   if (!trimmed) return null;
   const wildcard = trimmed.startsWith('*.');
   if (wildcard) trimmed = trimmed.slice(2);
@@ -99,6 +135,8 @@ function normalizeScope(entry: string): Scope | null {
       host: u.hostname.replace(/^www\./, ''),
       path: u.pathname.replace(/\/+$/, ''),
       wildcard,
+      market,
+      environment,
     };
   } catch {
     return null;
@@ -106,12 +144,11 @@ function normalizeScope(entry: string): Scope | null {
 }
 
 /**
- * Specificity of `entry` against `url`, or -1 for no match. An exact host outranks
- * any wildcard, and among equals the longer path prefix wins.
+ * Specificity of `scope` against `url`, or -1 for no match. An exact host
+ * outranks any wildcard, and among equals the longer path prefix wins. A path
+ * matches only on a segment boundary, so `/app` does not claim `/application`.
  */
-function scopeMatch(entry: string, url: string): number {
-  const scope = normalizeScope(entry);
-  if (!scope) return -1;
+function scopeMatch(scope: Scope, url: string): number {
   let target: URL;
   try {
     target = new URL(url);
@@ -128,29 +165,50 @@ function scopeMatch(entry: string, url: string): number {
   return (exact ? HOST_EXACT : 0) + scope.path.length;
 }
 
+export interface SiteMatch {
+  site: SiteConfig;
+  /** The winning scope entry, which carries the market and environment. */
+  scope: Scope;
+  specificity: number;
+  /** Other sites tying at the same specificity. Non-empty means the config is
+   *  ambiguous for this url; `site` is still the first one configured. */
+  ambiguous: SiteConfig[];
+}
+
 /**
- * The site whose scope matches `url` most specifically. Longest path prefix wins,
- * so a site owning `acme.com/app` beats one owning `acme.com`.
+ * The site whose scope matches `url` most specifically, ranked by exact host,
+ * then longest path prefix, then configuration order. A tie between two sites is
+ * reported rather than silently broken.
  */
-export function matchSite(config: IdentityConfig | null, url: string): SiteConfig | null {
+export function matchSite(config: IdentityConfig | null, url: string): SiteMatch | null {
   if (!config?.sites?.length) return null;
-  let best: SiteConfig | null = null;
-  let bestLength = -1;
+
+  let best: SiteMatch | null = null;
+  const tied: SiteConfig[] = [];
+
   for (const site of config.sites) {
     for (const entry of site.scope || []) {
-      const length = scopeMatch(entry, url);
-      if (length > bestLength) {
-        bestLength = length;
-        best = site;
+      const scope = normalizeScope(entry);
+      if (!scope) continue;
+      const specificity = scopeMatch(scope, url);
+      if (specificity < 0) continue;
+
+      if (!best || specificity > best.specificity) {
+        best = { site, scope, specificity, ambiguous: [] };
+        tied.length = 0;
+      } else if (specificity === best.specificity && site !== best.site && !tied.includes(site)) {
+        tied.push(site);
       }
     }
   }
+
+  if (best) best.ambiguous = tied;
   return best;
 }
 
 /**
- * Resolve the identity to stamp on a run. Flags beat config so an ad hoc run can
- * override a repo's committed identity; config beats derivation.
+ * Resolve the identity to stamp on a run. Precedence is per field: a flag beats
+ * config, config beats derivation, and each field is decided on its own.
  */
 export function resolveIdentity(
   url: string,
@@ -158,31 +216,50 @@ export function resolveIdentity(
   config: IdentityConfig | null = null,
 ): Identity {
   const matched = overrides.site
-    ? config?.sites?.find(s => s.name === overrides.site) ?? null
+    ? matchByName(config, overrides.site)
     : matchSite(config, url);
 
-  const site = overrides.site ?? matched?.name ?? siteKeyOf(url);
-  const environment =
-    overrides.environment ?? matched?.environment ?? DEFAULT_ENVIRONMENT;
-  const brand = overrides.brand ?? matched?.brand ?? config?.brand ?? null;
+  const pick = <T>(flag: T | undefined, fromConfig: T | null | undefined, derived: T | null) =>
+    flag !== undefined
+      ? ([flag, 'flag'] as const)
+      : fromConfig != null
+        ? ([fromConfig, 'config'] as const)
+        : ([derived, derived == null ? 'unset' : 'derived'] as const);
 
-  let source: IdentitySource = 'derived';
-  if (overrides.site || overrides.environment || overrides.brand) source = 'flag';
-  else if (matched) source = 'config';
+  const [site, siteSource] = pick(overrides.site, matched?.site.name, siteKeyOf(url));
+  const [market, marketSource] = pick(overrides.market, matched?.scope.market, null);
+  const [environment, environmentSource] = pick(
+    overrides.environment, matched?.scope.environment, DEFAULT_ENVIRONMENT);
+  const [brand, brandSource] = pick(
+    overrides.brand, matched?.site.brand ?? config?.brand, null);
 
   return {
     brand,
-    site,
-    environment,
+    site: site as string,
+    market,
+    environment: environment as string,
     profile: overrides.profile ?? null,
-    source,
-    siteId: matched?.id ?? siteKeyOf(url),
+    source: {
+      brand: brandSource,
+      site: siteSource,
+      market: marketSource,
+      environment: environmentSource,
+    },
+    siteId: matched?.site.id ?? siteKeyOf(url),
   };
 }
 
+/** A named site still needs a scope entry, for the market it implies. */
+function matchByName(config: IdentityConfig | null, name: string): SiteMatch | null {
+  const site = config?.sites?.find(s => s.name === name);
+  if (!site) return null;
+  const scope = (site.scope || []).map(normalizeScope).find((s): s is Scope => s !== null);
+  return scope ? { site, scope, specificity: -1, ambiguous: [] } : null;
+}
+
 /**
- * A `--site` naming no configured site is an error, not a new site: a typo would
- * otherwise start an empty baseline history and report zero drift.
+ * A `--site` naming no configured site is an error, not a new site. A typo would
+ * otherwise silently start an empty baseline history and report zero drift.
  */
 export function validateOverrides(
   config: IdentityConfig | null,
@@ -195,6 +272,24 @@ export function validateOverrides(
     return `Unknown profile "${overrides.profile}". Configured profiles: ${config.profiles.map(p => p.name).join(', ')}`;
   }
   return null;
+}
+
+/**
+ * A profile's paths must fall inside its site's scope. Both list paths, so both
+ * can disagree, and a profile pointing outside its site would file a measurement
+ * of one site under another.
+ */
+export function validateProfilePaths(site: SiteConfig, profile: RunProfile): string[] {
+  const scopes = (site.scope || []).map(normalizeScope).filter((s): s is Scope => s !== null);
+  if (!scopes.length) return [];
+
+  return (profile.paths || [])
+    .filter(path => !scopes.some(scope => {
+      const host = scope.wildcard ? 'sub.' + scope.host : scope.host;
+      const target = `https://${host}${path.startsWith('/') ? path : '/' + path}`;
+      return scopeMatch(scope, target) >= 0;
+    }))
+    .map(path => `profile "${profile.name}" targets ${path}, outside site "${site.name}" scope.`);
 }
 
 /**
