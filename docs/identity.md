@@ -238,8 +238,88 @@ extraction says what it is about; the account says who may see it.
 As types: `Brand`, `SiteConfig`, `Environment`, `RunProfile`. Portfolio is a
 product word for a list the App renders, not a type.
 
+## Storage model
+
+The same model has three representations, and the rules between them are the
+design work.
+
+**Declared**, in the customer's repo: `dembrandt.config.json` holds `Brand`,
+`Site`, `ScopeEntry` and `RunProfile`. Editable, portable, written by a human or
+an agent. No history, and no identifier the customer cannot read.
+
+**Stated**, in the extraction: `Identity`, flat and denormalized. A snapshot has
+to be readable on its own years later without our account data, so it carries
+names rather than references, and it is immutable because it describes a moment.
+
+**Accumulated**, account-side: the entities and their history. This is the part
+being sold, and the only one that normalizes, because names change and history
+must not break.
+
+An extraction denormalizes for readability, the store normalizes for
+persistence, and the config is the source for the declared side. A disagreement
+resolves in favour of the store, which is the only one holding history.
+
+```
+Account        accountId
+Brand          brandId
+Site           siteId                                  stable, opaque
+Variant        (siteId, market, environment)           the measurable coordinate
+RunProfile     (siteId, profileName)                   the way of measuring
+Snapshot       snapshotId                              an immutable event
+Reference      (siteId, market, environment, profile)  what a run is compared against
+Waiver         (same key, findingId)                   an accepted deviation
+```
+
+`Variant` is worth naming even though it is only a pair. Unnamed, every surface
+composes `market + environment` itself, which is the scattered derivation we
+removed from the hostname, one level up.
+
+`Reference` has two forms: a previous snapshot, or a document, meaning a brand
+guideline. Same key, same role, different source. Left unnamed, the first
+implementation pins the reference to the previous snapshot and the product's
+document-first direction has to unpick that later. The distinction is also the
+difference between answering "did it change" and answering "is it right", and
+only the second is what a brand owner is buying.
+
+`Waiver` is the other missing entity. A campaign site deviates on purpose, and a
+market may carry an approved difference. Without a way to accept a deviation,
+drift is noise from the second run onward and the third is not read.
+
+```mermaid
+erDiagram
+  ACCOUNT ||--o{ BRAND : owns
+  BRAND ||--o{ SITE : names
+  SITE ||--o{ VARIANT : "market x environment"
+  SITE ||--o{ RUNPROFILE : "measured by"
+  VARIANT ||--o{ SNAPSHOT : "observed as"
+  RUNPROFILE ||--o{ SNAPSHOT : "produced"
+  VARIANT ||--|| REFERENCE : "compared against"
+  REFERENCE }o--|| SNAPSHOT : "or a previous snapshot"
+  REFERENCE }o--|| DOCUMENT : "or a brand guideline"
+  VARIANT ||--o{ WAIVER : "accepted deviation"
+```
+
+### Layout
+
+Today's path is `extractions/{userId}/{domain}/{timestamp}.json`, which puts the
+key in the path. Pushing the coordinates deeper into that tree repeats the same
+mistake one level up, because `market` and `environment` are editable labels just
+as a name is. The principle decides it: a path holds stable identifiers only.
+
+```
+extractions/{accountId}/{siteId}/{timestamp}--{snapshotId}.json
+extractions/{accountId}/{siteId}/_index.json     coordinates -> snapshots
+```
+
+Coordinates live in the index, not in the directory structure. The index already
+exists, and is already built to be a rebuildable cache that is ignored when its
+version does not match, so this extends a mechanism rather than adding one.
+
 ## Open decisions
 
+- Reference and waiver are named here but not modelled in `lib/identity.ts`.
+  They belong to the account-side store, not the extraction, so they follow the
+  App rather than the CLI contract.
 - Billing. Credits are keyed by domain today. Once a site is user-declared, the
   customer controls the grouping, so the billed unit has to be decided before
   identity ships rather than restricted afterwards.
