@@ -315,6 +315,53 @@ Coordinates live in the index, not in the directory structure. The index already
 exists, and is already built to be a rebuildable cache that is ignored when its
 version does not match, so this extends a mechanism rather than adding one.
 
+## v1: one user, access to everything
+
+The CLI side does not shrink. The store does.
+
+The ownership axis goes: no client, no roles, no portfolio entity. The account is
+implicit and already in the path. `Brand` is a string on the site, not an entity.
+It becomes one when something attaches to the brand rather than the site, and the
+first such thing is a guideline used as a reference.
+
+```
+site         dembrandt.com        stable id
+environment  production, staging  felt on day one
+profile      design, voice        felt on day one
+market       null                 inert, reserved
+brand        "Dembrandt"          a label that groups the list
+```
+
+Environment and profile are what a single user feels immediately. Staging and
+production read as two brands today. A `--voice` run poisons the baseline of a
+`--crawl` run. Neither can be said now.
+
+Market and brand are inert here and cost one nullable field and one string. They
+reserve the coordinate, so nothing has to be smuggled into an existing string
+later.
+
+`lib/identity.ts` is already exactly this. One user is not a different model. It
+is the same model with three fields on their defaults.
+
+```
+extractions/{userId}/{siteId}/
+├── _index.json          (market, environment, profile) -> snapshots
+└── {timestamp}--{snapshotId}.json
+```
+
+The reference has one form for now, the previous snapshot. It is still named. The
+document form should not have to unpick a default.
+
+`Waiver` is out of v1. It bites on the second run, but it lives App-side and
+blocks nothing in the CLI.
+
+The config file is optional. Flags cover an ad hoc run. The file is what makes a
+CI run repeatable.
+
+The derived path must produce today's key exactly. A user who does nothing sees
+no change. That is also the migration: old data does not become wrong, it becomes
+labelled.
+
 ## Open decisions
 
 - Reference and waiver are named here but not modelled in `lib/identity.ts`.
