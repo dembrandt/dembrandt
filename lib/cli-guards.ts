@@ -15,6 +15,7 @@ export interface GuardOptions {
   jsonOnly?: boolean;
   designMd?: boolean;
   tailwind?: string | boolean;
+  shadcn?: string | boolean;
   html?: string | boolean;
   brandGuide?: boolean;
 }
@@ -43,6 +44,7 @@ export function colorFormatWarning(opts: GuardOptions): string | null {
     opts.dtcg && "--dtcg",
     opts.designMd && "--design-md",
     opts.tailwind && "--tailwind",
+    opts.shadcn && "--shadcn",
     opts.html && "--html",
     opts.brandGuide && "--brand-guide",
   ].filter(Boolean) as string[];

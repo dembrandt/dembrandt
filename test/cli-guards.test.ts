@@ -40,6 +40,12 @@ test('no discovery warning without both a path list and a discovery flag', () =>
   assert.equal(ignoredDiscoveryWarning({}, ['/pricing']), null);
 });
 
+test('--color-format warns that the shadcn theme keeps its own notation', () => {
+  const warning = colorFormatWarning({ colorFormat: 'rgb', shadcn: true }) ?? '';
+  assert.match(warning, /--shadcn/);
+  assert.equal(colorFormatWarning({ colorFormat: 'hex', shadcn: true }), null);
+});
+
 test('--color-format names only the export paths present in the run', () => {
   assert.equal(colorFormatWarning({ colorFormat: 'oklch' }), null);
   assert.equal(colorFormatWarning({ colorFormat: 'hex', dtcg: true }), null);
