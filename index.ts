@@ -19,6 +19,7 @@ import { toDtcgTokens } from "./lib/formatters/dtcg.js";
 import { generatePDF } from "./lib/formatters/pdf.js";
 import { generateDesignMd } from "./lib/formatters/markdown.js";
 import { generateTailwindTheme } from "./lib/formatters/tailwind.js";
+import { generateShadcnTheme } from "./lib/formatters/shadcn.js";
 import { generateHtmlReport } from "./lib/formatters/html.js";
 import { resolveCompare } from "./lib/compare.js";
 import { emitDriftAnnotations } from "./lib/ci-annotations.js";
@@ -75,6 +76,7 @@ program
   .option("--brand-guide", "Export a brand guide PDF")
   .option("--design-md", "Export a DESIGN.md file")
   .option("--tailwind [path]", "Write a Tailwind v4 @theme CSS file with the observed values only (default: output/<domain>/theme.css)")
+  .option("--shadcn [path]", "Write a shadcn/ui theme block, observed slots only (default: output/<domain>/shadcn.css)")
   .option("--html [path]", "Write a self-contained HTML report (default: output/<domain>/<timestamp>.html)")
   .option("--compare <baseline>", "Drift-compare against a baseline: a local JSON file, or an App baseline id (posts to the .dembrandtrc endpoint, default dembrandt.com). Exits 1 on drift.")
   .option("--approve", "With --compare <file>: accept the current extraction as the new baseline by overwriting that local file, and pass instead of failing. Ignored for App baseline ids.")
@@ -589,6 +591,35 @@ program
         }
       }
 
+      const writeEmitter = (
+        flag: string | boolean | undefined,
+        fileName: string,
+        label: string,
+        build: () => string,
+      ) => {
+        if (flag === undefined) return;
+        try {
+          const domain = new URL(url).hostname.replace("www.", "");
+          let target: string;
+          if (typeof flag === "string") {
+            target = resolve(process.cwd(), flag);
+            mkdirSync(dirname(target), { recursive: true });
+          } else {
+            const dir = join(process.cwd(), "output", domain);
+            mkdirSync(dir, { recursive: true });
+            target = join(dir, fileName);
+          }
+          writeFileSync(target, build());
+          const shown = typeof flag === "string" ? flag : `output/${domain}/${fileName}`;
+          savedNotices.push(chalk.dim(`💾 ${label}: ${color.info(shown)}`));
+        } catch (err) {
+          console.log(color.warning(`! Could not write ${label}: ${err.message}`));
+        }
+      };
+
+      writeEmitter(opts.shadcn, "shadcn.css", "shadcn theme saved (--shadcn)", () =>
+        generateShadcnTheme(result, { version }));
+
       // Generate Tailwind v4 theme
       if (opts.tailwind !== undefined) {
         try {
@@ -835,7 +866,7 @@ program
 // so render them via a custom formatHelp. Subcommands keep a single flat list.
 const OPTION_GROUPS = [
   ["Extraction", ["--dark-mode", "--mobile", "--slow", "--crawl", "--sitemap", "--browser"]],
-  ["Output & export", ["--json-only", "--save-output", "--dtcg", "--brand-guide", "--design-md", "--tailwind", "--html", "--screenshot", "--raw-colors"]],
+  ["Output & export", ["--json-only", "--save-output", "--dtcg", "--brand-guide", "--design-md", "--tailwind", "--shadcn", "--html", "--screenshot", "--raw-colors"]],
   ["Analysis", ["--wcag", "--compare", "--approve"]],
   ["Network & auth", ["--cookie", "--header", "--user-agent", "--locale", "--timezone", "--accept-language", "--screen-size"]],
   ["Anti-detection", ["--stealth", "--no-sandbox"]],

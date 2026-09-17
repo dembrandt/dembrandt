@@ -155,6 +155,26 @@ v4 only. The output is plain CSS custom properties, so nothing you install depen
 
 A scheduled `Tailwind Watch` workflow runs weekly. It checks for a new major, which is the event that can invalidate the theme namespaces used here, and separately recompiles the emitted theme against the latest published Tailwind so a minor that changes what a namespace means cannot pass unnoticed behind the pinned devDependency. Either signal hands the update to an agent, which verifies each namespace against the current docs and opens a PR; it falls back to opening an issue if no agent credential is configured.
 
+## shadcn/ui theme
+
+```bash
+dembrandt dembrandt.com --shadcn
+# Saves to: output/dembrandt.com/shadcn.css
+```
+
+Writes the `:root` block and the `@theme inline` mapping shadcn needs under
+Tailwind v4. Values are oklch, which is what shadcn's own theme uses; a
+translucent value is kept as authored, because the alpha is the token.
+
+A slot is written only when the page supplied it. Anything not observed is
+listed in the file header and left to shadcn's default, so a theme is never
+padded out with plausible values that read as measured. Across the corpus,
+background, foreground, primary, border and radius land on almost every site;
+popover and destructive land on none.
+
+One run renders one colour scheme, so one run writes one block. `--dark-mode`
+produces the `.dark` block.
+
 ## WCAG Contrast Analysis
 
 Use `--wcag` to check accessibility contrast ratios across the page. Unlike palette-based checkers, dembrandt walks the actual DOM and finds what color is rendered on top of what background, per element.

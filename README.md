@@ -48,6 +48,7 @@ Playwright renders the page, dembrandt reads computed styles from the DOM, analy
 ```bash
 dembrandt dembrandt.com --save-output   # Save JSON to output/dembrandt.com/TIMESTAMP.json
 dembrandt dembrandt.com --dtcg          # W3C Design Tokens (DTCG) export, for Style Dictionary or Tokens Studio
+dembrandt dembrandt.com --shadcn        # shadcn/ui theme block, observed slots only
 dembrandt dembrandt.com --design-md     # DESIGN.md for AI agents
 dembrandt dembrandt.com --tailwind      # Tailwind v4 @theme CSS, observed values only
 dembrandt dembrandt.com --wcag          # WCAG 2.1 contrast, real DOM pairs with AA/AAA grades
