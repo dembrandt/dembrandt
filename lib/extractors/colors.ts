@@ -569,7 +569,7 @@ export async function extractColors(page) {
     // brands have no such candidate, so they are left untouched.
     if (semanticColors.primary) {
       const primaryNorm = normalizeColor(semanticColors.primary);
-      if (typeof primaryNorm === 'string' && chroma(primaryNorm) < 0.12) {
+      if (typeof primaryNorm === 'string' && chroma(primaryNorm) < 0.20) {
         // Only the strongest brand signals override a near-neutral primary: a
         // declared brand token or a recurring CTA background. A merely
         // high-confidence chromatic accent is not enough; that would demote a

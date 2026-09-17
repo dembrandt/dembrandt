@@ -39,6 +39,18 @@
  *  (unversioned) — `voice` / `voiceSkipped` ship behind a hidden, opt-in flag
  *          and deliberately do not bump the contract. Bump when the flag is
  *          documented, not before.
+ *  1.14.0 — colors.semantic.primary: the neutral-primary rescue now considers any
+ *          primary below 0.20 chroma, not 0.12. The rescue exists to replace a
+ *          near-neutral primary with a declared brand token or a recurring CTA
+ *          background, and two corpus brands sat just above the old gate with
+ *          their real colour already in the palette. The bar a replacement must
+ *          clear is unchanged at 0.25, so a deliberately neutral identity is
+ *          protected exactly as before. BEHAVIOR: primary moves on sites whose
+ *          previous pick was a desaturated grey. Measured over the 29 corpus
+ *          sites that can change at all: two improved, none regressed. That
+ *          delta is inside the corpus labelling error, so the two sites were
+ *          inspected individually rather than credited to the aggregate.
+ *          Values move for an unchanged site.
  *  1.13.0 — wcag pairs gain fontSize, fontWeight, large, requiredAA, passAA and
  *          passAAA: the observed text size decides which 1.4.3 / 1.4.6
  *          threshold governs a pair, so passAA is a verdict where aa was only
@@ -183,7 +195,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.13.0';
+export const SCHEMA_VERSION = '1.14.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
