@@ -16,10 +16,16 @@ function hero(): string {
     `<button class="cta" style="background:${BRAND};width:180px;height:48px">Start</button></header>`;
 }
 
-function swatchStrip(): string {
-  return `<div class="demo">` +
+/**
+ * Repeated, because one occurrence of a colour never reaches the palette on its
+ * own. A strip that appears once is filtered by usage and the assertion below
+ * would pass with the swatch rule removed.
+ */
+function swatchStrip(rows = 8): string {
+  const strip = `<div class="demo">` +
     SWATCH.map((c) => `<div style="background:${c};width:64px;height:64px"></div>`).join('') +
     `</div>`;
+  return strip.repeat(rows);
 }
 
 let browser: Browser | null = null;
@@ -56,14 +62,16 @@ test('a row of cards sharing one fill is not mistaken for a swatch strip', async
 });
 
 test('an element labelled with its own colour value is skipped', async () => {
-  const labelled = `<div style="background:${SWATCH[0]};width:300px;height:80px">${SWATCH[0]}</div>`;
+  const labelled = Array.from({ length: 10 }, () =>
+    `<div style="background:${SWATCH[0]};width:300px;height:80px">${SWATCH[0]}</div>`).join('');
   const palette = await paletteOf(page_(hero() + labelled));
   assert.ok(!palette.includes(SWATCH[0]), 'a colour that names itself is a sample');
 });
 
 test('colours inside a code block are documentation', async () => {
-  const snippet = `<pre><code style="color:${SWATCH[1]};display:block;width:400px;height:60px">` +
-    `--brand: ${SWATCH[1]}</code></pre>`;
+  const snippet = Array.from({ length: 12 }, () =>
+    `<pre><code style="background:${SWATCH[1]};display:block;width:400px;height:60px">` +
+    `--brand: ${SWATCH[1]}</code></pre>`).join('');
   const palette = await paletteOf(page_(hero() + snippet));
   assert.ok(!palette.includes(SWATCH[1]), 'a code sample is not chrome');
 });
