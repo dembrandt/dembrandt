@@ -39,14 +39,36 @@
  *  (unversioned) — `voice` / `voiceSkipped` ship behind a hidden, opt-in flag
  *          and deliberately do not bump the contract. Bump when the flag is
  *          documented, not before.
- *  1.14.0 — spacing.scaleType is decided by how much of the observed spacing sits
+ *  1.14.0 — three extraction-accuracy changes that move values for an unchanged
+ *          site. They ship together so a consumer re-approves one baseline, not
+ *          three.
+ *
+ *          spacing.scaleType is decided by how much of the observed spacing sits
  *          on the grid, weighted by occurrence, instead of whether any single
- *          value divides by 8 or 4. BEHAVIOR: the old test passed on one stray
- *          multiple, so most sites reported "8px" regardless of their real
- *          rhythm; a site now reads "custom" unless 60% of spacing declarations
- *          land on the step. spacing.commonValues[].rem is computed against the
- *          document's root font size rather than a hardcoded 16, so rem moves on
- *          any site that sets html { font-size }. No field is added or removed.
+ *          value divides by 8 or 4. The old test passed on one stray multiple,
+ *          so most sites reported "8px" regardless of their rhythm; a site now
+ *          reads "custom" unless 60% of declarations land on the step. Two large
+ *          public sites with 20% and 3% on the 8 grid both move to "custom".
+ *          spacing.commonValues[].rem is computed against the document's root
+ *          font size rather than a hardcoded 16, so rem moves on any site that
+ *          sets html { font-size }.
+ *
+ *          colors.palette drops colour samples: a run of four or more equal-size
+ *          siblings whose fills are all opaque and all distinct, an element whose
+ *          entire text is its own colour value, and anything inside code/pre/
+ *          samp/kbd. Any page documenting a palette previously scored its own
+ *          swatches as brand colour. A row of cards shares one fill and is
+ *          untouched.
+ *
+ *          colors.semantic.primary: the neutral-primary rescue now considers any
+ *          primary below 0.20 chroma, not 0.12. The bar a replacement must clear
+ *          is unchanged at 0.25, so a deliberately neutral identity is protected
+ *          exactly as before. Primary moves on sites whose previous pick was a
+ *          desaturated grey. Measured over the 29 corpus sites that can change at
+ *          all: two improved, none regressed, a delta inside the corpus labelling
+ *          error, so both were inspected individually.
+ *
+ *          No field is added or removed. Values move for an unchanged site.
  *          Values move for an unchanged site.
  *  1.13.0 — wcag pairs gain fontSize, fontWeight, large, requiredAA, passAA and
  *          passAAA: the observed text size decides which 1.4.3 / 1.4.6
