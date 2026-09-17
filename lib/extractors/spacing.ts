@@ -2,6 +2,7 @@ import { normalizeRadiusValues } from '../radius-normalize.js';
 export async function extractSpacing(page) {
   return await page.evaluate(() => {
     const spacings = new Map();
+    const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 
     document.querySelectorAll("*").forEach((el) => {
       const computed = getComputedStyle(el);
@@ -21,15 +22,18 @@ export async function extractSpacing(page) {
       .map(([px, count]) => ({
         px: px + "px",
         display: px + "px",
-        rem: (px / 16).toFixed(2) + "rem",
+        rem: (px / rootPx).toFixed(2) + "rem",
         count,
         numericValue: px,
       }))
       .sort((a, b) => a.numericValue - b.numericValue);
 
-    const is4px = values.some((v) => parseFloat(v.px) % 4 === 0);
-    const is8px = values.some((v) => parseFloat(v.px) % 8 === 0);
-    const scaleType = is8px ? "8px" : is4px ? "4px" : "custom";
+    const total = values.reduce((sum, v) => sum + v.count, 0);
+    const share = (step) =>
+      total === 0
+        ? 0
+        : values.reduce((sum, v) => (v.numericValue % step === 0 ? sum + v.count : sum), 0) / total;
+    const scaleType = share(8) >= 0.6 ? "8px" : share(4) >= 0.6 ? "4px" : "custom";
 
     return { scaleType, commonValues: values };
   });

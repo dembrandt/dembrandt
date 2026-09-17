@@ -39,6 +39,15 @@
  *  (unversioned) — `voice` / `voiceSkipped` ship behind a hidden, opt-in flag
  *          and deliberately do not bump the contract. Bump when the flag is
  *          documented, not before.
+ *  1.14.0 — spacing.scaleType is decided by how much of the observed spacing sits
+ *          on the grid, weighted by occurrence, instead of whether any single
+ *          value divides by 8 or 4. BEHAVIOR: the old test passed on one stray
+ *          multiple, so most sites reported "8px" regardless of their real
+ *          rhythm; a site now reads "custom" unless 60% of spacing declarations
+ *          land on the step. spacing.commonValues[].rem is computed against the
+ *          document's root font size rather than a hardcoded 16, so rem moves on
+ *          any site that sets html { font-size }. No field is added or removed.
+ *          Values move for an unchanged site.
  *  1.13.0 — wcag pairs gain fontSize, fontWeight, large, requiredAA, passAA and
  *          passAAA: the observed text size decides which 1.4.3 / 1.4.6
  *          threshold governs a pair, so passAA is a verdict where aa was only
@@ -183,7 +192,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.13.0';
+export const SCHEMA_VERSION = '1.14.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
