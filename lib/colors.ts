@@ -365,6 +365,35 @@ export function relativeLuminance(hex) {
   return 0.2126 * srgbToLinear(rgb.r) + 0.7152 * srgbToLinear(rgb.g) + 0.0722 * srgbToLinear(rgb.b);
 }
 
+/** Parse a hex or rgb()/rgba() string to #rrggbb, or null if unparseable. */
+export function toHexColor(input: string | undefined | null): string | null {
+  if (!input) return null;
+  const s = String(input).trim();
+  if (/^#[0-9a-f]{6}$/i.test(s)) return s.toLowerCase();
+  if (/^#[0-9a-f]{3}$/i.test(s)) {
+    return ("#" + s.slice(1).split("").map((ch) => ch + ch).join("")).toLowerCase();
+  }
+  const m = s.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (m) {
+    const h = (n: string) => Math.max(0, Math.min(255, Number(n))).toString(16).padStart(2, "0");
+    return ("#" + h(m[1]) + h(m[2]) + h(m[3])).toLowerCase();
+  }
+  return null;
+}
+
+/** WCAG contrast ratio between two colours (any parseable form), or null. */
+export function contrastRatio(a: string, b: string): number | null {
+  const ha = toHexColor(a);
+  const hb = toHexColor(b);
+  if (!ha || !hb) return null;
+  const la = relativeLuminance(ha);
+  const lb = relativeLuminance(hb);
+  if (la == null || lb == null) return null;
+  const hi = Math.max(la, lb);
+  const lo = Math.min(la, lb);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
 /** 1.4.3 large scale is 18pt, or 14pt bold. Points, not pixels. */
 export function isLargeScale(fontSizePx: number, weight: number): boolean {
   const pt = 96 / 72;

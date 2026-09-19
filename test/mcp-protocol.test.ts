@@ -58,7 +58,7 @@ test('every tool compiles to a valid schema', () => {
   // zod 4 rejects some zod 3 spellings at schema-build time, and the failure
   // takes down tools/list for every tool at once: one bad parameter breaks the
   // whole server, which is how #158 shipped a compute_drift nobody could call.
-  assert.equal(tools.length, 17, `the tool set changed: ${tools.map(t => t.name).join(', ')}`);
+  assert.equal(tools.length, 21, `the tool set changed: ${tools.map(t => t.name).join(', ')}`);
   for (const tool of tools) {
     assert.equal(tool.inputSchema.type, 'object', `${tool.name} has no object schema`);
     assert.ok(tool.description.length > 40, `${tool.name} needs a usable description`);
@@ -150,6 +150,33 @@ test('the emitters an agent can reach match the ones the CLI writes', async () =
   const tailwind = await call('export_tailwind', { result: extraction });
   assert.notEqual(tailwind.isError, true, `export_tailwind errored: ${JSON.stringify(tailwind)}`);
   assert.match(tailwind.content[0].text, /@theme/);
+});
+
+test('the pure analysis tools grade and validate without a browser', async () => {
+  const contrast = await call('check_contrast', {
+    pairs: [
+      { foreground: '#767676', background: '#ffffff', label: 'body grey' },
+      { foreground: '#767676', background: '#ffffff', fontSizePx: 32, fontWeight: 700, label: 'the same grey, headline size' },
+      { foreground: 'not-a-colour', background: '#ffffff', label: 'unparseable' },
+    ],
+  });
+  assert.notEqual(contrast.isError, true, `check_contrast errored: ${JSON.stringify(contrast)}`);
+  const graded = JSON.parse(contrast.content[0].text).pairs;
+  // 4.54:1 passes body AA and, being large scale, passes there too: the point
+  // is that the same pair is graded against a different bar.
+  assert.equal(graded[0].requiredAA, 4.5, 'body text is graded at 4.5:1');
+  assert.equal(graded[1].requiredAA, 3, '18pt+ is large scale and graded at 3:1');
+  assert.ok(graded[2].error, 'an unparseable colour is reported, not graded');
+
+  const valid = await call('validate_dtcg', {
+    tokens: { brand: { $type: 'color', $value: { colorSpace: 'srgb', components: [0.1, 0.2, 0.4] } } },
+  });
+  assert.equal(JSON.parse(valid.content[0].text).valid, true);
+
+  const broken = await call('validate_dtcg', {
+    tokens: { brand: { $type: 'color', $value: { colorSpace: 'srgb', components: [2, 0, 0] } } },
+  });
+  assert.equal(JSON.parse(broken.content[0].text).valid, false, 'a component out of range is not valid');
 });
 
 test('job listing works before any job exists', async () => {

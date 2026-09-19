@@ -10,7 +10,7 @@
  * finding has a severity, and the consistency score is derived from them.
  */
 
-import { deltaE2000, relativeLuminance } from "./colors.js";
+import { contrastRatio, deltaE2000 } from "./colors.js";
 import { spacingBase } from "./normalize.js";
 import type { BrandingResult } from "./types.js";
 
@@ -35,34 +35,6 @@ export interface FindingsReport {
   coverage: { present: number; total: number };
 }
 
-/** Parse a hex or rgb()/rgba() string to #rrggbb, or null if unparseable. */
-function toHex(input: string | undefined | null): string | null {
-  if (!input) return null;
-  const s = String(input).trim();
-  if (/^#[0-9a-f]{6}$/i.test(s)) return s.toLowerCase();
-  if (/^#[0-9a-f]{3}$/i.test(s)) {
-    return ("#" + s.slice(1).split("").map((c) => c + c).join("")).toLowerCase();
-  }
-  const m = s.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-  if (m) {
-    const h = (n: string) => Math.max(0, Math.min(255, Number(n))).toString(16).padStart(2, "0");
-    return ("#" + h(m[1]) + h(m[2]) + h(m[3])).toLowerCase();
-  }
-  return null;
-}
-
-/** WCAG contrast ratio between two colours (any parseable form), or null. */
-function contrastRatio(a: string, b: string): number | null {
-  const ha = toHex(a);
-  const hb = toHex(b);
-  if (!ha || !hb) return null;
-  const la = relativeLuminance(ha);
-  const lb = relativeLuminance(hb);
-  if (la == null || lb == null) return null;
-  const hi = Math.max(la, lb);
-  const lo = Math.min(la, lb);
-  return (hi + 0.05) / (lo + 0.05);
-}
 
 /** Leading pixel value of a size string like "40px (2.50rem)", or null. */
 function pxOf(size: string | undefined): number | null {
