@@ -212,6 +212,23 @@ function toolHandler(pick, extraOptions = {}) {
 
 // ── Server entry ───────────────────────────────────────────────────────
 
+interface ContrastPair {
+  foreground: string;
+  background: string;
+  fontSizePx?: number;
+  fontWeight?: number;
+  label?: string;
+}
+
+interface GradedPair extends ContrastPair {
+  ratio?: number;
+  large?: boolean;
+  requiredAA?: number;
+  passAA?: boolean;
+  passAAA?: boolean;
+  error?: string;
+}
+
 async function main() {
   let McpServer, StdioServerTransport, z;
   try {
@@ -433,7 +450,7 @@ async function main() {
     "validate_dtcg",
     "Validate a W3C Design Tokens (DTCG) document against the 2025.10 spec: token types, colour objects and their component ranges, dimensions, references, and property-level $ref pointers. Returns valid plus the list of errors with the path each one sits at. Pure and synchronous, no browser. Use it after writing or editing a token file, including one this server produced, so a hand edit cannot quietly break the document.",
     { tokens: z.record(z.string(), z.any()).describe("The DTCG token document to validate, as an object") },
-    ({ tokens }: any) => {
+    ({ tokens }: { tokens: Record<string, unknown> }) => {
       if (!tokens || typeof tokens !== "object") return errorResult("Pass tokens: a DTCG document object.");
       return jsonResult(validateTokensObject(tokens));
     },
@@ -451,8 +468,8 @@ async function main() {
         label: z.string().optional().describe("Your own name for the pair, echoed back"),
       })).min(1).max(200).describe("The colour pairs to grade"),
     },
-    ({ pairs }: any) => {
-      const graded = pairs.map((pair: any) => {
+    ({ pairs }: { pairs: ContrastPair[] }) => {
+      const graded: GradedPair[] = pairs.map((pair) => {
         const ratio = contrastRatio(pair.foreground, pair.background);
         if (ratio == null) {
           return { ...pair, error: "Could not parse one of the colours" };
@@ -461,7 +478,7 @@ async function main() {
         const rounded = Math.round(ratio * 100) / 100;
         return { ...pair, ratio: rounded, ...wcagVerdict(rounded, large) };
       });
-      const failures = graded.filter((g: any) => g.passAA === false).length;
+      const failures = graded.filter((g) => g.passAA === false).length;
       return jsonResult({ pairs: graded, summary: { total: graded.length, failingAA: failures } });
     },
   );
@@ -470,9 +487,16 @@ async function main() {
     "check_robots",
     "Ask whether robots.txt allows extracting a URL, before spending a browser run on it. Returns the verdict, the rule that decided it, and the robots.txt status. A 404 or 410 means no robots.txt and everything is allowed; any other unreadable response is treated as a refusal. Cheap and synchronous: one HTTP request, no browser.",
     { url: z.string().describe("The URL you intend to extract") },
-    async ({ url: target }: any) => {
+    async ({ url: target }: { url: string }) => {
       const result = await checkRobotsTxt(target);
-      return jsonResult(result);
+      const strict = robotsVerdict(result, { enforce: true });
+      const lenient = robotsVerdict(result, { enforce: false });
+      return jsonResult({
+        ...result,
+        allowed: lenient.action === "proceed",
+        allowedWhenEnforcing: strict.action === "proceed",
+        reason: ("reason" in strict ? strict.reason : undefined) ?? ("reason" in lenient ? lenient.reason : undefined) ?? null,
+      });
     },
   );
 
