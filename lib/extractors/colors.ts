@@ -270,11 +270,13 @@ export async function extractColors(page) {
     // intent, and any docs or style-guide page renders them.
     function isColorSample(el: Element, rect: DOMRect) {
       if (el.closest('code, pre, samp, kbd')) return true;
-      const text = (el.textContent || '').trim();
-      if (colorLiteralRe.test(text)) return true;
+      // Leaves only: textContent on every node of a deep page is quadratic, and
+      // a swatch label is never a wrapper.
+      if (el.children.length === 0 && colorLiteralRe.test((el.textContent || '').trim())) return true;
 
-      const siblings: Element[] = el.parentElement ? Array.from(el.parentElement.children) : [];
-      if (siblings.length < 4 || rect.width > 200 || rect.height > 200) return false;
+      if (rect.width > 200 || rect.height > 200 || !el.parentElement) return false;
+      const siblings: Element[] = Array.from(el.parentElement.children);
+      if (siblings.length < 4) return false;
       const fills = new Set();
       for (const sib of siblings) {
         const sibRect = sib.getBoundingClientRect();
