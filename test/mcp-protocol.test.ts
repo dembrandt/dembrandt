@@ -125,9 +125,6 @@ test('the pure tools run without a browser', async () => {
 });
 
 test('the emitters an agent can reach match the ones the CLI writes', async () => {
-  // A flag that writes a file the CLI user can have, with no MCP tool beside
-  // it, is a surface the agent cannot reach at all: --shadcn shipped in 0.34.0
-  // and was unreachable over MCP for two releases.
   const extraction = {
     url: 'https://example.com/',
     extractedAt: '2026-01-01T00:00:00.000Z',
@@ -162,8 +159,6 @@ test('the pure analysis tools grade and validate without a browser', async () =>
   });
   assert.notEqual(contrast.isError, true, `check_contrast errored: ${JSON.stringify(contrast)}`);
   const graded = JSON.parse(contrast.content[0].text).pairs;
-  // 4.54:1 passes body AA and, being large scale, passes there too: the point
-  // is that the same pair is graded against a different bar.
   assert.equal(graded[0].requiredAA, 4.5, 'body text is graded at 4.5:1');
   assert.equal(graded[1].requiredAA, 3, '18pt+ is large scale and graded at 3:1');
   assert.ok(graded[2].error, 'an unparseable colour is reported, not graded');
