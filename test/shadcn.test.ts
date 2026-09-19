@@ -66,6 +66,25 @@ test('radius takes a single length, never a multi-corner shorthand', () => {
   assert.doesNotMatch(css, /--radius: 0px 2px/);
 });
 
+test('radius is the length the page uses most, not the smallest one it has', () => {
+  const css = generateShadcnTheme({
+    borderRadius: { values: [
+      { value: '1px', confidence: 'high', count: 31 },
+      { value: '4px', confidence: 'high', count: 141 },
+      { value: '6px', confidence: 'high', count: 116 },
+    ] },
+  } as never);
+  assert.match(css, /--radius: 4px;/);
+});
+
+test('the radius ladder never goes negative on a small base', () => {
+  const css = generateShadcnTheme({
+    borderRadius: { values: [{ value: '1px', confidence: 'high', count: 31 }] },
+  } as never);
+  assert.match(css, /--radius-sm: max\(0px, calc\(var\(--radius\) - 4px\)\);/);
+  assert.doesNotMatch(css, /--radius-sm: calc\(var\(--radius\) - 4px\);/);
+});
+
 test('the @theme inline block maps every slot that was written, and nothing else', () => {
   const css = generateShadcnTheme(DARK_PAGE);
   const [, mapping] = css.split('@theme inline {');

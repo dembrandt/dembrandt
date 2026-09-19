@@ -33,7 +33,7 @@ export interface ShadcnInput {
   url?: string;
   colors?: Colors;
   borders?: { combinations?: { color?: string; count?: number }[] };
-  borderRadius?: { values?: { value?: string; confidence?: string }[] };
+  borderRadius?: { values?: { value?: string; confidence?: string; count?: number }[] };
   components?: {
     badges?: { all?: { backgroundColor?: string; color?: string }[] };
     inputs?: Record<string, { states?: { default?: Record<string, string>; focus?: Record<string, string> } }[]>;
@@ -70,7 +70,11 @@ function ringFrom(boxShadow?: string): string | null {
 /** shadcn's --radius is one length, never a multi-corner shorthand. */
 function baseRadius(input: ShadcnInput): string | null {
   const values = input.borderRadius?.values ?? [];
-  const usable = values.filter((v) => v.confidence !== 'low' && v.value && !v.value.trim().includes(' '));
+  // values arrive sorted by length, so the first is the smallest, not the one
+  // the page actually uses.
+  const usable = values
+    .filter((v) => v.confidence !== 'low' && v.value && !v.value.trim().includes(' '))
+    .sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
   return usable[0]?.value ?? null;
 }
 
@@ -169,8 +173,10 @@ export function generateShadcnTheme(input: ShadcnInput, options: ShadcnOptions =
   lines.push('@theme inline {');
   for (const slot of written) lines.push('  --color-' + slot + ': var(--' + slot + ');');
   if (radius) {
-    lines.push('  --radius-sm: calc(var(--radius) - 4px);');
-    lines.push('  --radius-md: calc(var(--radius) - 2px);');
+    // max() keeps the ladder valid on a small base: calc(1px - 4px) is a
+    // negative radius, which the browser drops.
+    lines.push('  --radius-sm: max(0px, calc(var(--radius) - 4px));');
+    lines.push('  --radius-md: max(0px, calc(var(--radius) - 2px));');
     lines.push('  --radius-lg: var(--radius);');
     lines.push('  --radius-xl: calc(var(--radius) + 4px);');
   }
