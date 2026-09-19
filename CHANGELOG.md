@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.2] - 2026-09-19
+
+A colour's alpha can be an alias, the way its components already could.
+
+### Fixed
+- The DTCG validator rejected a property-level `$ref` in a colour's `alpha`, although §7.3.1 allows one and the same colour's `components` already accepted it. A token set that aliases one opacity across a palette failed validation. The reference resolves now, and the resolved value is type-checked and range-checked like a literal (#224)
+
 ## [0.34.1] - 2026-09-19
 
 The shadcn radius was the smallest one on the page, not the one the page uses.
