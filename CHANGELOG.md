@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.34.1] - 2026-09-19
+
+The shadcn radius was the smallest one on the page, not the one the page uses.
+
+### Fixed
+- `--shadcn` wrote `--radius: 1px` for a site whose buttons and inputs are 4px. The radius list arrives sorted by length and the emitter took the first entry, so a 31-use hairline outranked the 141-use value. It takes the highest count now (#222)
+- The `--radius-sm` and `--radius-md` rungs were emitted as a bare `calc()`, so a small base produced `calc(1px - 4px)`: a negative radius the browser drops. Both are clamped with `max(0px, ...)` (#222)
+- The release workflow's downstream sync read npm before the publish had propagated and failed on `ETARGET`, leaving the dembrandt-next bump PR unopened. It waits for the version to resolve first
+
 ## [0.34.0] - 2026-09-19
 
 Three heuristics stopped deciding a whole page from a single observation.

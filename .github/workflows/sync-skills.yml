@@ -94,6 +94,16 @@ jobs:
         run: |
           cd dembrandt-next
           VERSION="${DEMBRANDT_VERSION#v}"
+
+          # npm answers "being processed" for up to a few minutes after publish,
+          # so this job raced its own release and died on ETARGET (v0.34.0).
+          for i in $(seq 1 30); do
+            npm view "dembrandt@${VERSION}" version >/dev/null 2>&1 && break
+            echo "dembrandt@${VERSION} not on the registry yet, waiting ($i/30)"
+            sleep 20
+          done
+          npm view "dembrandt@${VERSION}" version
+
           npm pkg set dependencies.dembrandt="${VERSION}"
           # Keep package-lock.json in sync with package.json. Without this the
           # lock still pins the old version and `npm ci` (CI, the drift gate)

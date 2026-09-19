@@ -110,7 +110,7 @@ reference is **[docs/usage.md](docs/usage.md)**.
 Extract a preview deployment, compare against a committed baseline, fail the job when tokens moved:
 
 ```yaml
-- uses: dembrandt/dembrandt@v0.34.0
+- uses: dembrandt/dembrandt@v0.34.1
   with:
     url: https://preview.example.com
     baseline: .dembrandt/baseline.json
