@@ -174,9 +174,32 @@ test('the pure analysis tools grade and validate without a browser', async () =>
   assert.equal(JSON.parse(broken.content[0].text).valid, false, 'a component out of range is not valid');
 });
 
+test('check_robots answers on an unreachable host instead of hanging', async () => {
+  const res = await call('check_robots', { url: 'http://127.0.0.1:1/' });
+  assert.notEqual(res.isError, true, `check_robots errored: ${JSON.stringify(res)}`);
+  const verdict = JSON.parse(res.content[0].text);
+  assert.ok('status' in verdict, 'the verdict must name the robots.txt status');
+  assert.notEqual(verdict.status, 'ok', 'a refused connection is not a readable robots.txt');
+  assert.ok('allowed' in verdict, 'the caller needs a yes or no, not just a status');
+});
+
 test('job listing works before any job exists', async () => {
   const res = await call('list_jobs', {});
   assert.deepEqual(JSON.parse(res.content[0].text), { jobs: [] });
+
+test('an extraction tool queues instead of blocking, and the job can be cancelled', async () => {
+  const queued = await call('get_motion', { url: 'https://example.com/' });
+  assert.notEqual(queued.isError, true, `get_motion errored: ${JSON.stringify(queued)}`);
+  const { job_id: jobId, status } = JSON.parse(queued.content[0].text);
+  assert.ok(jobId, 'an async extraction must hand back a job_id');
+  assert.equal(status, 'queued');
+
+  const cancelled = await call('cancel_job', { job_id: jobId });
+  assert.notEqual(cancelled.isError, true);
+  const after = await call('get_job_status', { job_id: jobId });
+  assert.doesNotMatch(after.content[0].text, /"status":\s*"completed"/, 'a cancelled job must not complete');
+});
+
 });
 
 test('the process exits when its transport closes', async () => {
