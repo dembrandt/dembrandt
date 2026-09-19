@@ -595,6 +595,7 @@ program
         flag: string | boolean | undefined,
         fileName: string,
         label: string,
+        flagName: string,
         build: () => string,
       ) => {
         if (flag === undefined) return;
@@ -611,40 +612,17 @@ program
           }
           writeFileSync(target, build());
           const shown = typeof flag === "string" ? flag : `output/${domain}/${fileName}`;
-          savedNotices.push(chalk.dim(`💾 ${label}: ${color.info(shown)}`));
+          savedNotices.push(chalk.dim(`💾 ${label} saved (${flagName}): ${color.info(shown)}`));
         } catch (err) {
           console.log(color.warning(`! Could not write ${label}: ${err.message}`));
         }
       };
 
-      writeEmitter(opts.shadcn, "shadcn.css", "shadcn theme saved (--shadcn)", () =>
+      writeEmitter(opts.shadcn, "shadcn.css", "shadcn theme", "--shadcn", () =>
         generateShadcnTheme(result, { version }));
 
-      // Generate Tailwind v4 theme
-      if (opts.tailwind !== undefined) {
-        try {
-          const twDomain = new URL(url).hostname.replace("www.", "");
-          let twPath;
-          if (typeof opts.tailwind === "string") {
-            twPath = resolve(process.cwd(), opts.tailwind);
-            mkdirSync(dirname(twPath), { recursive: true });
-          } else {
-            const twDir = join(process.cwd(), "output", twDomain);
-            mkdirSync(twDir, { recursive: true });
-            twPath = join(twDir, "theme.css");
-          }
-          writeFileSync(twPath, generateTailwindTheme(result, { version }));
-          const twLabel =
-            typeof opts.tailwind === "string" ? opts.tailwind : `output/${twDomain}/theme.css`;
-          savedNotices.push(
-            chalk.dim(`💾 Tailwind theme saved (--tailwind): ${color.info(twLabel)}`)
-          );
-        } catch (err) {
-          console.log(
-            color.warning(`! Could not write Tailwind theme: ${err.message}`)
-          );
-        }
-      }
+      writeEmitter(opts.tailwind, "theme.css", "Tailwind theme", "--tailwind", () =>
+        generateTailwindTheme(result, { version }));
 
       // Compare against a baseline: a local file (free, offline) or an App
       // baseline id (platform). resolveCompare dispatches on file-vs-id.
