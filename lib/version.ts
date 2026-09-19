@@ -69,7 +69,6 @@
  *          error, so both were inspected individually.
  *
  *          No field is added or removed. Values move for an unchanged site.
- *          Values move for an unchanged site.
  *  1.13.0 — wcag pairs gain fontSize, fontWeight, large, requiredAA, passAA and
  *          passAAA: the observed text size decides which 1.4.3 / 1.4.6
  *          threshold governs a pair, so passAA is a verdict where aa was only
