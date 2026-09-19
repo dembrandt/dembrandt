@@ -43,20 +43,67 @@ Requires Node.js 18+
 
 Playwright renders the page, dembrandt reads computed styles from the DOM, analyzes color usage and confidence, groups similar typography, detects spacing patterns, and returns design tokens.
 
-## Common flags
+## Flags
 
 ```bash
-dembrandt dembrandt.com --save-output   # Save JSON to output/dembrandt.com/TIMESTAMP.json
-dembrandt dembrandt.com --dtcg          # W3C Design Tokens (DTCG) export, for Style Dictionary or Tokens Studio
-dembrandt dembrandt.com --shadcn        # shadcn/ui theme block, observed slots only
-dembrandt dembrandt.com --design-md     # DESIGN.md for AI agents
-dembrandt dembrandt.com --tailwind      # Tailwind v4 @theme CSS, observed values only
-dembrandt dembrandt.com --wcag          # WCAG 2.1 contrast, real DOM pairs with AA/AAA grades
-dembrandt dembrandt.com --crawl 10      # Merge 10 pages into one output, cross-page confidence boosting
-dembrandt dembrandt.com --slow          # 3x timeouts for JavaScript-heavy sites
+dembrandt dembrandt.com --shadcn        # shadcn/ui theme, observed slots only
+dembrandt dembrandt.com --dtcg          # W3C design tokens, for Style Dictionary or Tokens Studio
+dembrandt dembrandt.com --wcag          # WCAG 2.1 contrast on real DOM pairs
 ```
 
-Default is formatted terminal output only. Full flag reference in **[docs/usage.md](docs/usage.md)**: mobile and dark mode, browser selection and CDP, brand guide PDF, motion tokens, fingerprint options.
+Default is formatted terminal output only. Every flag below; the detailed
+reference is **[docs/usage.md](docs/usage.md)**.
+
+**Export**
+
+| Flag | What you get |
+|---|---|
+| `--shadcn [path]` | shadcn/ui theme, observed slots only |
+| `--tailwind [path]` | Tailwind v4 `@theme` CSS |
+| `--dtcg` | W3C design tokens (DTCG) |
+| `--design-md` | DESIGN.md for AI agents |
+| `--html [path]` | Self-contained HTML report |
+| `--brand-guide` | Brand guide PDF |
+| `--screenshot <path>` | Viewport screenshot |
+| `--save-output` | JSON to `output/<domain>/` |
+| `--json-only` | Raw JSON to stdout |
+| `--raw-colors` | Pre-filter colours too |
+| `--color-format <f>` | Colour notation: hex, rgb, oklch, lch, source |
+
+**Analysis**
+
+| Flag | What you get |
+|---|---|
+| `--wcag` | Contrast grades on real DOM pairs |
+| `--compare <baseline>` | Drift gate; exits 1 when tokens moved |
+| `--approve` | Accept the current run as the new baseline |
+| `--ai` | ML brand-primary prediction (experimental) |
+
+**Coverage**
+
+| Flag | What you get |
+|---|---|
+| `--crawl [n]` | Merge N pages, cross-page confidence |
+| `--sitemap` | Discover pages from sitemap.xml |
+| `--dark-mode` | The dark theme's tokens |
+| `--mobile` | Mobile viewport |
+| `--slow` | 3x timeouts for heavy sites |
+| `--browser <type>` | chromium or firefox; CDP via env |
+| `--no-sandbox` | For Docker and CI |
+
+**Access**
+
+| Flag | What you get |
+|---|---|
+| `--cookie <string>` | Reach pages behind a session |
+| `--header <string>` | Any extra request header |
+| `--user-agent <string>` | Custom user agent |
+| `--locale <string>` | Locale for the fingerprint |
+| `--timezone <string>` | Timezone for the fingerprint |
+| `--accept-language <s>` | Accept-Language header |
+| `--screen-size <WxH>` | Reported screen resolution |
+| `--stealth` | Anti-detection; authorized use only |
+| `--key <string>` | Sync runs to your account |
 
 ## Catch design drift in CI
 
