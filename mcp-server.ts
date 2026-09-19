@@ -19,7 +19,11 @@ import { computeFindings } from "./lib/findings.js";
 import { stripAssetBytes } from "./lib/mcp/assets.js";
 import { generateHtmlReport } from "./lib/formatters/html.js";
 import { toDtcgTokens } from "./lib/formatters/dtcg.js";
+import { validateTokensObject } from "./lib/dtcg/validate.js";
+import { contrastRatio, isLargeScale, wcagVerdict } from "./lib/colors.js";
 import { generateDesignMd } from "./lib/formatters/markdown.js";
+import { generateTailwindTheme } from "./lib/formatters/tailwind.js";
+import { generateShadcnTheme } from "./lib/formatters/shadcn.js";
 import { mergeResults } from "./lib/merger.js";
 import { additionalPages, discoveryBudget, extractOptions, isMultiPage, launchArgs } from "./lib/mcp/options.js";
 import type { Extraction, ExtractionRequest } from "./lib/mcp/options.js";
@@ -208,6 +212,23 @@ function toolHandler(pick, extraOptions = {}) {
 
 // ── Server entry ───────────────────────────────────────────────────────
 
+interface ContrastPair {
+  foreground: string;
+  background: string;
+  fontSizePx?: number;
+  fontWeight?: number;
+  label?: string;
+}
+
+interface GradedPair extends ContrastPair {
+  ratio?: number;
+  large?: boolean;
+  requiredAA?: number;
+  passAA?: boolean;
+  passAAA?: boolean;
+  error?: string;
+}
+
 async function main() {
   let McpServer, StdioServerTransport, z;
   try {
@@ -232,6 +253,7 @@ async function main() {
   const slow = z.boolean().optional().default(false).describe("3x timeouts for heavy SPAs");
   const sync = z.boolean().optional().default(false).describe("Wait for the result directly instead of returning a job_id. Blocks 15-40s for one page, and proportionally longer for a multi-page crawl.");
   const mobile = z.boolean().optional().default(false).describe("Extract from a mobile viewport instead of desktop");
+  const darkMode = z.boolean().optional().default(false).describe("Extract the dark theme: the page is rendered with prefers-color-scheme: dark");
   const cookie = z.string().optional().describe('Cookie string for authenticated pages, e.g. "session=abc; token=xyz"');
   const header = z.string().optional().describe('Extra HTTP header, e.g. "Authorization: Bearer eyJ..."');
   const userAgent = z.string().optional().describe("Custom user agent string");
@@ -242,7 +264,7 @@ async function main() {
 
   // Every extraction tool takes the same navigation, auth and crawl surface.
   const crawlParams = { pages, paths, sitemap };
-  const browserParams = { slow, mobile, cookie, header, userAgent, noSandbox };
+  const browserParams = { slow, mobile, darkMode, cookie, header, userAgent, noSandbox };
 
   // ── Extraction tools ───────────────────────────────────────────────────
 
@@ -251,7 +273,6 @@ async function main() {
     "Extract the full design system from a live website. Launches a real browser, navigates to the site, and returns production-ready design tokens: color palette (hex, RGB, LCH, OKLCH) with semantic roles and CSS custom properties, typography scale (families, fallbacks, sizes, weights, line heights, letter spacing by context), spacing system with grid detection, border radii, border patterns, box shadows for elevation, component styles (buttons with hover/focus states, inputs, links, badges), responsive breakpoints, logo and favicons, site name, detected CSS frameworks, and icon systems. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
     {
       url, sync, ...browserParams, ...crawlParams,
-      darkMode: z.boolean().optional().default(false).describe("Extract with dark mode emulation (prefers-color-scheme: dark)"),
       wcag: z.boolean().optional().default(false).describe("Include WCAG contrast analysis between palette colors"),
     },
     toolHandler((d) => d),
@@ -299,6 +320,13 @@ async function main() {
     "Extract the spacing system from a live website: common margin and padding values sorted by frequency, pixel and rem values, and grid system detection (4px, 8px, or custom scale). Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
     { url, sync, ...browserParams, ...crawlParams },
     toolHandler((d) => ({ url: d.url, spacing: d.spacing })),
+  );
+
+  (server.tool as any)(
+    "get_motion",
+    "Extract the motion system from a live website: transition and animation durations with their usage counts, easing curves, the durations and easings used per component context (button, link, nav, card, modal), named keyframe animations, and the hover patterns discovered by simulating real interaction. Also returns gradients, which travel with motion as the decorative layer. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status.",
+    { url, sync, ...browserParams, ...crawlParams },
+    toolHandler((d) => ({ url: d.url, motion: d.motion, gradients: d.gradients })),
   );
 
   (server.tool as any)(
@@ -393,6 +421,82 @@ async function main() {
       const source = resolveExtraction(result, job_id, "result", jobQueue);
       if (!source.ok) return errorResult(source.error);
       return { content: [{ type: "text", text: generateDesignMd(source.value, { version }) }] };
+    },
+  );
+
+  (server.tool as any)(
+    "export_tailwind",
+    "Render a Tailwind v4 @theme CSS block from a dembrandt extraction: colors, typography, spacing, radii and shadows as custom properties, observed values only, with nothing invented. Pure and synchronous, no browser. Takes either an inline extraction or the job_id of a completed one. Write the output to a project's CSS entry point so Tailwind utilities resolve to the measured brand.",
+    { result: extract, job_id: sourceJob },
+    ({ result, job_id }: any) => {
+      const source = resolveExtraction(result, job_id, "result", jobQueue);
+      if (!source.ok) return errorResult(source.error);
+      return { content: [{ type: "text", text: generateTailwindTheme(source.value, { version }) }] };
+    },
+  );
+
+  (server.tool as any)(
+    "export_shadcn",
+    "Render a shadcn/ui theme from a dembrandt extraction: the :root block and the @theme inline mapping Tailwind v4 needs. A slot is written only where the page supplied a value, and the rest are named in the file header and left at shadcn's own defaults, so no slot is filled with an invented value that reads as measured. Pure and synchronous, no browser. Takes either an inline extraction or the job_id of a completed one.",
+    { result: extract, job_id: sourceJob },
+    ({ result, job_id }: any) => {
+      const source = resolveExtraction(result, job_id, "result", jobQueue);
+      if (!source.ok) return errorResult(source.error);
+      return { content: [{ type: "text", text: generateShadcnTheme(source.value, { version }) }] };
+    },
+  );
+
+  (server.tool as any)(
+    "validate_dtcg",
+    "Validate a W3C Design Tokens (DTCG) document against the 2025.10 spec: token types, colour objects and their component ranges, dimensions, references, and property-level $ref pointers. Returns valid plus the list of errors with the path each one sits at. Pure and synchronous, no browser. Use it after writing or editing a token file, including one this server produced, so a hand edit cannot quietly break the document.",
+    { tokens: z.record(z.string(), z.any()).describe("The DTCG token document to validate, as an object") },
+    ({ tokens }: { tokens: Record<string, unknown> }) => {
+      if (!tokens || typeof tokens !== "object") return errorResult("Pass tokens: a DTCG document object.");
+      return jsonResult(validateTokensObject(tokens));
+    },
+  );
+
+  (server.tool as any)(
+    "check_contrast",
+    "Grade colour pairs against WCAG 2.1 contrast, at the threshold the text size earns: 18pt, or 14pt bold, is large scale and needs 3:1 where body text needs 4.5:1. Takes pairs you name, so it grades colours you are about to ship rather than only colours already on a page. Returns the ratio, the required ratio, and the AA and AAA verdicts per pair. Pure and synchronous, no browser. For pairs already rendered on a site, extract with wcag instead.",
+    {
+      pairs: z.array(z.object({
+        foreground: z.string().describe("Text colour, hex or rgb()"),
+        background: z.string().describe("Background it sits on, hex or rgb()"),
+        fontSizePx: z.number().optional().describe("Rendered size in px. Without it the pair is graded as body text"),
+        fontWeight: z.number().optional().describe("Numeric weight, 400 unless given"),
+        label: z.string().optional().describe("Your own name for the pair, echoed back"),
+      })).min(1).max(200).describe("The colour pairs to grade"),
+    },
+    ({ pairs }: { pairs: ContrastPair[] }) => {
+      const graded: GradedPair[] = pairs.map((pair) => {
+        const ratio = contrastRatio(pair.foreground, pair.background);
+        if (ratio == null) {
+          return { ...pair, error: "Could not parse one of the colours" };
+        }
+        const large = isLargeScale(pair.fontSizePx ?? 16, pair.fontWeight ?? 400);
+        const rounded = Math.round(ratio * 100) / 100;
+        return { ...pair, ratio: rounded, ...wcagVerdict(rounded, large) };
+      });
+      const failures = graded.filter((g) => g.passAA === false).length;
+      return jsonResult({ pairs: graded, summary: { total: graded.length, failingAA: failures } });
+    },
+  );
+
+  (server.tool as any)(
+    "check_robots",
+    "Ask whether robots.txt allows extracting a URL, before spending a browser run on it. Returns the verdict, the rule that decided it, and the robots.txt status. A 404 or 410 means no robots.txt and everything is allowed; any other unreadable response is treated as a refusal. Cheap and synchronous: one HTTP request, no browser.",
+    { url: z.string().describe("The URL you intend to extract") },
+    async ({ url: target }: { url: string }) => {
+      const result = await checkRobotsTxt(target);
+      const strict = robotsVerdict(result, { enforce: true });
+      const lenient = robotsVerdict(result, { enforce: false });
+      return jsonResult({
+        ...result,
+        allowed: lenient.action === "proceed",
+        allowedWhenEnforcing: strict.action === "proceed",
+        reason: ("reason" in strict ? strict.reason : undefined) ?? ("reason" in lenient ? lenient.reason : undefined) ?? null,
+      });
     },
   );
 

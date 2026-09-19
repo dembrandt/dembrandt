@@ -58,7 +58,7 @@ test('every tool compiles to a valid schema', () => {
   // zod 4 rejects some zod 3 spellings at schema-build time, and the failure
   // takes down tools/list for every tool at once: one bad parameter breaks the
   // whole server, which is how #158 shipped a compute_drift nobody could call.
-  assert.equal(tools.length, 15, `the tool set changed: ${tools.map(t => t.name).join(', ')}`);
+  assert.equal(tools.length, 21, `the tool set changed: ${tools.map(t => t.name).join(', ')}`);
   for (const tool of tools) {
     assert.equal(tool.inputSchema.type, 'object', `${tool.name} has no object schema`);
     assert.ok(tool.description.length > 40, `${tool.name} needs a usable description`);
@@ -79,7 +79,7 @@ test('extraction tools expose the crawl and auth surface', () => {
 });
 
 test('pure tools accept a job_id in place of an inline extraction', () => {
-  for (const name of ['get_findings', 'export_dtcg', 'generate_design_md', 'render_report']) {
+  for (const name of ['get_findings', 'export_dtcg', 'export_tailwind', 'export_shadcn', 'generate_design_md', 'render_report']) {
     const tool = tools.find(t => t.name === name);
     assert.ok(tool, `${name} is missing`);
     const schema = tool.inputSchema;
@@ -124,9 +124,82 @@ test('the pure tools run without a browser', async () => {
   assert.match(md.content[0].text, /^#/m);
 });
 
+test('the emitters an agent can reach match the ones the CLI writes', async () => {
+  const extraction = {
+    url: 'https://example.com/',
+    extractedAt: '2026-01-01T00:00:00.000Z',
+    meta: { schemaVersion: '1.14.0', dembrandtVersion: '0.34.2' },
+    colors: {
+      palette: [{ color: '#133174', normalized: '#133174', count: 40, confidence: 'high', role: 'surface', onColor: '#ffffff' }],
+      semantic: { primary: '#133174', background: '#ffffff', text: '#111111' },
+      cssVariables: {},
+    },
+    typography: { styles: [], sources: {} },
+    spacing: { commonValues: [] },
+    borderRadius: { values: [{ value: '8px', confidence: 'high', count: 12 }] },
+  };
+
+  const shadcn = await call('export_shadcn', { result: extraction });
+  assert.notEqual(shadcn.isError, true, `export_shadcn errored: ${JSON.stringify(shadcn)}`);
+  assert.match(shadcn.content[0].text, /@theme inline/, 'the mapping block is what makes the file work');
+  assert.match(shadcn.content[0].text, /--primary:/);
+
+  const tailwind = await call('export_tailwind', { result: extraction });
+  assert.notEqual(tailwind.isError, true, `export_tailwind errored: ${JSON.stringify(tailwind)}`);
+  assert.match(tailwind.content[0].text, /@theme/);
+});
+
+test('the pure analysis tools grade and validate without a browser', async () => {
+  const contrast = await call('check_contrast', {
+    pairs: [
+      { foreground: '#767676', background: '#ffffff', label: 'body grey' },
+      { foreground: '#767676', background: '#ffffff', fontSizePx: 32, fontWeight: 700, label: 'the same grey, headline size' },
+      { foreground: 'not-a-colour', background: '#ffffff', label: 'unparseable' },
+    ],
+  });
+  assert.notEqual(contrast.isError, true, `check_contrast errored: ${JSON.stringify(contrast)}`);
+  const graded = JSON.parse(contrast.content[0].text).pairs;
+  assert.equal(graded[0].requiredAA, 4.5, 'body text is graded at 4.5:1');
+  assert.equal(graded[1].requiredAA, 3, '18pt+ is large scale and graded at 3:1');
+  assert.ok(graded[2].error, 'an unparseable colour is reported, not graded');
+
+  const valid = await call('validate_dtcg', {
+    tokens: { brand: { $type: 'color', $value: { colorSpace: 'srgb', components: [0.1, 0.2, 0.4] } } },
+  });
+  assert.equal(JSON.parse(valid.content[0].text).valid, true);
+
+  const broken = await call('validate_dtcg', {
+    tokens: { brand: { $type: 'color', $value: { colorSpace: 'srgb', components: [2, 0, 0] } } },
+  });
+  assert.equal(JSON.parse(broken.content[0].text).valid, false, 'a component out of range is not valid');
+});
+
+test('check_robots answers on an unreachable host instead of hanging', async () => {
+  const res = await call('check_robots', { url: 'http://127.0.0.1:1/' });
+  assert.notEqual(res.isError, true, `check_robots errored: ${JSON.stringify(res)}`);
+  const verdict = JSON.parse(res.content[0].text);
+  assert.ok('status' in verdict, 'the verdict must name the robots.txt status');
+  assert.notEqual(verdict.status, 'ok', 'a refused connection is not a readable robots.txt');
+  assert.ok('allowed' in verdict, 'the caller needs a yes or no, not just a status');
+});
+
 test('job listing works before any job exists', async () => {
   const res = await call('list_jobs', {});
   assert.deepEqual(JSON.parse(res.content[0].text), { jobs: [] });
+
+test('an extraction tool queues instead of blocking, and the job can be cancelled', async () => {
+  const queued = await call('get_motion', { url: 'https://example.com/' });
+  assert.notEqual(queued.isError, true, `get_motion errored: ${JSON.stringify(queued)}`);
+  const { job_id: jobId, status } = JSON.parse(queued.content[0].text);
+  assert.ok(jobId, 'an async extraction must hand back a job_id');
+  assert.equal(status, 'queued');
+
+  const cancelled = await call('cancel_job', { job_id: jobId });
+  assert.notEqual(cancelled.isError, true);
+  const after = await call('get_job_status', { job_id: jobId });
+  assert.doesNotMatch(after.content[0].text, /"status":\s*"completed"/, 'a cancelled job must not complete');
+});
+
 });
 
 test('the process exits when its transport closes', async () => {
