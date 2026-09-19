@@ -184,7 +184,16 @@ function validateColorValue(value, path, errors, _warnings) {
 
     // alpha property is optional but must be [0-1] if present
     if (value.alpha !== undefined) {
-      if (typeof value.alpha !== 'number') {
+      if (isPointerRef(value.alpha)) {
+        const resolved = resolvePointerDeep(value.alpha.$ref);
+        if (resolved.error) {
+          errors.push(`${resolved.error} at ${path}.alpha`);
+        } else if (typeof resolved.value !== 'number') {
+          errors.push(`Color alpha reference at ${path}.alpha must resolve to a number`);
+        } else if (resolved.value < 0 || resolved.value > 1) {
+          errors.push(`Color alpha property at ${path} must be between 0 and 1`);
+        }
+      } else if (typeof value.alpha !== 'number') {
         errors.push(`Color alpha property at ${path} must be a number`);
       } else if (value.alpha < 0 || value.alpha > 1) {
         errors.push(`Color alpha property at ${path} must be between 0 and 1`);
