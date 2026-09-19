@@ -7,15 +7,7 @@ import { dirname, resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
-/**
- * The CLI and the MCP server are two front doors onto one engine, and they
- * drift apart silently: `--shadcn` shipped in 0.34.0 and no agent could reach
- * it for two releases, because nothing compared the two lists.
- *
- * Every CLI flag is either answered over MCP or listed here as deliberately
- * CLI-only, with the reason. A new flag fails this test until someone decides
- * which it is.
- */
+/** Every CLI flag is answered over MCP, or listed as CLI-only with a reason. */
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = resolve(HERE, '..', 'index.js');
@@ -45,10 +37,7 @@ const PARAM_FOR_FLAG: Record<string, string> = {
   '--no-sandbox': 'noSandbox',
 };
 
-/**
- * Deliberately CLI-only. The reason is the point: an entry here is a decision,
- * and an entry nobody can justify is a gap wearing a disguise.
- */
+/** Deliberately CLI-only. */
 const CLI_ONLY: Record<string, string> = {
   '--json-only': 'Output shaping for a terminal. MCP returns structured content already.',
   '--save-output': 'Writes to the caller\'s disk. An agent writes the file itself.',
@@ -123,8 +112,7 @@ test('every CLI flag is answered over MCP or declared CLI-only', () => {
 
 test('every extraction tool takes the whole navigation surface, not just one of them', () => {
   const shared = ['slow', 'mobile', 'darkMode', 'cookie', 'header', 'userAgent', 'noSandbox', 'pages', 'paths', 'sitemap'];
-  // An extraction tool is one that opens a browser: it takes a url and offers
-  // sync. check_robots takes a url and opens nothing.
+  // An extraction tool opens a browser: url plus sync. check_robots does not.
   const extraction = tools.filter((t) => {
     const props = Object.keys(t.inputSchema.properties ?? {});
     return props.includes('url') && props.includes('sync');
