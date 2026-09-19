@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.34.0] - 2026-09-19
+
+Three heuristics stopped deciding a whole page from a single observation.
+
+### Fixed
+- `spacing.scaleType` called a page an 8px system if any one value divided by 8, so almost every site claimed a grid it did not have. The verdict is weighted by how much of the observed spacing lands on the step, and a site reads `custom` below 60%. Two large public sites with 20% and 3% on the 8 grid both move (#218)
+- `spacing.commonValues[].rem` was computed against a hardcoded 16, so the rem column was wrong on any site that sets `html { font-size }`. It reads the document's root size now (#218)
+- Swatch strips, colour labels and code samples were scored as painted brand colour, so any page documenting a palette poisoned its own extraction. A run of four or more equal-size siblings with distinct opaque fills, an element whose whole text is its own colour value, and anything inside `code`/`pre`/`samp`/`kbd` are out. A row of cards shares one fill and is untouched (#218)
+- The neutral-primary rescue only woke below 0.12 chroma, so brands whose real colour sat in the palette kept a grey primary. The gate is 0.20; the bar a replacement must clear is unchanged at 0.25, so a deliberately neutral identity is protected exactly as before (#218)
+
+### Added
+- `--shadcn` writes a shadcn/ui theme: the `:root` block and the `@theme inline` mapping Tailwind v4 needs. A slot is written only when the page supplied it, and the rest are named in the file header and left to shadcn's own defaults, so a theme is never padded with plausible values that read as measured. Measured over 206 extractions: background, foreground, primary, border and radius land on almost every site; popover and destructive on none. `--dark-mode` produces the `.dark` block (#217)
+
+### Changed
+- Schema 1.14.0. Values move for an unchanged site: `spacing.scaleType`, `spacing.commonValues[].rem`, `colors.palette` and `colors.semantic.primary`. No field is added or removed, and a consumer re-approves one baseline rather than four. The neutral-primary change was measured over the 29 corpus sites that can change at all: two improved, none regressed. The drift gate scores this release `stable 0` on dembrandt.com and `stable 4` on stripe.com because it does not read `scaleType`: the movement is real and the gate is blind to it (#218)
+
 ## [0.33.0] - 2026-09-13
 
 The artifact is correct on its own.
