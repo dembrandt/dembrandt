@@ -20,6 +20,8 @@ import { stripAssetBytes } from "./lib/mcp/assets.js";
 import { generateHtmlReport } from "./lib/formatters/html.js";
 import { toDtcgTokens } from "./lib/formatters/dtcg.js";
 import { generateDesignMd } from "./lib/formatters/markdown.js";
+import { generateTailwindTheme } from "./lib/formatters/tailwind.js";
+import { generateShadcnTheme } from "./lib/formatters/shadcn.js";
 import { mergeResults } from "./lib/merger.js";
 import { additionalPages, discoveryBudget, extractOptions, isMultiPage, launchArgs } from "./lib/mcp/options.js";
 import type { Extraction, ExtractionRequest } from "./lib/mcp/options.js";
@@ -393,6 +395,28 @@ async function main() {
       const source = resolveExtraction(result, job_id, "result", jobQueue);
       if (!source.ok) return errorResult(source.error);
       return { content: [{ type: "text", text: generateDesignMd(source.value, { version }) }] };
+    },
+  );
+
+  (server.tool as any)(
+    "export_tailwind",
+    "Render a Tailwind v4 @theme CSS block from a dembrandt extraction: colors, typography, spacing, radii and shadows as custom properties, observed values only, with nothing invented. Pure and synchronous, no browser. Takes either an inline extraction or the job_id of a completed one. Write the output to a project's CSS entry point so Tailwind utilities resolve to the measured brand.",
+    { result: extract, job_id: sourceJob },
+    ({ result, job_id }: any) => {
+      const source = resolveExtraction(result, job_id, "result", jobQueue);
+      if (!source.ok) return errorResult(source.error);
+      return { content: [{ type: "text", text: generateTailwindTheme(source.value, { version }) }] };
+    },
+  );
+
+  (server.tool as any)(
+    "export_shadcn",
+    "Render a shadcn/ui theme from a dembrandt extraction: the :root block and the @theme inline mapping Tailwind v4 needs. A slot is written only where the page supplied a value, and the rest are named in the file header and left at shadcn's own defaults, so no slot is filled with an invented value that reads as measured. Pure and synchronous, no browser. Takes either an inline extraction or the job_id of a completed one.",
+    { result: extract, job_id: sourceJob },
+    ({ result, job_id }: any) => {
+      const source = resolveExtraction(result, job_id, "result", jobQueue);
+      if (!source.ok) return errorResult(source.error);
+      return { content: [{ type: "text", text: generateShadcnTheme(source.value, { version }) }] };
     },
   );
 

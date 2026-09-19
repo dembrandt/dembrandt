@@ -58,7 +58,7 @@ test('every tool compiles to a valid schema', () => {
   // zod 4 rejects some zod 3 spellings at schema-build time, and the failure
   // takes down tools/list for every tool at once: one bad parameter breaks the
   // whole server, which is how #158 shipped a compute_drift nobody could call.
-  assert.equal(tools.length, 15, `the tool set changed: ${tools.map(t => t.name).join(', ')}`);
+  assert.equal(tools.length, 17, `the tool set changed: ${tools.map(t => t.name).join(', ')}`);
   for (const tool of tools) {
     assert.equal(tool.inputSchema.type, 'object', `${tool.name} has no object schema`);
     assert.ok(tool.description.length > 40, `${tool.name} needs a usable description`);
@@ -79,7 +79,7 @@ test('extraction tools expose the crawl and auth surface', () => {
 });
 
 test('pure tools accept a job_id in place of an inline extraction', () => {
-  for (const name of ['get_findings', 'export_dtcg', 'generate_design_md', 'render_report']) {
+  for (const name of ['get_findings', 'export_dtcg', 'export_tailwind', 'export_shadcn', 'generate_design_md', 'render_report']) {
     const tool = tools.find(t => t.name === name);
     assert.ok(tool, `${name} is missing`);
     const schema = tool.inputSchema;
@@ -122,6 +122,34 @@ test('the pure tools run without a browser', async () => {
   const md = await call('generate_design_md', { result: extraction });
   assert.notEqual(md.isError, true);
   assert.match(md.content[0].text, /^#/m);
+});
+
+test('the emitters an agent can reach match the ones the CLI writes', async () => {
+  // A flag that writes a file the CLI user can have, with no MCP tool beside
+  // it, is a surface the agent cannot reach at all: --shadcn shipped in 0.34.0
+  // and was unreachable over MCP for two releases.
+  const extraction = {
+    url: 'https://example.com/',
+    extractedAt: '2026-01-01T00:00:00.000Z',
+    meta: { schemaVersion: '1.14.0', dembrandtVersion: '0.34.2' },
+    colors: {
+      palette: [{ color: '#133174', normalized: '#133174', count: 40, confidence: 'high', role: 'surface', onColor: '#ffffff' }],
+      semantic: { primary: '#133174', background: '#ffffff', text: '#111111' },
+      cssVariables: {},
+    },
+    typography: { styles: [], sources: {} },
+    spacing: { commonValues: [] },
+    borderRadius: { values: [{ value: '8px', confidence: 'high', count: 12 }] },
+  };
+
+  const shadcn = await call('export_shadcn', { result: extraction });
+  assert.notEqual(shadcn.isError, true, `export_shadcn errored: ${JSON.stringify(shadcn)}`);
+  assert.match(shadcn.content[0].text, /@theme inline/, 'the mapping block is what makes the file work');
+  assert.match(shadcn.content[0].text, /--primary:/);
+
+  const tailwind = await call('export_tailwind', { result: extraction });
+  assert.notEqual(tailwind.isError, true, `export_tailwind errored: ${JSON.stringify(tailwind)}`);
+  assert.match(tailwind.content[0].text, /@theme/);
 });
 
 test('job listing works before any job exists', async () => {
