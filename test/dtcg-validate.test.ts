@@ -576,6 +576,59 @@ describe('DTCG Validator - W3C Spec Compliant', () => {
         expect(result.valid).toBe(false);
         expect(result.errors.some(e => e.includes('alpha property') && e.includes('must be a number'))).toBe(true);
       });
+
+      it('should accept a JSON Pointer $ref as alpha, like components', () => {
+        const result = validateTokensObject({
+          base: { half: { $type: 'number', $value: 0.5 } },
+          color: {
+            aliased: {
+              $type: 'color',
+              $value: {
+                colorSpace: 'srgb',
+                components: [1, 0, 0],
+                alpha: { $ref: '#/base/half/$value' }
+              }
+            }
+          }
+        });
+        expect(result.valid).toBe(true);
+      });
+
+      it('should range-check alpha through a $ref', () => {
+        const result = validateTokensObject({
+          base: { tooMuch: { $type: 'number', $value: 1.7 } },
+          color: {
+            aliased: {
+              $type: 'color',
+              $value: {
+                colorSpace: 'srgb',
+                components: [1, 0, 0],
+                alpha: { $ref: '#/base/tooMuch/$value' }
+              }
+            }
+          }
+        });
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.includes('alpha property') && e.includes('must be between 0 and 1'))).toBe(true);
+      });
+
+      it('should error when an alpha $ref resolves to a non-number', () => {
+        const result = validateTokensObject({
+          base: { label: { $type: 'fontFamily', $value: 'Inter' } },
+          color: {
+            aliased: {
+              $type: 'color',
+              $value: {
+                colorSpace: 'srgb',
+                components: [1, 0, 0],
+                alpha: { $ref: '#/base/label/$value' }
+              }
+            }
+          }
+        });
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.includes('alpha reference') && e.includes('must resolve to a number'))).toBe(true);
+      });
     });
 
     it('should error on missing colorSpace', () => {
