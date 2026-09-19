@@ -234,6 +234,7 @@ async function main() {
   const slow = z.boolean().optional().default(false).describe("3x timeouts for heavy SPAs");
   const sync = z.boolean().optional().default(false).describe("Wait for the result directly instead of returning a job_id. Blocks 15-40s for one page, and proportionally longer for a multi-page crawl.");
   const mobile = z.boolean().optional().default(false).describe("Extract from a mobile viewport instead of desktop");
+  const darkMode = z.boolean().optional().default(false).describe("Extract the dark theme: the page is rendered with prefers-color-scheme: dark");
   const cookie = z.string().optional().describe('Cookie string for authenticated pages, e.g. "session=abc; token=xyz"');
   const header = z.string().optional().describe('Extra HTTP header, e.g. "Authorization: Bearer eyJ..."');
   const userAgent = z.string().optional().describe("Custom user agent string");
@@ -244,7 +245,7 @@ async function main() {
 
   // Every extraction tool takes the same navigation, auth and crawl surface.
   const crawlParams = { pages, paths, sitemap };
-  const browserParams = { slow, mobile, cookie, header, userAgent, noSandbox };
+  const browserParams = { slow, mobile, darkMode, cookie, header, userAgent, noSandbox };
 
   // ── Extraction tools ───────────────────────────────────────────────────
 
@@ -253,7 +254,6 @@ async function main() {
     "Extract the full design system from a live website. Launches a real browser, navigates to the site, and returns production-ready design tokens: color palette (hex, RGB, LCH, OKLCH) with semantic roles and CSS custom properties, typography scale (families, fallbacks, sizes, weights, line heights, letter spacing by context), spacing system with grid detection, border radii, border patterns, box shadows for elevation, component styles (buttons with hover/focus states, inputs, links, badges), responsive breakpoints, logo and favicons, site name, detected CSS frameworks, and icon systems. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
     {
       url, sync, ...browserParams, ...crawlParams,
-      darkMode: z.boolean().optional().default(false).describe("Extract with dark mode emulation (prefers-color-scheme: dark)"),
       wcag: z.boolean().optional().default(false).describe("Include WCAG contrast analysis between palette colors"),
     },
     toolHandler((d) => d),
