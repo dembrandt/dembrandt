@@ -67,7 +67,7 @@ const CLI_ONLY: Record<string, string> = {
   '--version': 'Protocol handshake carries the server version.',
   '--help': 'Protocol handshake carries the tool list.',
   '--ai': 'Experimental ML primary prediction; not a promised surface.',
-  '--wcag': 'A parameter on get_design_tokens, and get_findings reports the failures.',
+  '--wcag': 'A parameter on get_design_tokens; check_contrast grades pairs an agent names.',
 };
 
 interface ToolDefinition {
@@ -123,7 +123,12 @@ test('every CLI flag is answered over MCP or declared CLI-only', () => {
 
 test('every extraction tool takes the whole navigation surface, not just one of them', () => {
   const shared = ['slow', 'mobile', 'darkMode', 'cookie', 'header', 'userAgent', 'noSandbox', 'pages', 'paths', 'sitemap'];
-  const extraction = tools.filter((t) => Object.keys(t.inputSchema.properties ?? {}).includes('url'));
+  // An extraction tool is one that opens a browser: it takes a url and offers
+  // sync. check_robots takes a url and opens nothing.
+  const extraction = tools.filter((t) => {
+    const props = Object.keys(t.inputSchema.properties ?? {});
+    return props.includes('url') && props.includes('sync');
+  });
   assert.ok(extraction.length >= 7, 'expected the seven extraction tools');
   for (const tool of extraction) {
     const props = Object.keys(tool.inputSchema.properties ?? {});

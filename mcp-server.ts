@@ -19,6 +19,8 @@ import { computeFindings } from "./lib/findings.js";
 import { stripAssetBytes } from "./lib/mcp/assets.js";
 import { generateHtmlReport } from "./lib/formatters/html.js";
 import { toDtcgTokens } from "./lib/formatters/dtcg.js";
+import { validateTokensObject } from "./lib/dtcg/validate.js";
+import { contrastRatio, isLargeScale, wcagVerdict } from "./lib/colors.js";
 import { generateDesignMd } from "./lib/formatters/markdown.js";
 import { generateTailwindTheme } from "./lib/formatters/tailwind.js";
 import { generateShadcnTheme } from "./lib/formatters/shadcn.js";
@@ -304,6 +306,13 @@ async function main() {
   );
 
   (server.tool as any)(
+    "get_motion",
+    "Extract the motion system from a live website: transition and animation durations with their usage counts, easing curves, the durations and easings used per component context (button, link, nav, card, modal), named keyframe animations, and the hover patterns discovered by simulating real interaction. Also returns gradients, which travel with motion as the decorative layer. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status.",
+    { url, sync, ...browserParams, ...crawlParams },
+    toolHandler((d) => ({ url: d.url, motion: d.motion, gradients: d.gradients })),
+  );
+
+  (server.tool as any)(
     "get_brand_identity",
     "Extract brand identity from a live website: site name, logo (source, dimensions, safe zone), all favicon variants (icon, apple-touch-icon, og:image, twitter:image with sizes and URLs), detected CSS frameworks (Tailwind, Bootstrap, MUI, etc.), icon systems (Font Awesome, Material Icons, SVG), and responsive breakpoints. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
     { url, sync, ...browserParams, ...crawlParams },
@@ -417,6 +426,53 @@ async function main() {
       const source = resolveExtraction(result, job_id, "result", jobQueue);
       if (!source.ok) return errorResult(source.error);
       return { content: [{ type: "text", text: generateShadcnTheme(source.value, { version }) }] };
+    },
+  );
+
+  (server.tool as any)(
+    "validate_dtcg",
+    "Validate a W3C Design Tokens (DTCG) document against the 2025.10 spec: token types, colour objects and their component ranges, dimensions, references, and property-level $ref pointers. Returns valid plus the list of errors with the path each one sits at. Pure and synchronous, no browser. Use it after writing or editing a token file, including one this server produced, so a hand edit cannot quietly break the document.",
+    { tokens: z.record(z.string(), z.any()).describe("The DTCG token document to validate, as an object") },
+    ({ tokens }: any) => {
+      if (!tokens || typeof tokens !== "object") return errorResult("Pass tokens: a DTCG document object.");
+      return jsonResult(validateTokensObject(tokens));
+    },
+  );
+
+  (server.tool as any)(
+    "check_contrast",
+    "Grade colour pairs against WCAG 2.1 contrast, at the threshold the text size earns: 18pt, or 14pt bold, is large scale and needs 3:1 where body text needs 4.5:1. Takes pairs you name, so it grades colours you are about to ship rather than only colours already on a page. Returns the ratio, the required ratio, and the AA and AAA verdicts per pair. Pure and synchronous, no browser. For pairs already rendered on a site, extract with wcag instead.",
+    {
+      pairs: z.array(z.object({
+        foreground: z.string().describe("Text colour, hex or rgb()"),
+        background: z.string().describe("Background it sits on, hex or rgb()"),
+        fontSizePx: z.number().optional().describe("Rendered size in px. Without it the pair is graded as body text"),
+        fontWeight: z.number().optional().describe("Numeric weight, 400 unless given"),
+        label: z.string().optional().describe("Your own name for the pair, echoed back"),
+      })).min(1).max(200).describe("The colour pairs to grade"),
+    },
+    ({ pairs }: any) => {
+      const graded = pairs.map((pair: any) => {
+        const ratio = contrastRatio(pair.foreground, pair.background);
+        if (ratio == null) {
+          return { ...pair, error: "Could not parse one of the colours" };
+        }
+        const large = isLargeScale(pair.fontSizePx ?? 16, pair.fontWeight ?? 400);
+        const rounded = Math.round(ratio * 100) / 100;
+        return { ...pair, ratio: rounded, ...wcagVerdict(rounded, large) };
+      });
+      const failures = graded.filter((g: any) => g.passAA === false).length;
+      return jsonResult({ pairs: graded, summary: { total: graded.length, failingAA: failures } });
+    },
+  );
+
+  (server.tool as any)(
+    "check_robots",
+    "Ask whether robots.txt allows extracting a URL, before spending a browser run on it. Returns the verdict, the rule that decided it, and the robots.txt status. A 404 or 410 means no robots.txt and everything is allowed; any other unreadable response is treated as a refusal. Cheap and synchronous: one HTTP request, no browser.",
+    { url: z.string().describe("The URL you intend to extract") },
+    async ({ url: target }: any) => {
+      const result = await checkRobotsTxt(target);
+      return jsonResult(result);
     },
   );
 
