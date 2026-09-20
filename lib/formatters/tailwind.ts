@@ -14,6 +14,7 @@
  */
 import { shadowDepth, splitShadowLayers } from '../shadow-parse.js';
 import { convertColor, deltaE } from '../colors.js';
+import { spacingBase } from '../normalize.js';
 import type {
   BorderRadius,
   Breakpoint,
@@ -372,11 +373,9 @@ function buildSpacing(result: TailwindThemeInput): ThemeEntry[] {
   // multiplier than as a handful of named steps: it reproduces every observed
   // value and everything between them, which is what a human continuing the
   // file will reach for next.
-  // scaleType is "base-8" in normalized payloads and "8px" straight off the
-  // extractor; both name the same rhythm.
   const scaleType = String(result.spacing?.scaleType ?? '');
-  const base = /^base-(\d+)$/.exec(scaleType) ?? /^(\d+)px$/.exec(scaleType);
-  if (base) return [{ name: '--spacing', value: `${base[1]}px`, note: `${scaleType} scale` }];
+  const base = spacingBase(scaleType);
+  if (base) return [{ name: '--spacing', value: `${base}px`, note: `${scaleType} scale` }];
 
   const names = ['xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl'];
   return mostUsed(

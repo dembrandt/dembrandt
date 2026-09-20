@@ -275,6 +275,18 @@ export async function extractColors(page) {
       if (el.children.length === 0 && colorLiteralRe.test((el.textContent || '').trim())) return true;
 
       if (rect.width > 200 || rect.height > 200 || !el.parentElement) return false;
+
+      // A small solid block beside text that is nothing but a colour value is a
+      // swatch wherever the two sit in the tree. The sibling run below only sees
+      // a strip under one parent, and documentation far more often lists one
+      // swatch per row next to the hex it names (DEM-253).
+      if (rect.width <= 64 && rect.height <= 64 && colorAlpha(toLegacy(getComputedStyle(el).backgroundColor)) >= 0.9) {
+        for (const sib of Array.from(el.parentElement.children)) {
+          if (sib === el) continue;
+          if (sib.children.length === 0 && colorLiteralRe.test((sib.textContent || '').trim())) return true;
+        }
+      }
+
       const siblings: Element[] = Array.from(el.parentElement.children);
       if (siblings.length < 4) return false;
       const fills = new Set();

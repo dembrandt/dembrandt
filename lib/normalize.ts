@@ -76,3 +76,15 @@ export function normalizeExtraction<T extends BrandingResult>(result: T): T {
 
   return out;
 }
+
+/**
+ * Base grid in px from a spacing scaleType, 0 when none was detected.
+ * The extractor writes "8px"/"4px"; normalized payloads carry "base-8"/"base-4".
+ * Both name the same rhythm, and reading only one of them silently disables
+ * every off-grid check downstream.
+ */
+export function spacingBase(scaleType: unknown): number {
+  const s = String(scaleType ?? '');
+  const m = /^base-(\d+)$/.exec(s) ?? /^(\d+)px$/.exec(s);
+  return m ? Number(m[1]) : 0;
+}

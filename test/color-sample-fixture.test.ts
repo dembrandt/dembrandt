@@ -84,3 +84,26 @@ test('fewer than four equal blocks is too small a run to call a strip', async ()
   const palette = await paletteOf(page_(hero() + row.repeat(4)));
   assert.ok(trio.every((c) => palette.includes(c)), 'three-wide rows stay in the palette');
 });
+
+/**
+ * dembrandt.com's own demo: each swatch sits in its own row beside the hex it
+ * names, so the swatches are cousins and never four equal siblings. The strip
+ * rule cannot see it, and the landing page elected its documentation orange as
+ * primary for a month (DEM-253).
+ */
+function swatchRows(rows = 8): string {
+  const list = `<div class="demo">` +
+    SWATCH.map((c) =>
+      `<div><span style="background:${c};width:10px;height:10px;display:inline-block"></span>` +
+      `<span>${c}</span><span>role</span></div>`).join('') +
+    `</div>`;
+  return list.repeat(rows);
+}
+
+test('a swatch labelled by the hex next to it is a sample, not a sibling strip', async () => {
+  const palette = await paletteOf(page_(hero() + swatchRows()));
+  for (const swatch of SWATCH) {
+    assert.ok(!palette.includes(swatch), `${swatch} is documentation, not brand colour`);
+  }
+  assert.ok(palette.includes(BRAND), 'the real brand colour survives');
+});

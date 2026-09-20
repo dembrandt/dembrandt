@@ -316,3 +316,53 @@ test('drift classification agrees with the shared deltaE across the colorSame bo
   assert.equal(colorOf(same)?.changed, 0, 'a sub-JND colour was reported as changed');
   assert.equal(colorOf(moved)?.changed, 1, 'a supra-JND colour was not reported as changed');
 });
+
+/**
+ * A single changed brand colour must fail the gate. The semantic map used to
+ * share the palette's denominator, so one magenta primary in a real palette
+ * scored stable 0 and exited 0 — the exact case the gate exists for (DEM-376).
+ *
+ * The palette keeps its own denominator, so the churn tolerance below still
+ * holds: scoring the two together in either direction breaks one of them.
+ */
+test('one changed semantic colour is not diluted by a stable palette', () => {
+  const palette = Array.from({ length: 24 }, (_, i) => ({
+    normalized: `#${(0x0a0a0a * (i + 1)).toString(16).padStart(6, '0').slice(-6)}`,
+    count: 40,
+    confidence: 'high',
+  }));
+  const at = (primary: string) =>
+    fixture({ colors: { palette, semantic: { primary }, cssVariables: {} } });
+
+  const before = computeDrift(at('#635bff'), at('#635bff'));
+  assert.equal(before.status, 'stable');
+  assert.equal(before.score, 0);
+
+  const after = computeDrift(at('#635bff'), at('#ff00ff'));
+  assert.equal(after.status, 'drift');
+  assert.ok(after.score > after.threshold, `score ${after.score} must exceed ${after.threshold}`);
+});
+
+test('a single added or removed palette entry stays under the gate', () => {
+  const palette = (n: number, extra: string[] = []) => [
+    ...Array.from({ length: n }, (_, i) => ({
+      normalized: `#${(0x0a0a0a * (i + 1)).toString(16).padStart(6, '0').slice(-6)}`,
+      count: 40,
+      confidence: 'high',
+    })),
+    ...extra.map((normalized) => ({ normalized, count: 40, confidence: 'high' })),
+  ];
+  const at = (pal: unknown[]) =>
+    fixture({ colors: { palette: pal, semantic: { primary: '#635bff' }, cssVariables: {} } });
+
+  // A site varies between runs: an A/B variant, a CDN edge, a lazy image's
+  // sampled colour. One palette entry appearing or vanishing must not fail a
+  // gate on a site nobody touched.
+  for (const [label, cand] of [
+    ['added', at(palette(30, ['#ff00ff']))],
+    ['removed', at(palette(29))],
+  ] as const) {
+    const report = computeDrift(at(palette(30)), cand);
+    assert.equal(report.status, 'stable', `one ${label} entry scored ${report.score}`);
+  }
+});

@@ -319,20 +319,26 @@ function compareColors(
     added++;
   });
 
-  // The semantic map rides in the same category: a role is a colour claim, and
-  // splitting it out would let a moved primary average away against a palette
-  // that did not move.
+  // The semantic map is a colour claim and belongs in this category, but it
+  // must not share a denominator with the palette. Folding it in divided a
+  // moved primary by every stable palette entry, and the brand colour of
+  // stripe.com turned magenta scored stable 0 and exited 0 (DEM-376).
+  //
+  // Scoring them apart and taking the worse one keeps both truths: the palette
+  // keeps its churn tolerance, so an A/B variant appearing in one run does not
+  // fail a gate, and a role that actually moved carries its own weight to the
+  // threshold. The category is as bad as its worst evidence.
   const sem = compareSemantic(semantic?.base, semantic?.cand, cfg);
   changes.push(...sem.changes);
-  penalty += sem.penalty;
-  totalWeight += sem.weight;
   changed += sem.changed;
   added += sem.added;
   removed += sem.removed;
 
   // Weighted: a primary/accent shift dominates a background-tint shift instead
   // of counting the same. Score stays 0..1 (penalty divided by total weight).
-  const score = totalWeight > 0 ? clamp01(penalty / totalWeight) : (cand.length > 0 ? 1 : 0);
+  const paletteScore = totalWeight > 0 ? clamp01(penalty / totalWeight) : (cand.length > 0 ? 1 : 0);
+  const semScore = sem.weight > 0 ? clamp01(sem.penalty / sem.weight) : 0;
+  const score = Math.max(paletteScore, semScore);
   return { changes, result: { category: "color", score, changed, added, removed } };
 }
 

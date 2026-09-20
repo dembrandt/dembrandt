@@ -13,7 +13,7 @@ function base(overrides: Record<string, unknown> = {}): any {
     url: 'https://example.com/',
     colors: { palette: [{ normalized: '#133174', confidence: 'high', count: 40 }], semantic: { primary: '#133174' } },
     typography: { styles: [{ context: 'body', size: '16px (1rem)', weight: 400 }] },
-    spacing: { scaleType: 'base-8', commonValues: [{ px: 16, display: '16px' }] },
+    spacing: { scaleType: '8px', commonValues: [{ px: 16, display: '16px' }] },
     borderRadius: { values: [{ value: '8px' }] },
     shadows: [{ shadow: '0 1px 2px rgba(0,0,0,.1)' }],
     breakpoints: [{ px: 768 }],
@@ -71,14 +71,19 @@ test('rgb() primary is parsed for the white-contrast check', () => {
   assert.equal(fr.findings.filter((f) => f.category === 'contrast').length, 1);
 });
 
-test('spacing values off the detected base grid are flagged', () => {
-  const fr = computeFindings(base({
-    spacing: { scaleType: 'base-8', commonValues: [{ px: 16 }, { px: 13 }, { px: 24 }] },
-  }));
-  const c = fr.findings.filter((f) => f.message.includes('spacing grid'));
-  assert.equal(c.length, 1);
-  assert.match(c[0].message, /13px/);
-});
+// The extractor emits "8px"; normalized payloads carry "base-8". The check read
+// only the second, so on a live extraction it never ran and this test passed on
+// a value production cannot produce (DEM-379). Both forms are pinned now.
+for (const scaleType of ['8px', 'base-8']) {
+  test(`spacing values off the detected base grid are flagged (${scaleType})`, () => {
+    const fr = computeFindings(base({
+      spacing: { scaleType, commonValues: [{ px: 16 }, { px: 13 }, { px: 24 }] },
+    }));
+    const c = fr.findings.filter((f) => f.message.includes('spacing grid'));
+    assert.equal(c.length, 1);
+    assert.match(c[0].message, /13px/);
+  });
+}
 
 test('coverage counts only the token categories actually present', () => {
   const fr = computeFindings(base({ shadows: [], breakpoints: [] }));

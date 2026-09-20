@@ -11,6 +11,7 @@
  */
 
 import { deltaE2000, relativeLuminance } from "./colors.js";
+import { spacingBase } from "./normalize.js";
 import type { BrandingResult } from "./types.js";
 
 export type FindingSeverity = "error" | "warn";
@@ -151,7 +152,7 @@ export function computeFindings(result: BrandingResult): FindingsReport {
 
   // 4. Off-scale spacing — values that break the detected base grid.
   const scaleType = result.spacing?.scaleType ?? "";
-  const base = scaleType === "base-8" ? 8 : scaleType === "base-4" ? 4 : 0;
+  const base = spacingBase(scaleType);
   if (base) {
     const off = (result.spacing?.commonValues ?? [])
       .map((v) => v.px)

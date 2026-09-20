@@ -39,6 +39,20 @@
  *  (unversioned) — `voice` / `voiceSkipped` ship behind a hidden, opt-in flag
  *          and deliberately do not bump the contract. Bump when the flag is
  *          documented, not before.
+ *  1.15.0 — two scoring checks that were dead in the field start firing, so a
+ *          site that changed nothing reports differently than it did on 1.14.0.
+ *
+ *          findings off-scale spacing ran only when spacing.scaleType read
+ *          "base-8"/"base-4", while 1.14.0 changed the extractor to emit
+ *          "8px"/"4px". On a live extraction the base was always 0, the check
+ *          never ran, and every site reported zero off-grid values. Sites with
+ *          off-grid spacing now carry the finding and a lower consistency score.
+ *
+ *          drift compareColors counted every baseline palette entry toward the
+ *          denominator, unchanged ones included, so one changed brand colour in
+ *          a real palette scored stable and exited 0. Only changed, added and
+ *          removed entries carry weight now, matching compareSemantic. Drift
+ *          scores rise across the board and gates that passed may fail.
  *  1.14.0 — three extraction-accuracy changes that move values for an unchanged
  *          site. They ship together so a consumer re-approves one baseline, not
  *          three.
@@ -213,7 +227,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.14.0';
+export const SCHEMA_VERSION = '1.15.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
