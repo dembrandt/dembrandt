@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.35.0] - 2026-09-20
+
+Three scoring checks that were quietly returning a pass.
+
+### Fixed
+- The drift gate could not fail on a changed brand colour. The semantic map shared the palette's denominator, so a moved `primary` was divided by every stable palette entry: a real stripe.com baseline with `semantic.primary` turned magenta reported delta 49.8, scored `stable 0` and exited 0. Palette and semantic are scored apart now and the worse one stands, so a moved role reaches the threshold while the palette keeps its churn tolerance (DEM-376)
+- Off-scale spacing never fired. The check compared `spacing.scaleType` to `base-8`/`base-4` while the extractor has written `8px`/`4px` since 1.14.0, so the base was always 0 and every site reported zero off-grid values. Both spellings are read through one helper now, shared with the Tailwind emitter, which had its own copy of the same regex (DEM-379)
+- A colour swatch beside the hex that names it entered the palette as brand colour. The sample filter only recognised a strip of four or more equal siblings under one parent, while documentation far more often lists one swatch per row next to its value. Any page documenting a palette scored its own samples as brand evidence (DEM-253)
+
+### Upgrading
+Baseline churn measured against 0.34.2 on two reference sites, twice each: `dembrandt.com` stable 0, `stripe.com` stable 4 against a threshold of 10. No gate flips on an unchanged site.
+
+A site whose brand colour genuinely moved will now fail a gate that passed before. That is the fix. Re-approve with `--compare <baseline> --approve` once, or regenerate the baseline.
+
 ## [0.34.2] - 2026-09-19
 
 A colour's alpha can be an alias, the way its components already could.
