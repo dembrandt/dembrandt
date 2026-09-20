@@ -78,7 +78,7 @@ program
   .option("--tailwind [path]", "Write a Tailwind v4 @theme CSS file with the observed values only (default: output/<domain>/theme.css)")
   .option("--shadcn [path]", "Write a shadcn/ui theme block, observed slots only (default: output/<domain>/shadcn.css)")
   .option("--html [path]", "Write a self-contained HTML report (default: output/<domain>/<timestamp>.html)")
-  .option("--compare <baseline>", "Drift-compare against a baseline: a local JSON file, or an App baseline id (posts to the .dembrandtrc endpoint, default dembrandt.com). Exits 1 on drift.")
+  .option("--compare <baseline>", "Drift-compare against a baseline JSON file. Exits 1 on drift, 2 if the baseline cannot be read.")
   .option("--approve", "With --compare <file>: accept the current extraction as the new baseline by overwriting that local file, and pass instead of failing. Ignored for App baseline ids.")
   .option("--no-sandbox", "Disable browser sandbox (needed for Docker/CI)")
   .option("--raw-colors", "Include pre-filter raw colors in JSON output")

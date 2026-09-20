@@ -40,7 +40,7 @@ jobs:
 | Input | Required | Description |
 |---|---|---|
 | `url` | yes | URL to extract, typically the PR's preview deployment |
-| `baseline` | no | Committed baseline JSON path, or an App baseline id. Omit to extract without gating |
+| `baseline` | no | Committed baseline JSON path. Omit to extract without gating |
 | `key` | no | API key for cloud snapshot sync ([dembrandt.com/app/api-keys](https://www.dembrandt.com/app/api-keys)) |
 | `args` | no | Extra CLI flags, e.g. `--wcag` or `--crawl 3` |
 
