@@ -67,6 +67,33 @@ test('local file path: unparseable baseline rejects with a clear error, not a ba
   );
 });
 
+/**
+ * Valid JSON is not an extraction. Without a shape check the baseline reads as
+ * empty, every token in the candidate counts as added, and the run reports
+ * total drift and exits 1 — a design change that never happened, in the bucket
+ * the exit-code contract reserves for real drift.
+ */
+test('local file path: JSON that is not an extraction rejects rather than scoring as total drift', async () => {
+  await assert.rejects(
+    () => resolveCompare('baseline.json', fixture(), {
+      isFile: () => true,
+      readFile: () => JSON.stringify({ nope: true }),
+    }),
+    /baseline baseline\.json is not a dembrandt JSON extraction \(no "colors" block\)/,
+  );
+});
+
+test('local file path: an older extraction without today\'s fields still compares', async () => {
+  // The check is shallow on purpose. A baseline from an earlier contract is
+  // readable and must not be rejected for missing a field added since.
+  const old: any = { url: 'https://example.com/', colors: { palette: [], semantic: {} } };
+  const r = await resolveCompare('old.json', fixture(), {
+    isFile: () => true,
+    readFile: () => JSON.stringify(old),
+  });
+  assert.equal(r.mode, 'local');
+});
+
 test('path-looking argument that is not a file rejects instead of POSTing to the App', async () => {
   let fetched = false;
   const fetchFn = (async () => { fetched = true; return { ok: true, json: async () => ({}) }; }) as any;

@@ -13,6 +13,7 @@
 
 import { existsSync, readFileSync } from "fs";
 import { computeDrift } from "./drift.js";
+import { isExtraction } from "./normalize.js";
 import type { BrandingResult } from "./types.js";
 import type { DriftReport } from "./drift.js";
 
@@ -53,6 +54,18 @@ export async function resolveCompare(
         { cause: err }
       );
     }
+    // Valid JSON is not the same as an extraction. Without this, a truncated
+    // download or a wrong path that happens to hit another JSON file reads as
+    // an empty baseline: every token counts as added, the run reports total
+    // drift and exits 1, and the reader goes looking for a design change that
+    // never happened. A broken baseline is an extraction failure, not drift.
+    if (!isExtraction(baseline)) {
+      throw new Error(
+        `baseline ${arg} is not a dembrandt JSON extraction (no "colors" block) ` +
+        `— create one with --save-output or --json-only`
+      );
+    }
+
     return { report: computeDrift(baseline, candidate), source: arg, mode: "local" };
   }
 

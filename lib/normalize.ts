@@ -88,3 +88,19 @@ export function spacingBase(scaleType: unknown): number {
   const m = /^base-(\d+)$/.exec(s) ?? /^(\d+)px$/.exec(s);
   return m ? Number(m[1]) : 0;
 }
+
+/**
+ * Whether a parsed object is a dembrandt extraction at all.
+ *
+ * Deliberately shallow: `colors` is the one block every extraction has carried
+ * since the first release, and a deeper check would reject an older contract
+ * this build can still read. The point is to tell an extraction from some other
+ * JSON file, not to validate it.
+ *
+ * It lives here because both sides need the same answer. The App had its own
+ * copy, and the CLI had none, so `--compare` against a JSON file that was not an
+ * extraction read every token as added and reported total drift.
+ */
+export function isExtraction(value: unknown): value is BrandingResult {
+  return Boolean(value && typeof value === 'object' && 'colors' in (value as Record<string, unknown>));
+}
