@@ -364,9 +364,9 @@ labelled.
 
 ## Beyond one user: four rows, no new levels
 
-The snapshot stays the atom. Nothing below adds a level to the measurement axis
-or a field to `Identity`; each is an account-side row that points at a snapshot
-or at a coordinate, and the extraction is readable without any of them.
+The snapshot stays the atom. Nothing here adds a level to the measurement axis
+or a field to `Identity`. Each is an account-side row that points at a snapshot
+or at a coordinate, and an extraction is readable without any of them.
 
 Two customer shapes ask for them. An in-house team running one brand across six
 applications, several behind a login. An agency running twenty brands with a
@@ -379,27 +379,26 @@ Policy        (scopeRef, thresholds, validFrom)       inherited down the ownersh
 Subscription  (userId, scopeRef, events)
 ```
 
-`Grant` answers the third open decision below. `scopeRef` is polymorphic over
-the ownership axis because all three cases are live at once: an in-house team is
-granted a brand, an agency a client, a contractor one site. One table, not
-three, and the axis already exists.
+`Grant` answers the third open decision below. One `scopeRef` covers all four
+levels because all three cases are live at once: a team is granted a brand, an
+agency a client, a contractor one site. One table, not three.
 
-`Policy` is the one that is not just access. Thresholds live in `.dembrandtrc`
+`Policy` is the one that is not about access. Thresholds live in `.dembrandtrc`
 in the customer's repo, which is right for a team that owns the repo and reviews
-the change beside the code. An agency owns none of its clients' repos and its
-threshold is its own standard. Inherited rather than copied, because twenty
-brands across two environments is several hundred thresholds set by hand, and
-they diverge in a month. Note that scope precedence above resolves which *site*
-a url belongs to; it does not resolve which *thresholds* apply. Different
-question, and only the first has an entity today.
+the change next to the code. An agency owns none of its clients' repos, and its
+threshold is its own standard. Inherited rather than copied: twenty brands
+across two environments is several hundred thresholds to set by hand, and they
+diverge in a month. Note that scope precedence above resolves which *site* a url
+belongs to. It does not resolve which *thresholds* apply. Different question,
+and only the first has an entity today.
 
 `Subscription` is not `Grant`. One says what you may see, the other what reaches
 you. A twenty-brand feed is not read.
 
-### Reference and Waiver are on the timeline
+### Reference and waiver belong on the timeline
 
 Snapshots already are: immutable, timestamped, one per observation. The two
-things a snapshot is judged against are not, and they have to be.
+things a snapshot is judged against are not, and they should be.
 
 ```
 Reference  (siteId, market, environment, profile, validFrom, source)
@@ -407,15 +406,31 @@ Waiver     (siteId, market, environment, profile, findingId,
             grantedBy, grantedAt, expiresAt, reason)
 ```
 
-`validFrom` is what makes "was this right at the time" answerable, and that is
-the question the document form of a reference exists for. Without it, accepting
-a new baseline overwrites the reason every earlier run passed.
+`validFrom` is what makes "was this right at the time" answerable, which is the
+question the document form of a reference exists for. Without it, accepting a
+new baseline erases the reason every earlier run passed.
 
-On `Waiver`: an exception with no author is a mute button rather than an
-approval, and one with no expiry is permanent. The justification for the entity
-is that a campaign site deviates on purpose, and a campaign ends.
+A waiver with no author is a mute button, not an approval. One with no expiry is
+permanent, and the reason for having the entity at all is that a campaign site
+deviates on purpose. Campaigns end.
 
 Both are two columns on rows the model already names. Neither is in v1.
+
+### What the CLI carries of this
+
+Only the schema link, exported at `dembrandt/identity`:
+
+```
+SnapshotRef            snapshotId, schemaVersion, takenAt
+ReferenceSource        a snapshot, or a document
+referenceComparability(reference) -> { comparable, reason }
+```
+
+A baseline points at an extraction and the output contract moves, so the schema
+version travels with the pointer and the rule for reading it sits next to
+`SCHEMA_VERSION`. The rows above stay App-side: the CLI never reads them,
+ownership is kept out of the extraction on purpose, and a public npm package
+should not carry the shape of a commercial account.
 
 ## Open decisions
 
