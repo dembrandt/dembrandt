@@ -46,6 +46,12 @@
       "import": "./dist/lib/version.js",
       "default": "./dist/lib/version.js"
     },
+    "./identity": {
+      "types": "./dist/lib/identity.d.ts",
+      "require": "./dist/lib/identity.js",
+      "import": "./dist/lib/identity.js",
+      "default": "./dist/lib/identity.js"
+    },
     "./drift": {
       "types": "./dist/lib/drift.d.ts",
       "require": "./dist/lib/drift.js",

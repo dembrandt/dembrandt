@@ -10,6 +10,8 @@
  * and `source` says per field which of the two produced it.
  */
 
+import { checkSchemaCompatibility } from './version.js';
+
 /** `unset` marks a field nothing supplied, which only `brand` can be. */
 export type IdentitySource = 'flag' | 'config' | 'derived' | 'unset';
 
@@ -307,4 +309,145 @@ export function profileFlagMismatch(
     .map(([flag, want]) =>
       `profile "${profile.name}" declares ${flag}=${String(want)}, run has ` +
       `${flag}=${String(actual[flag] ?? 'unset')}; this run is not comparable to its baseline.`);
+}
+
+/**
+ * Account-side rows. Types only: this module owns the shape, the store that
+ * persists them lives in the App.
+ *
+ * They are exported from here rather than declared in the App because a stored
+ * row points at an extraction, and the extraction's contract moves. Two copies
+ * of the shape drift the moment SCHEMA_VERSION does, and the divergence is
+ * silent — the App keeps reading a field the CLI stopped writing, or compares
+ * against a reference recorded under a contract that no longer means the same
+ * thing. One declaration, one place to change.
+ *
+ * None of this enters an extraction. `Identity` says what a snapshot is about;
+ * these say who may see it, what it is judged against, and when.
+ */
+
+/**
+ * A pointer to a stored snapshot that remembers which contract produced it.
+ *
+ * The version is the point. A reference or a waiver recorded under schema
+ * 1.14.0 and read under 1.15.0 may be comparing values the extractor now
+ * derives differently, and `checkSchemaCompatibility` can only say so if the
+ * producing version travelled with the pointer.
+ */
+export interface SnapshotRef {
+  snapshotId: string;
+  /** meta.schemaVersion of the snapshot, as written. Null for pre-contract data. */
+  schemaVersion: string | null;
+  takenAt: string;
+}
+
+/** The measurable coordinate a row attaches to. */
+export interface VariantKey {
+  siteId: string;
+  market: string | null;
+  environment: string;
+  profile: string;
+}
+
+/** Ownership axis. A role and a policy attach to one of these, never to a variant. */
+export type ScopeRef =
+  | { kind: 'account'; id: string }
+  | { kind: 'client'; id: string }
+  | { kind: 'brand'; id: string }
+  | { kind: 'site'; id: string };
+
+export type Role = 'owner' | 'editor' | 'viewer';
+
+export interface Grant {
+  userId: string;
+  scope: ScopeRef;
+  role: Role;
+  grantedAt: string;
+}
+
+/**
+ * Thresholds, inherited down the ownership axis rather than copied. A team that
+ * owns its repo keeps them in `.dembrandtrc` beside the code; an agency owns
+ * none of its clients' repos and needs one standard across them.
+ */
+export interface Policy {
+  scope: ScopeRef;
+  thresholds: Record<string, number>;
+  validFrom: string;
+}
+
+/** What reaches a person, as opposed to what they may see. */
+export interface Subscription {
+  userId: string;
+  scope: ScopeRef;
+  events: string[];
+}
+
+/**
+ * What a run is compared against: an earlier snapshot, or a document such as a
+ * brand guideline. Same key, same role, different source.
+ *
+ * `validFrom` is what makes "was this right at the time" answerable. Without
+ * it, accepting a new baseline overwrites the reason every earlier run passed.
+ */
+export type Reference = VariantKey & {
+  validFrom: string;
+  source: { kind: 'snapshot'; ref: SnapshotRef } | { kind: 'document'; documentId: string };
+};
+
+/**
+ * An accepted deviation. The author and the expiry are not metadata: without an
+ * author it is a mute button rather than an approval, and without an expiry it
+ * outlives the campaign it was granted for.
+ */
+export type Waiver = VariantKey & {
+  findingId: string;
+  grantedBy: string;
+  grantedAt: string;
+  expiresAt: string | null;
+  reason: string;
+};
+
+/**
+ * Whether a stored reference can still be compared against a fresh run, and
+ * what to say when it cannot.
+ *
+ * A document reference is never invalidated by a contract change: it states
+ * intent and has no producing version. A snapshot reference does, and it is
+ * the case that fails quietly — the comparison still runs, the numbers still
+ * look like numbers, and a value the extractor now derives differently reads
+ * as drift the site never had. Schema 1.14.0 moved spacing, rem and the
+ * palette; 1.15.0 moved the scoring underneath.
+ *
+ * The comparison itself is `checkSchemaCompatibility`, not a second copy of
+ * it. Re-deriving "is this contract close enough" here is how the App's own
+ * version check diverged from the CLI's before, and a private semver parse in
+ * this module would be the same mistake with a different name. This adds only
+ * the part that is specific to a reference: a document has no version, and a
+ * pointer with no version at all is worse than an old one.
+ *
+ * Deliberately advisory. The caller decides whether to warn, re-baseline or
+ * refuse; refusing here would break a comparison the user may still want.
+ */
+export function referenceComparability(
+  reference: Pick<Reference, 'source'>,
+): { comparable: boolean; reason: string | null } {
+  if (reference.source.kind === 'document') return { comparable: true, reason: null };
+
+  const compat = checkSchemaCompatibility({
+    meta: { schemaVersion: reference.source.ref.schemaVersion ?? undefined },
+  });
+
+  // 'legacy' and 'unknown' both mean the contract cannot be established, which
+  // for a baseline is worse than an old contract: nothing says what it measured.
+  if (compat.status === 'legacy' || compat.status === 'unknown') {
+    return {
+      comparable: false,
+      reason:
+        'The baseline carries no readable schema version, so what it measured cannot be established. ' +
+        'Re-baseline before reading a comparison against it.',
+    };
+  }
+
+  return { comparable: compat.compatible, reason: compat.message };
 }

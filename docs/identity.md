@@ -362,16 +362,76 @@ The derived path must produce today's key exactly. A user who does nothing sees
 no change. That is also the migration: old data does not become wrong, it becomes
 labelled.
 
+## Beyond one user: four rows, no new levels
+
+The snapshot stays the atom. Nothing below adds a level to the measurement axis
+or a field to `Identity`; each is an account-side row that points at a snapshot
+or at a coordinate, and the extraction is readable without any of them.
+
+Two customer shapes ask for them. An in-house team running one brand across six
+applications, several behind a login. An agency running twenty brands with a
+team of its own. Neither needs the extraction to change.
+
+```
+Member        (accountId, userId)
+Grant         (userId, scopeRef, role, grantedAt)     scopeRef: account | client | brand | site
+Policy        (scopeRef, thresholds, validFrom)       inherited down the ownership axis
+Subscription  (userId, scopeRef, events)
+```
+
+`Grant` answers the third open decision below. `scopeRef` is polymorphic over
+the ownership axis because all three cases are live at once: an in-house team is
+granted a brand, an agency a client, a contractor one site. One table, not
+three, and the axis already exists.
+
+`Policy` is the one that is not just access. Thresholds live in `.dembrandtrc`
+in the customer's repo, which is right for a team that owns the repo and reviews
+the change beside the code. An agency owns none of its clients' repos and its
+threshold is its own standard. Inherited rather than copied, because twenty
+brands across two environments is several hundred thresholds set by hand, and
+they diverge in a month. Note that scope precedence above resolves which *site*
+a url belongs to; it does not resolve which *thresholds* apply. Different
+question, and only the first has an entity today.
+
+`Subscription` is not `Grant`. One says what you may see, the other what reaches
+you. A twenty-brand feed is not read.
+
+### Reference and Waiver are on the timeline
+
+Snapshots already are: immutable, timestamped, one per observation. The two
+things a snapshot is judged against are not, and they have to be.
+
+```
+Reference  (siteId, market, environment, profile, validFrom, source)
+Waiver     (siteId, market, environment, profile, findingId,
+            grantedBy, grantedAt, expiresAt, reason)
+```
+
+`validFrom` is what makes "was this right at the time" answerable, and that is
+the question the document form of a reference exists for. Without it, accepting
+a new baseline overwrites the reason every earlier run passed.
+
+On `Waiver`: an exception with no author is a mute button rather than an
+approval, and one with no expiry is permanent. The justification for the entity
+is that a campaign site deviates on purpose, and a campaign ends.
+
+Both are two columns on rows the model already names. Neither is in v1.
+
 ## Open decisions
 
 - Reference and waiver are named here but not modelled in `lib/identity.ts`.
   They belong to the account-side store, not the extraction, so they follow the
-  App rather than the CLI contract.
+  App rather than the CLI contract. Their shape is above.
 - Billing. Credits are keyed by domain today. Once a site is user-declared, the
   customer controls the grouping, so the billed unit has to be decided before
-  identity ships rather than restricted afterwards.
+  identity ships rather than restricted afterwards. A measured estate puts a
+  number on it: one brand across six applications is billed six times per
+  domain and once per brand. The customer sets the grouping, so this is the
+  decision that has to precede wiring, not follow it.
 - Whether `client` becomes a real entity on the ownership axis, or an account
-  stays the only boundary. Needed once one account manages brands it does not own.
+  stays the only boundary. Needed once one account manages brands it does not
+  own. `Grant` above assumes it can be a scope; it does not require it to exist
+  until then.
 - Whether `market` should also cover language editions on one host, e.g.
   `acme.com/de`. The path form already expresses it; what is undecided is
   whether that is the same concept.

@@ -12,8 +12,10 @@ import {
   validateOverrides,
   validateProfilePaths,
   profileFlagMismatch,
+  referenceComparability,
   type IdentityConfig,
 } from '../lib/identity.js';
+import { SCHEMA_VERSION, checkSchemaCompatibility } from '../lib/version.js';
 
 const config: IdentityConfig = {
   brand: 'Acme',
@@ -133,4 +135,63 @@ test('flags that contradict the profile make the run incomparable', () => {
   assert.deepEqual(profileFlagMismatch(profile, { crawl: 5 }), []);
   assert.equal(profileFlagMismatch(profile, { crawl: 2 }).length, 1);
   assert.match(profileFlagMismatch(profile, {})[0], /not comparable/);
+});
+
+/**
+ * A stored reference points at an extraction, and the extraction's contract
+ * moves. The failure this guards is quiet: the comparison still runs, the
+ * numbers still look like numbers, and a value the extractor now derives
+ * differently reads as drift the site never had.
+ *
+ * Cases are expressed against SCHEMA_VERSION rather than a literal, so the
+ * next contract bump does not silently turn "a minor behind" into "current"
+ * and leave the assertion passing for the wrong reason.
+ */
+const snapshotRef = (schemaVersion: string | null) => ({
+  source: {
+    kind: 'snapshot' as const,
+    ref: { snapshotId: 's1', schemaVersion, takenAt: '2026-01-01T00:00:00.000Z' },
+  },
+});
+
+const [maj, min] = SCHEMA_VERSION.split('.').map(Number);
+
+test('a document reference is never invalidated by a contract change', () => {
+  assert.deepEqual(
+    referenceComparability({ source: { kind: 'document', documentId: 'guideline-1' } }),
+    { comparable: true, reason: null },
+  );
+});
+
+test('the current contract compares without a caveat', () => {
+  assert.deepEqual(referenceComparability(snapshotRef(SCHEMA_VERSION)), {
+    comparable: true,
+    reason: null,
+  });
+});
+
+test('a minor step still compares, and carries the caveat verbatim from version.ts', () => {
+  const older = `${maj}.${Math.max(0, min - 1)}.0`;
+  const r = referenceComparability(snapshotRef(older));
+  const compat = checkSchemaCompatibility({ meta: { schemaVersion: older } });
+  assert.equal(r.comparable, compat.compatible);
+  assert.equal(r.reason, compat.message, 'the notice must not be a second wording of the same check');
+});
+
+test('a major step is not like for like', () => {
+  const r = referenceComparability(snapshotRef(`${maj + 1}.0.0`));
+  assert.equal(r.comparable, false);
+  assert.ok(r.reason, 'an incompatible baseline must say why');
+});
+
+test('a baseline with no schema version cannot be established', () => {
+  const r = referenceComparability(snapshotRef(null));
+  assert.equal(r.comparable, false);
+  assert.match(r.reason ?? '', /no readable schema version/);
+});
+
+test('an unreadable version is refused rather than guessed', () => {
+  const r = referenceComparability(snapshotRef('not-a-version'));
+  assert.equal(r.comparable, false);
+  assert.match(r.reason ?? '', /no readable schema version/);
 });
