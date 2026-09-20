@@ -77,7 +77,11 @@ export async function resolveCompare(
 
   // Not a local file → treat as a platform baseline id.
   const fetchFn = deps.fetchFn ?? fetch;
-  const api = (deps.api ?? "https://dembrandt.com").replace(/\/$/, "");
+  // www, matching the sync upload in index.ts. The apex answers 308 to www, and
+  // a cross-origin redirect is where an Authorization header goes missing — this
+  // call carries none today, so the only cost is a round trip, but the two paths
+  // disagreeing is how that stops being true quietly.
+  const api = (deps.api ?? "https://www.dembrandt.com").replace(/\/$/, "");
   const res = await fetchFn(`${api}/api/app/drift`, {
     method: "POST",
     headers: { "content-type": "application/json" },
