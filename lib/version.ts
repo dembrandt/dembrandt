@@ -36,6 +36,20 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.16.0 — meta.crawl gains `pages`: the landed URL of every page merged into
+ *          the result, in merge order. A count cannot be checked, reproduced or
+ *          re-read, and a merged palette is not interpretable without knowing
+ *          which pages produced it.
+ *
+ *          Behaviour, not contract, in the same release: colors.palette no
+ *          longer reads `color` off an element that paints no text of its own,
+ *          nor `border-color` off one that draws no border. Both resolve to
+ *          currentColor when unset, so every wrapper reported the inherited
+ *          value — on an unstyled anchor, the browser's default link blue.
+ *          rgb(0,0,238) was the most frequent semantic.primary across a 174-site
+ *          corpus. Palettes shrink on most sites and primary moves on some;
+ *          dji.com and paypal.com both move onto their hand-labelled colour.
+ *
  *  (unversioned) — `voice` / `voiceSkipped` ship behind a hidden, opt-in flag
  *          and deliberately do not bump the contract. Bump when the flag is
  *          documented, not before.
@@ -227,7 +241,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.15.0';
+export const SCHEMA_VERSION = '1.16.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';

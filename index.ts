@@ -428,6 +428,9 @@ program
                 technique: crawlTechnique,
                 pagesRequested: computePagesRequested({ hasExplicitPaths, explicitPathCount: paths?.length || 0, isSitemap: !!opts.sitemap, sitemapMax, crawlN }),
                 pagesFound,
+                // Which pages, not just how many: a merged palette cannot be
+                // checked, reproduced or re-read from a count alone.
+                pages: allResults.map((r) => r?.url).filter((u): u is string => typeof u === 'string'),
               };
             }
           }

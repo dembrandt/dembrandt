@@ -310,8 +310,20 @@ export async function extractColors(page) {
       if (isColorSample(el, rect)) return;
 
       const bgColor = toLegacy(computed.backgroundColor);
-      const textColor = toLegacy(computed.color);
-      const borderColor = toLegacy(computed.borderColor);
+      // `color` inherits, so a wrapper that paints no text still reports one —
+      // and for an unstyled <a> that is the browser's default link blue, which
+      // then outranks the brand. Read the text colour only off elements that
+      // actually render text.
+      const paintsText = Array.from(el.childNodes).some(
+        (n) => n.nodeType === 3 && (n.textContent || "").trim() !== ""
+      );
+      const textColor = paintsText ? toLegacy(computed.color) : "";
+      // Same trap on the border: an unset border-color resolves to currentColor,
+      // so every element reports one whether or not a border is drawn.
+      const hasBorder = [computed.borderTopWidth, computed.borderRightWidth,
+        computed.borderBottomWidth, computed.borderLeftWidth]
+        .some((w) => parseFloat(w) > 0);
+      const borderColor = hasBorder ? toLegacy(computed.borderColor) : "";
 
       const context = (
         el.className + " " + el.id + " " +

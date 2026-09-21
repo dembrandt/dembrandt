@@ -417,6 +417,8 @@ export interface ExtractionMeta {
     pagesRequested: number | null;
     /** How many pages actually made it into the merged result. */
     pagesFound: number;
+    /** Which pages, in merge order — the landed URLs, not the requested ones. */
+    pages?: string[];
   };
   /**
    * Human-readable notes on pages robots.txt disallowed but the run still
