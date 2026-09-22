@@ -135,3 +135,38 @@ export function classifyStructural(
 
   return false;
 }
+
+/**
+ * Below this a colour is ink or paper rather than a brand hue, and above it a
+ * candidate is colourful enough to replace one. The single knob the
+ * near-neutral primary override turns.
+ */
+export const NEUTRAL_PRIMARY_MAX_CHROMA = 0.30;
+
+/**
+ * How strongly an opaque hex reads as a colour rather than as ink or paper.
+ * Saturation alone does not answer that: #091e42 is near-black navy at s=0.76
+ * in HSL and 0.86 in HSV. Attenuating by distance from black and white leaves
+ * mid-lightness colours untouched (the factor is 1 at l=0.5) and collapses the
+ * extremes.
+ *
+ * Mirrored inline in colors.ts as `chroma`, which page.evaluate needs in the
+ * browser realm; change both together.
+ * @param {string} hex e.g. "#1a2b3c"
+ * @returns {number} 0..1
+ */
+export function brandChroma(hex: string): number {
+  if (typeof hex !== 'string') return 0;
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return 0;
+  const n = m[1];
+  const r = parseInt(n.substring(0, 2), 16) / 255;
+  const g = parseInt(n.substring(2, 4), 16) / 255;
+  const b = parseInt(n.substring(4, 6), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return 0;
+  const s = l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
+  if (l < 0.08 || l > 0.92) return 0;
+  return s * (1 - Math.abs(2 * l - 1));
+}

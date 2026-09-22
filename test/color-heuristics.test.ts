@@ -8,6 +8,8 @@ import {
   classifyStructural,
   ancestorLiftScore,
   ANCESTOR_LIFT_MAX,
+  brandChroma,
+  NEUTRAL_PRIMARY_MAX_CHROMA,
 } from '../lib/extractors/color-heuristics.js';
 
 // These guard the recall-vs-precision tuning for card / section / input / badge
@@ -128,4 +130,48 @@ test('malformed hex never throws and is treated as neutral (saturation 0)', () =
     classifyStructural({ count: 600, score: 600, bgCount: 600, normalizedHex: 'garbage' }, 1000),
     true,
   );
+});
+
+// A near-neutral primary is the dominant colour mis-pick: a dark ink or surface
+// colour out-scores the real brand hue. The override that exists to catch it is
+// gated on how colourful the pick is, so that measure has to answer "does this
+// read as a colour", not "is this saturated". Saturation alone does not:
+// #091e42 is near-black navy at s=0.76 (HSL) and 0.86 (HSV), and on that number
+// the gate never fires.
+
+test('brandChroma collapses near-black and near-white, saturation does not', () => {
+  for (const ink of ['#091e42', '#091723', '#1f243c', '#0e4343', '#163300']) {
+    // the raw measure clears the gate, which is why the override never fired
+    assert.ok(
+      saturationFromHex(ink) > NEUTRAL_PRIMARY_MAX_CHROMA,
+      `${ink} clears the gate on the raw measure (got ${saturationFromHex(ink)})`
+    );
+    assert.ok(
+      brandChroma(ink) < NEUTRAL_PRIMARY_MAX_CHROMA,
+      `${ink} should not read as a brand hue (got ${brandChroma(ink)})`
+    );
+  }
+});
+
+test('brandChroma keeps genuine brand hues above the gate', () => {
+  for (const hue of ['#0052cc', '#ff5600', '#fde050', '#027e6f', '#003b95', '#e60023', '#d1f470']) {
+    assert.ok(
+      brandChroma(hue) > NEUTRAL_PRIMARY_MAX_CHROMA,
+      `${hue} should stay eligible as a primary (got ${brandChroma(hue)})`
+    );
+  }
+});
+
+test('brandChroma leaves mid-lightness colours unattenuated', () => {
+  // The factor is 1 at l=0.5, so the fallback and accent thresholds keep their
+  // meaning for ordinary colours; only the extremes lose standing.
+  assert.equal(brandChroma('#ff0000'), 1);
+  assert.equal(brandChroma('#0000ff'), 1);
+});
+
+test('brandChroma is total: no NaN, no throw, 0 for achromatic and junk', () => {
+  for (const x of ['#000000', '#ffffff', '#808080', 'not-a-hex', '', '#abc']) {
+    assert.equal(brandChroma(x as string), 0, `${x} should be 0`);
+  }
+  assert.equal(brandChroma(undefined as unknown as string), 0);
 });

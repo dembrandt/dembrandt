@@ -53,6 +53,20 @@
  *  (unversioned) — `voice` / `voiceSkipped` ship behind a hidden, opt-in flag
  *          and deliberately do not bump the contract. Bump when the flag is
  *          documented, not before.
+ *  1.16.0 — the neutral-primary rescue starts firing on dark brand-coloured
+ *          picks, so a site that changed nothing can report a different primary.
+ *
+ *          The rescue is gated on how colourful the current pick is, and that
+ *          measure was HSL saturation, which is meaningless near black: a
+ *          near-black navy reads 0.76 and cleared the 0.20 bar, so the gate
+ *          built for exactly this mis-pick never fired. Chroma is now attenuated
+ *          by distance from black and white, unchanged at mid lightness, and the
+ *          bar moves to 0.30 on the new scale for both the gate and the
+ *          replacement. Primary moves on sites whose previous pick was a dark
+ *          ink or surface colour with a declared brand token or recurring CTA
+ *          behind it.
+ *
+ *          No field is added or removed. Values move for an unchanged site.
  *  1.15.0 — two scoring checks that were dead in the field start firing, so a
  *          site that changed nothing reports differently than it did on 1.14.0.
  *
