@@ -132,16 +132,11 @@ test('malformed hex never throws and is treated as neutral (saturation 0)', () =
   );
 });
 
-// A near-neutral primary is the dominant colour mis-pick: a dark ink or surface
-// colour out-scores the real brand hue. The override that exists to catch it is
-// gated on how colourful the pick is, so that measure has to answer "does this
-// read as a colour", not "is this saturated". Saturation alone does not:
-// #091e42 is near-black navy at s=0.76 (HSL) and 0.86 (HSV), and on that number
-// the gate never fires.
+// The near-neutral primary override is gated on how colourful the pick is, and
+// on raw saturation a near-black navy clears that gate.
 
 test('brandChroma collapses near-black and near-white, saturation does not', () => {
   for (const ink of ['#091e42', '#091723', '#1f243c', '#0e4343', '#163300']) {
-    // the raw measure clears the gate, which is why the override never fired
     assert.ok(
       saturationFromHex(ink) > NEUTRAL_PRIMARY_MAX_CHROMA,
       `${ink} clears the gate on the raw measure (got ${saturationFromHex(ink)})`
@@ -163,8 +158,6 @@ test('brandChroma keeps genuine brand hues above the gate', () => {
 });
 
 test('brandChroma leaves mid-lightness colours unattenuated', () => {
-  // The factor is 1 at l=0.5, so the fallback and accent thresholds keep their
-  // meaning for ordinary colours; only the extremes lose standing.
   assert.equal(brandChroma('#ff0000'), 1);
   assert.equal(brandChroma('#0000ff'), 1);
 });

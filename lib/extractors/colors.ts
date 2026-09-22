@@ -106,13 +106,9 @@ export async function extractColors(page) {
       return (Math.max(r, g, b) + Math.min(r, g, b)) / 2;
     }
 
-    // Mirror of NEUTRAL_PRIMARY_MAX_CHROMA (color-heuristics.ts).
+    // Mirrors NEUTRAL_PRIMARY_MAX_CHROMA / brandChroma (color-heuristics.ts).
     const NEUTRAL_PRIMARY_MAX_CHROMA = 0.30;
 
-    // Mirror of brandChroma (color-heuristics.ts) — kept inline because
-    // page.evaluate runs in an isolated realm and cannot import. How strongly a
-    // hex reads as a colour rather than as ink or paper: saturation alone does
-    // not answer that, since #091e42 is near-black navy at s=0.76.
     function chroma(hex) {
       if (!hex || !hex.startsWith('#')) return 0;
       const r = parseInt(hex.slice(1, 3), 16) / 255;

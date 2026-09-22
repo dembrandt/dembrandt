@@ -144,16 +144,8 @@ export function classifyStructural(
 export const NEUTRAL_PRIMARY_MAX_CHROMA = 0.30;
 
 /**
- * How strongly an opaque hex reads as a colour rather than as ink or paper.
- * Saturation alone does not answer that: #091e42 is near-black navy at s=0.76
- * in HSL and 0.86 in HSV. Attenuating by distance from black and white leaves
- * mid-lightness colours untouched (the factor is 1 at l=0.5) and collapses the
- * extremes.
- *
- * Mirrored inline in colors.ts as `chroma`, which page.evaluate needs in the
- * browser realm; change both together.
- * @param {string} hex e.g. "#1a2b3c"
- * @returns {number} 0..1
+ * Saturation attenuated by distance from black and white, so #091e42 does not
+ * read as a brand hue at s=0.76. Unchanged at mid lightness. Mirrored in colors.ts.
  */
 export function brandChroma(hex: string): number {
   if (typeof hex !== 'string') return 0;
