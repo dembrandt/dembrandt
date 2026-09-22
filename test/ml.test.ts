@@ -4,6 +4,10 @@ import { test } from 'node:test';
 // onnxruntime-node is an optional dependency and the CLI treats it as one: the
 // call site imports this module dynamically inside a try. A static import here
 // turned a missing binary into a failed suite and a red main.
+//
+// Skipping is only honest where the binary is genuinely optional, which is a
+// contributor's machine. In CI it is expected, so its absence is an install
+// failure and has to stay loud rather than pass as seven skips.
 let runtime: typeof import('../lib/ml/runtime.js') | null = null;
 let unavailable: string | null = null;
 try {
@@ -11,7 +15,11 @@ try {
 } catch (e) {
   unavailable = `onnxruntime-node unavailable: ${(e as Error).message}`;
 }
-const opts = unavailable ? { skip: unavailable } : {};
+const opts = unavailable && !process.env.CI ? { skip: unavailable } : {};
+
+test('the model runtime loads, or says why it could not', opts, () => {
+  assert.equal(unavailable, null, unavailable ?? 'runtime loaded');
+});
 const { predictPrimary, scorePalette, modelMeta } = (runtime ?? {}) as typeof import('../lib/ml/runtime.js');
 
 const MINIMAL_EXTRACTION = {
