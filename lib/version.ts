@@ -53,7 +53,7 @@
  *  (unversioned) — `voice` / `voiceSkipped` ship behind a hidden, opt-in flag
  *          and deliberately do not bump the contract. Bump when the flag is
  *          documented, not before.
- *  1.16.0 — the neutral-primary rescue starts firing on dark brand-coloured
+ *  1.17.0 — the neutral-primary rescue starts firing on dark brand-coloured
  *          picks, so a site that changed nothing can report a different primary.
  *
  *          The rescue is gated on how colourful the current pick is, and that
@@ -255,7 +255,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.16.0';
+export const SCHEMA_VERSION = '1.17.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
