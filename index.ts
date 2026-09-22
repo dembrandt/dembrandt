@@ -79,7 +79,7 @@ program
   .option("--shadcn [path]", "Write a shadcn/ui theme block, observed slots only (default: output/<domain>/shadcn.css)")
   .option("--html [path]", "Write a self-contained HTML report (default: output/<domain>/<timestamp>.html)")
   .option("--compare <baseline>", "Drift-compare against a baseline JSON file. Exits 1 on drift, 2 if the baseline cannot be read.")
-  .option("--approve", "With --compare <file>: accept the current extraction as the new baseline by overwriting that local file, and pass instead of failing. Ignored for App baseline ids.")
+  .option("--approve", "With --compare <file>: accept the current extraction as the new baseline by overwriting that local file, and pass instead of failing.")
   .option("--no-sandbox", "Disable browser sandbox (needed for Docker/CI)")
   .option("--raw-colors", "Include pre-filter raw colors in JSON output")
   .option(

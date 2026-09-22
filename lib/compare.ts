@@ -1,11 +1,9 @@
 /**
- * --compare dispatch. The argument is either:
- *   - a local file  → diff against it here (free, offline, deterministic)
- *   - a baseline id → POST the candidate to the Dembrandt App, which stores
- *                     baselines and runs the same engine server-side
+ * --compare dispatch. A local file is diffed here, offline and deterministic.
  *
- * Same flag, two backends — the local path is the free wedge; the id path is the
- * App platform (dembrandt-next/app). Both call the one canonical drift engine.
+ * A bare id still posts to the App, but that route's baselineId branch is gone
+ * and this is its only caller, so the path is retained rather than supported.
+ * Bringing it back needs a per-account baseline store and auth on the endpoint.
  *
  * Dependencies are injectable so the dispatch is unit-testable without a real
  * filesystem or network.
@@ -30,7 +28,7 @@ export interface CompareDeps {
   readFile?: (p: string, enc: "utf-8") => string;
   fetchFn?: typeof fetch;
   /** App base URL. Caller passes the `.dembrandtrc` `endpoint`; default is the
-   *  production App at https://dembrandt.com. */
+   *  production App at https://www.dembrandt.com. */
   api?: string;
 }
 
@@ -50,7 +48,7 @@ export async function resolveCompare(
     } catch (err) {
       throw new Error(
         `baseline ${arg} is not a dembrandt JSON extraction ` +
-        `(${(err as Error).message}) — create one with --save-output or --json-only`,
+        `(${(err as Error).message}). Create one with --save-output or --json-only`,
         { cause: err }
       );
     }
@@ -61,26 +59,26 @@ export async function resolveCompare(
     // never happened. A broken baseline is an extraction failure, not drift.
     if (!isExtraction(baseline)) {
       throw new Error(
-        `baseline ${arg} is not a dembrandt JSON extraction (no "colors" block) ` +
-        `— create one with --save-output or --json-only`
+        `baseline ${arg} is not a dembrandt JSON extraction (no "colors" block). ` +
+        `Create one with --save-output or --json-only`
       );
     }
 
     return { report: computeDrift(baseline, candidate), source: arg, mode: "local" };
   }
 
-  // A path-looking argument that is not a file is a typo, not a baseline id —
-  // shipping it to the App would surface a confusing platform error instead.
+  // A path-looking argument that is not a file is a typo, not a baseline id.
+  // Shipping it to the App would surface a confusing platform error instead.
   if (arg.includes("/") || arg.includes("\\") || /\.(json|md)$/i.test(arg)) {
     throw new Error(`baseline file not found: ${arg}`);
   }
 
   // Not a local file → treat as a platform baseline id.
   const fetchFn = deps.fetchFn ?? fetch;
-  // www, matching the sync upload in index.ts. The apex answers 308 to www, and
-  // a cross-origin redirect is where an Authorization header goes missing — this
-  // call carries none today, so the only cost is a round trip, but the two paths
-  // disagreeing is how that stops being true quietly.
+  // www, matching the sync upload in index.ts. The apex answers 308 to www and
+  // a cross-origin redirect is where an Authorization header goes missing. This
+  // call carries none today, so the only cost is a round trip, but two paths
+  // disagreeing about the host is how that stops being true quietly.
   const api = (deps.api ?? "https://www.dembrandt.com").replace(/\/$/, "");
   const res = await fetchFn(`${api}/api/app/drift`, {
     method: "POST",
