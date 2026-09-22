@@ -1,6 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { predictPrimary, scorePalette, modelMeta } from '../lib/ml/runtime.js';
+
+// onnxruntime-node is an optional dependency and the CLI treats it as one: the
+// call site imports this module dynamically inside a try. A static import here
+// turned a missing binary into a failed suite and a red main.
+let runtime: typeof import('../lib/ml/runtime.js') | null = null;
+let unavailable: string | null = null;
+try {
+  runtime = await import('../lib/ml/runtime.js');
+} catch (e) {
+  unavailable = `onnxruntime-node unavailable: ${(e as Error).message}`;
+}
+const opts = unavailable ? { skip: unavailable } : {};
+const { predictPrimary, scorePalette, modelMeta } = (runtime ?? {}) as typeof import('../lib/ml/runtime.js');
 
 const MINIMAL_EXTRACTION = {
   url: 'https://example.com',
@@ -13,7 +25,7 @@ const MINIMAL_EXTRACTION = {
   },
 };
 
-test('modelMeta returns featureVersion and metrics', () => {
+test('modelMeta returns featureVersion and metrics', opts, () => {
   const meta = modelMeta();
   assert.ok(meta !== null, 'meta.json must be loadable');
   assert.ok(typeof meta!.featureVersion === 'number', 'featureVersion must be a number');
@@ -21,29 +33,29 @@ test('modelMeta returns featureVersion and metrics', () => {
   assert.ok(meta!.featureNames.length > 0, 'featureNames must not be empty');
 });
 
-test('predictPrimary returns hex and score for a normal extraction', async () => {
+test('predictPrimary returns hex and score for a normal extraction', opts, async () => {
   const result = await predictPrimary(MINIMAL_EXTRACTION as any);
   assert.ok(result !== null, 'should return a prediction');
   assert.match(result!.hex, /^#[0-9a-f]{6}$/, 'hex must be 6-char lowercase');
   assert.ok(result!.score >= 0 && result!.score <= 1, 'score must be in [0,1]');
 });
 
-test('predictPrimary does not throw on empty palette', async () => {
+test('predictPrimary does not throw on empty palette', opts, async () => {
   const result = await predictPrimary({ colors: { palette: [] } } as any);
   assert.equal(result, null, 'empty palette should return null');
 });
 
-test('predictPrimary does not throw on missing colors', async () => {
+test('predictPrimary does not throw on missing colors', opts, async () => {
   const result = await predictPrimary({} as any);
   assert.equal(result, null, 'missing colors should return null');
 });
 
-test('predictPrimary does not throw on null input', async () => {
+test('predictPrimary does not throw on null input', opts, async () => {
   const result = await predictPrimary(null as any);
   assert.equal(result, null, 'null input should return null');
 });
 
-test('scorePalette returns all candidates sorted best-first', async () => {
+test('scorePalette returns all candidates sorted best-first', opts, async () => {
   const scored = await scorePalette(MINIMAL_EXTRACTION as any);
   assert.ok(scored.length === 3, 'should score all palette entries');
   // scores are sorted descending
@@ -56,7 +68,7 @@ test('scorePalette returns all candidates sorted best-first', async () => {
   }
 });
 
-test('predictPrimary prefers chromatic over white/black', async () => {
+test('predictPrimary prefers chromatic over white/black', opts, async () => {
   const result = await predictPrimary(MINIMAL_EXTRACTION as any);
   // #ff5416 is the only chromatic color — model should prefer it
   assert.equal(result!.hex, '#ff5416', 'should pick the chromatic brand color');
