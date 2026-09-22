@@ -6,7 +6,6 @@ What the tool reports now matches what is actually on the page.
 
 ### Fixed
 - A colour was read off any element that had one, and `color` and `border-color` both resolve to `currentColor` when unset, so every wrapper reported a value it never drew. On an unstyled anchor that value is the browser's own link blue, and `rgb(0, 0, 238)` was the most frequent `semantic.primary` across a 174-site corpus. Both are read only off elements that paint text or draw a border now, so palettes come out smaller and carry fewer invisible greys (#231)
-- The rescue that stops a dark ink colour outscoring the real brand hue was gated on HSL saturation, which says nothing near black: a near-black navy reads 0.76 and cleared the 0.20 bar, so the gate built for exactly this mis-pick never fired on it. The measure is HSL chroma now, `(1 - |2L - 1|) x S`, which leaves mid-lightness colours untouched and collapses the extremes, and the bar sits at 0.30 on that scale (#232)
 - A baseline that parsed but was not an extraction read as an empty one, so every token counted as added and the run reported total drift and exited 1, the code reserved for a real design change. A truncated download or a typo onto another JSON file now exits 2 and names what is missing (#230)
 - `--compare` advertised an App baseline id in the help and both docs pages. That route's branch was deleted as dead code 86 days ago with this CLI as its only caller, so the docs describe what works today (#230)
 
@@ -18,9 +17,9 @@ What the tool reports now matches what is actually on the page.
 - The MCP server is typed rather than cast. All 21 tool registrations went through `(server.tool as any)`, which turned off checking across the whole surface (#228)
 
 ### Upgrading
-Output contract 1.15.0 to 1.17.0. Baseline churn measured against 0.35.0 on two reference sites: `dembrandt.com` stable 0, `stripe.com` stable 5 against a threshold of 10, with six colours removed from the palette.
+Output contract 1.15.0 to 1.16.0. Baseline churn measured against 0.35.0 on two reference sites: `dembrandt.com` stable 0, `stripe.com` stable 5 against a threshold of 10, with six colours removed from the palette.
 
-Palettes shrink on most sites and `semantic.primary` moves on some, for two reasons that travel together: a colour the page never painted can no longer win, and a dark ink colour no longer holds the primary slot against a declared brand token or a recurring call to action. Re-approve with `--compare <baseline> --approve` once, or regenerate the baseline.
+Palettes shrink on most sites and `semantic.primary` moves on some, because a colour the page never painted can no longer win. Re-approve with `--compare <baseline> --approve` once, or regenerate the baseline.
 
 ## [0.35.0] - 2026-09-20
 

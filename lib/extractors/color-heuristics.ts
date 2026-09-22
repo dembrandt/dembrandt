@@ -135,30 +135,3 @@ export function classifyStructural(
 
   return false;
 }
-
-/**
- * Below this a colour is ink or paper rather than a brand hue, and above it a
- * candidate is colourful enough to replace one. The single knob the
- * near-neutral primary override turns.
- */
-export const NEUTRAL_PRIMARY_MAX_CHROMA = 0.30;
-
-/**
- * Saturation attenuated by distance from black and white, so #091e42 does not
- * read as a brand hue at s=0.76. Unchanged at mid lightness. Mirrored in colors.ts.
- */
-export function brandChroma(hex: string): number {
-  if (typeof hex !== 'string') return 0;
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) return 0;
-  const n = m[1];
-  const r = parseInt(n.substring(0, 2), 16) / 255;
-  const g = parseInt(n.substring(2, 4), 16) / 255;
-  const b = parseInt(n.substring(4, 6), 16) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  if (max === min) return 0;
-  const s = l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
-  if (l < 0.08 || l > 0.92) return 0;
-  return s * (1 - Math.abs(2 * l - 1));
-}

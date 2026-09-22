@@ -106,9 +106,8 @@ export async function extractColors(page) {
       return (Math.max(r, g, b) + Math.min(r, g, b)) / 2;
     }
 
-    // Mirrors NEUTRAL_PRIMARY_MAX_CHROMA / brandChroma (color-heuristics.ts).
-    const NEUTRAL_PRIMARY_MAX_CHROMA = 0.30;
-
+    // HSL saturation of an opaque hex, with near-black/near-white forced to 0.
+    // Used both for the primary fallback and the near-neutral primary override.
     function chroma(hex) {
       if (!hex || !hex.startsWith('#')) return 0;
       const r = parseInt(hex.slice(1, 3), 16) / 255;
@@ -119,7 +118,7 @@ export async function extractColors(page) {
       if (max === min) return 0;
       const s = l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
       if (l < 0.08 || l > 0.92) return 0;
-      return s * (1 - Math.abs(2 * l - 1));
+      return s;
     }
 
     // HSL hue in degrees [0,360) from an opaque hex; -1 for achromatic colours.
@@ -622,14 +621,14 @@ export async function extractColors(page) {
     // brands have no such candidate, so they are left untouched.
     if (semanticColors.primary) {
       const primaryNorm = normalizeColor(semanticColors.primary);
-      if (typeof primaryNorm === 'string' && chroma(primaryNorm) < NEUTRAL_PRIMARY_MAX_CHROMA) {
+      if (typeof primaryNorm === 'string' && chroma(primaryNorm) < 0.20) {
         // Only the strongest brand signals override a near-neutral primary: a
         // declared brand token or a recurring CTA background. A merely
         // high-confidence chromatic accent is not enough; that would demote a
         // deliberately neutral brand identity for an incidental accent.
         const chromatic = perceptuallyDeduped
           .map((c) => ({ c, ch: chroma(c.normalized), isToken: tokenHexes.has(c.normalized), isCta: ctaPrimaryMap.has(c.normalized) }))
-          .filter((x) => x.ch > NEUTRAL_PRIMARY_MAX_CHROMA && (x.isToken || x.isCta))
+          .filter((x) => x.ch > 0.25 && (x.isToken || x.isCta))
           .sort((a, b) =>
             ((b.c.count + (b.isToken ? 20 : 0) + (b.isCta ? 20 : 0)) - (a.c.count + (a.isToken ? 20 : 0) + (a.isCta ? 20 : 0)))
             || (b.ch - a.ch))[0];
