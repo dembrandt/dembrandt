@@ -45,10 +45,10 @@
  *          longer reads `color` off an element that paints no text of its own,
  *          nor `border-color` off one that draws no border. Both resolve to
  *          currentColor when unset, so every wrapper reported the inherited
- *          value — on an unstyled anchor, the browser's default link blue.
+ *          value: on an unstyled anchor, the browser's default link blue.
  *          rgb(0,0,238) was the most frequent semantic.primary across a 174-site
- *          corpus. Palettes shrink on most sites and primary moves on some;
- *          dji.com and paypal.com both move onto their hand-labelled colour.
+ *          corpus. Palettes shrink on most sites and primary moves on some; two
+ *          large consumer brands move onto the colour they actually use.
  *
  *  (unversioned) — `voice` / `voiceSkipped` ship behind a hidden, opt-in flag
  *          and deliberately do not bump the contract. Bump when the flag is
