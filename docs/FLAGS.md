@@ -8,7 +8,7 @@ The tables below list the only exceptions: combinations that change each other's
 
 | Combination | Behavior |
 |---|---|
-| `--compare` + `--approve` | Local baseline file: the current extraction overwrites the baseline and the run passes regardless of drift. App baseline id: `--approve` is ignored and drift still exits 1. |
+| `--compare` + `--approve` | The current extraction overwrites the baseline file and the run passes regardless of drift. |
 | `--compare` + `--html` | The drift report is embedded in the HTML report. |
 | `--compare` + `--json-only` | A `drift` object is attached to the stdout JSON. Saved files (`--save-output`, baselines) stay pure extractions. |
 | `--crawl` + `--sitemap` | Sitemap discovery is used, `--crawl N` sets the page limit (N pages total). `--sitemap` alone discovers up to 20 additional pages. |
