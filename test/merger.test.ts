@@ -507,3 +507,19 @@ test('voiceAllPages is null when every page skipped voice, even though the run u
 
   assert.equal(merged.voiceAllPages, null);
 });
+
+// miro.com: the homepage elected #3859ff, an inner page painted a near shade
+// more often, and the merged palette kept the shade and lost the primary.
+test('the homepage primary stays the canonical of its cluster after a merge', () => {
+  const home = page('https://m.com/', {
+    colors: { palette: [color('#3859ff', 3, 'high')], semantic: { primary: 'rgb(56, 89, 255)' }, cssVariables: {} },
+  });
+  const inner = page('https://m.com/inner', {
+    colors: { palette: [color('#314cd9', 9, 'high')], semantic: {}, cssVariables: {} },
+  });
+  const merged = mergeResults([home, inner]);
+  const hexes = merged.colors.palette.map((c) => c.normalized);
+  assert.ok(hexes.includes('#3859ff'), `primary survives the merge, got ${hexes.join(' ')}`);
+  assert.equal(merged.colors.semantic.primary, 'rgb(56, 89, 255)');
+  assert.equal(merged.colors.palette.find((c) => c.normalized === '#3859ff').count, 12);
+});
