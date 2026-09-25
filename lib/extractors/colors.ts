@@ -15,7 +15,7 @@ export async function extractColors(page) {
     // and the opaque remainder resolved through canvas, because getImageData
     // on a semi-transparent fill round-trips through premultiplication and
     // corrupts the channels.
-    const _modernColorRe = /^(?:oklab|oklch|lab|lch|hwb|color)\(/i;
+    const _modernColorRe = /^(?:oklab|oklch|lab|lch|hwb|color|color-mix)\(/i;
     const _legacyMemo = new Map();
     function toLegacy(color) {
       if (!color || typeof color !== 'string') return color;
@@ -167,12 +167,17 @@ export async function extractColors(page) {
     const semanticColors: Record<string, string> = {};
     const cssVariables = {};
 
-    const styles = getComputedStyle(document.documentElement);
     const domain = window.location.hostname;
+    const declared = new Map<string, string>();
+    for (const el of [document.documentElement, document.body]) {
+      if (!el) continue;
+      const cs = getComputedStyle(el);
+      for (let i = 0; i < cs.length; i++) {
+        if (cs[i].startsWith("--")) declared.set(cs[i], cs.getPropertyValue(cs[i]).trim());
+      }
+    }
 
-    for (let i = 0; i < styles.length; i++) {
-      const prop = styles[i];
-      if (!prop.startsWith("--")) continue;
+    for (const [prop, value] of declared) {
       if (prop.startsWith("--wp--preset")) continue;
       if (
         prop.startsWith("--el-") || prop.startsWith("--p-") ||
@@ -211,30 +216,25 @@ export async function extractColors(page) {
       if (frameworkPalette.test(prop)) continue;
       if (/^--(?:tw-)?colors?-(?:transparent|current|black|white|inherit)$/.test(prop)) continue;
 
-      const value = styles.getPropertyValue(prop).trim();
-      if (!value.match(/^(#|rgb|hsl|hwb|var\(--.*color|color\(|oklab\(|oklch\(|lab\(|lch\()/i)) continue;
+      if (!value.match(/^(#|rgb|hsl|hwb|color\(|color-mix\(|oklab\(|oklch\(|lab\(|lch\()/i)) continue;
       if (
         value.includes("color.adjust(") || value.includes("rgba(0, 0, 0, 0)") ||
         value.includes("rgba(0,0,0,0)") || value.includes("lighten(") ||
         value.includes("darken(") || value.includes("saturate(")
       ) continue;
 
-      if (
-        isValidColorValue(value) &&
-        (prop.includes("color") || prop.includes("bg") || prop.includes("text") || prop.includes("brand"))
-      ) {
-        cssVariables[prop] = value;
-      }
+      if (isValidColorValue(value)) cssVariables[prop] = value;
     }
 
     // Declared :root custom properties carry brand-token provenance: the author
     // named these colours deliberately. They outweigh ad-hoc computed colours in
     // ranking, are never treated as structural, and are preferred as primary.
-    const tokenHexes = new Set();
-    for (const v of Object.values(cssVariables)) {
+    const tokenNames = new Map<string, string[]>();
+    for (const [name, v] of Object.entries(cssVariables)) {
       const n = normalizeColor(v as string);
-      if (typeof n === 'string' && /^#[0-9a-f]{6}$/.test(n)) tokenHexes.add(n);
+      if (typeof n === 'string' && /^#[0-9a-f]{6}$/.test(n)) tokenNames.set(n, [...(tokenNames.get(n) || []), name]);
     }
+    const tokenHexes = new Set(tokenNames.keys());
 
     const elements = document.querySelectorAll("*");
     const totalElements = elements.length;
@@ -557,6 +557,7 @@ export async function extractColors(page) {
           ? (data.score > 5 ? "high" : "medium")
           : data.score > 20 ? "high" : data.score > 5 ? "medium" : "low",
         sources: Array.from(data.sources).slice(0, 3),
+        ...(tokenNames.has(normalizedColor) ? { tokens: tokenNames.get(normalizedColor) } : {}),
       }))
       .sort((a, b) => b.count - a.count);
 

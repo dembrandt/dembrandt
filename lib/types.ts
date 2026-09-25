@@ -20,6 +20,8 @@ export interface PaletteColor {
   confidence: Confidence;
   /** Declared as a :root custom property, i.e. carries author provenance */
   isToken?: boolean;
+  /** Names of the declared custom properties that carry this exact colour */
+  tokens?: string[];
   /** 'surface' | 'neutral' | 'accent', derived from saturation and confidence */
   role?: string;
   /** Best-contrast foreground for this colour */
