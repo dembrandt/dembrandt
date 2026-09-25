@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test, before, after } from 'node:test';
 import { chromium, type Browser, type Page } from 'playwright';
 import { extractColors } from '../lib/extractors/colors.js';
+import type { PaletteColor } from '../lib/types.js';
 
 // Fixture-based extractor test (DEM-68): real chromium + page.setContent, no
 // network, deterministic. Pins the recall-vs-precision behaviour of the card /
@@ -25,7 +26,8 @@ const card = `<div class="benefit-card">` +
   `</div>`;
 const cards = Array.from({ length: 4 }, () => card).join('');
 const FIXTURE =
-  `<!doctype html><html><body style="margin:0;background:#ffffff;color:#111111">` +
+  `<!doctype html><html><head><style>:root{--primary:${BADGE}}body{--kit-accent:${ACCENT}}</style></head>` +
+  `<body style="margin:0;background:#ffffff;color:#111111">` +
   `<div class="layout">${greyCells}</div><main>${cards}</main></body></html>`;
 
 let browser: Browser | null = null;
@@ -95,7 +97,8 @@ test('semantic background + text are promoted from the body surface', async (t) 
 const PRIMARY = '#1d3a8a'; // navy CTA, hue ~224
 const ORANGE = '#e8590c';  // saturated brand orange, hue ~24 -> >30 from navy
 const ACCENT_FIXTURE =
-  `<!doctype html><html><body style="margin:0;background:#ffffff;color:#111111">` +
+  `<!doctype html><html><head><style>:root{--primary:${BADGE}}body{--kit-accent:${ACCENT}}</style></head>` +
+  `<body style="margin:0;background:#ffffff;color:#111111">` +
   Array.from({ length: 3 }, () => `<button class="btn-primary" style="background:${PRIMARY};color:#fff">Buy now</button>`).join('') +
   Array.from({ length: 4 }, () => `<a class="brand-mark" style="color:${ORANGE}">brand</a>`).join('') +
   `</body></html>`;
@@ -112,6 +115,14 @@ test('accent token surfaces a hue-distinct brand colour beside the primary', asy
   } finally {
     await accentPage.close().catch(() => {});
   }
+});
+
+test('palette entries name the tokens declared on :root and body', async (t) => {
+  if (browserUnavailable(t)) return;
+  const { palette } = await extractColors(page!);
+  const tokens = Object.fromEntries(palette.map((c: PaletteColor) => [c.normalized, c.tokens]));
+  assert.deepEqual(tokens[BADGE], ['--primary']);
+  assert.deepEqual(tokens[ACCENT], ['--kit-accent']);
 });
 
 // rgb() / #hex -> lowercase 6-digit hex for comparison.
