@@ -36,6 +36,12 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  (unversioned) — typography.sources.customFonts names families again when
+ *          @font-face rules are unreadable. Cross-origin stylesheets hide their
+ *          cssRules, so on most sites the field fell back to the fetched file
+ *          names. It now lists the families set on text that are neither
+ *          platform faces nor served by a font host. selfHostedFonts keeps the
+ *          file names.
  *  1.16.0 — meta.crawl gains `pages`: the landed URL of every page merged into
  *          the result, in merge order. A count cannot be checked, reproduced or
  *          re-read, and a merged palette is not interpretable without knowing

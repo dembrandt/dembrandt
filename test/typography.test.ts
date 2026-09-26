@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseVariableAxes, parseOpenTypeFeatures, pickBodyFamily, filterFontUrls, applyFamilyUsageFloor } from '../lib/extractors/typography.js';
+import { parseVariableAxes, parseOpenTypeFeatures, pickBodyFamily, filterFontUrls, applyFamilyUsageFloor, resolveCustomFonts } from '../lib/extractors/typography.js';
 
 /**
  * The typography extractor reads computed styles in the browser, but the
@@ -188,4 +188,26 @@ test('applyFamilyUsageFloor is a no-op on empty input', () => {
   const { styles, filteredFamilies } = applyFamilyUsageFloor([]);
   assert.deepEqual(styles, []);
   assert.deepEqual(filteredFamilies, []);
+});
+
+test('resolveCustomFonts prefers declared @font-face families', () => {
+  const out = resolveCustomFonts(['Charlie Text', 'Charlie Display', 'Charlie Text'], ['Charlie_Text-Regular.woff2'], ['Arial'], []);
+  assert.deepEqual(out, ['Charlie Display', 'Charlie Text']);
+});
+
+test('resolveCustomFonts falls back to used families when @font-face is unreadable', () => {
+  const out = resolveCustomFonts(
+    [],
+    ['Charlie_Text-Regular.woff2', 'Charlie_Display-Bold.woff2'],
+    ['Charlie Text', 'Charlie Display', 'Charlie Text', 'sans-serif', '-apple-system', 'Inter'],
+    ['Inter'],
+  );
+  assert.deepEqual(out, ['Charlie Display', 'Charlie Text']);
+});
+
+test('resolveCustomFonts never reports file names and stays empty without font files', () => {
+  assert.deepEqual(resolveCustomFonts([], [], ['Charlie Text'], []), []);
+  const out = resolveCustomFonts([], ['Sohne.cb178166.woff2'], ['sohne-var', 'Helvetica Neue'], []);
+  assert.deepEqual(out, ['sohne-var']);
+  assert.ok(out.every((f) => !/\.woff2?$/.test(f)));
 });

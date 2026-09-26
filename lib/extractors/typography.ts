@@ -60,6 +60,30 @@ export function applyFamilyUsageFloor<T extends { family: string; count?: number
   };
 }
 
+const PLATFORM_FAMILIES = new Set([
+  'serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-sans-serif',
+  'ui-serif', 'ui-monospace', 'ui-rounded', '-apple-system', 'blinkmacsystemfont', 'segoe ui',
+  'helvetica', 'helvetica neue', 'arial', 'times', 'times new roman', 'georgia', 'verdana',
+  'tahoma', 'trebuchet ms', 'courier', 'courier new', 'menlo', 'monaco', 'consolas',
+  'sf pro text', 'sf pro display', 'sf mono', 'sfmono-regular', 'noto sans', 'noto serif',
+]);
+
+export function resolveCustomFonts(
+  declared: string[],
+  fontFiles: string[],
+  usedFamilies: string[],
+  hostedFamilies: string[],
+): string[] {
+  if (declared.length) return [...new Set(declared)].sort();
+  if (!fontFiles.length) return [];
+  const hosted = new Set(hostedFamilies.map((f) => f.toLowerCase()));
+  const own = usedFamilies.filter((f) => {
+    const key = f.trim().toLowerCase();
+    return key && !PLATFORM_FAMILIES.has(key) && !hosted.has(key);
+  });
+  return [...new Set(own)].sort();
+}
+
 export function pickBodyFamily(bodyComputedFamily: string | null, weights: Record<string, number>): string | null {
   const base = (bodyComputedFamily || '').trim();
   const w = weights || {};
