@@ -1445,9 +1445,6 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
           // Sort: fontRequests is filled in network-arrival order, which differs
           // run-to-run and otherwise surfaces as phantom drift.
           selfHostedFonts: fontFiles,
-          customFonts: typography.sources?.customFonts?.length
-            ? [...typography.sources.customFonts].sort()
-            : fontFiles,
         }
       },
       spacing,
