@@ -58,17 +58,17 @@ reference is **[docs/usage.md](docs/usage.md)**.
 
 | Flag | What you get |
 |---|---|
-| `--shadcn [path]` | shadcn/ui theme, observed slots only |
-| `--tailwind [path]` | Tailwind v4 `@theme` CSS |
 | `--dtcg` | W3C design tokens (DTCG) |
 | `--design-md` | DESIGN.md for AI agents |
+| `--tailwind [path]` | Tailwind v4 `@theme` CSS |
+| `--shadcn [path]` | shadcn/ui theme, observed slots only |
 | `--html [path]` | Self-contained HTML report |
 | `--brand-guide` | Brand guide PDF |
-| `--screenshot <path>` | Viewport screenshot |
-| `--save-output` | JSON to `output/<domain>/` |
 | `--json-only` | Raw JSON to stdout |
-| `--raw-colors` | Pre-filter colours too |
+| `--save-output` | JSON to `output/<domain>/` |
+| `--screenshot <path>` | Viewport screenshot |
 | `--color-format <f>` | Colour notation: hex, rgb, oklch, lch, source |
+| `--raw-colors` | Pre-filter colours too |
 
 **Analysis**
 
