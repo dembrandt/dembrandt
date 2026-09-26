@@ -636,6 +636,23 @@ export async function extractColors(page) {
       }
     }
 
+    // A primary painted once is a guess. When the elected colour is in the
+    // palette with a count of one and is not a declared token, and a colour of
+    // the same hue is there at least five times, the frequent one is the
+    // brand's. One site's homepage elected #0066ff, painted once, over
+    // #0099ff, painted 22 times.
+    if (semanticColors.primary) {
+      const primaryNorm = normalizeColor(semanticColors.primary);
+      const entry = perceptuallyDeduped.find((c) => c.normalized === primaryNorm);
+      if (entry && (entry.count ?? 0) <= 1 && !tokenHexes.has(primaryNorm)) {
+        const h = typeof primaryNorm === 'string' ? hueOf(primaryNorm) : -1;
+        const kin = perceptuallyDeduped
+          .filter((c) => (c.count ?? 0) >= 5 && chroma(c.normalized) > 0.25 && h >= 0 && hueDistance(hueOf(c.normalized), h) <= 30)
+          .sort((a, b) => b.count - a.count)[0];
+        if (kin) semanticColors.primary = kin.color;
+      }
+    }
+
     // Accent vs primary. A brand often runs a primary alongside a distinct, more
     // saturated accent (e.g. a cyan brand mark beside a navy primary). Surface
     // the accent as its own token so the two are not collapsed: the most
