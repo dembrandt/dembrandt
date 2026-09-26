@@ -5,7 +5,7 @@ import { discoverLinks } from '../discovery.js';
 import { extractLogo, extractSiteName } from './logo.js';
 import { extractColors } from './colors.js';
 import { MENU_TRIGGER_SELECTOR, CAROUSEL_NEXT_SELECTOR } from './menu-triggers.js';
-import { extractTypography, resolveCustomFonts } from './typography.js';
+import { extractTypography } from './typography.js';
 import { extractSpacing, extractBorderRadius, extractBorders, extractShadows } from './spacing.js';
 import { extractButtonStyles, extractInputStyles, extractLinkStyles, extractBadgeStyles } from './components.js';
 import { extractBreakpoints, detectIconSystem, detectFrameworks, extractGradients, extractMotion, extractMotionStatic, FREEZE_STYLE_ID } from './breakpoints.js';
@@ -1445,15 +1445,6 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
           // Sort: fontRequests is filled in network-arrival order, which differs
           // run-to-run and otherwise surfaces as phantom drift.
           selfHostedFonts: fontFiles,
-          customFonts: resolveCustomFonts(
-            typography.sources?.customFonts ?? [],
-            fontFiles,
-            (typography.styles ?? []).map((s: { family: string }) => s.family),
-            [
-              ...(typography.sources?.googleFonts ?? []),
-              ...(Array.isArray(typography.sources?.adobeFonts) ? typography.sources.adobeFonts : []),
-            ],
-          ),
         }
       },
       spacing,

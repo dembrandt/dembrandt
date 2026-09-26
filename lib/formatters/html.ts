@@ -449,7 +449,6 @@ function typographySection(result: BrandingResult): string {
     ...(srcs.googleFonts ?? []),
     ...(Array.isArray(srcs.adobeFonts) ? srcs.adobeFonts : []),
     ...(srcs.customFonts ?? []),
-    ...(srcs.selfHostedFonts ?? []),
   ];
   const srcLine = fams.length ? `<p class="sub">Sources: ${esc(fams.join(", "))}</p>` : "";
   const fontUrls = (srcs.urls ?? []).filter(isHttpUrl);

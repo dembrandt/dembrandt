@@ -60,26 +60,18 @@ export function applyFamilyUsageFloor<T extends { family: string; count?: number
   };
 }
 
-const PLATFORM_FAMILIES = new Set([
-  'serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-sans-serif',
-  'ui-serif', 'ui-monospace', 'ui-rounded', '-apple-system', 'blinkmacsystemfont', 'segoe ui',
-  'helvetica', 'helvetica neue', 'arial', 'times', 'times new roman', 'georgia', 'verdana',
-  'tahoma', 'trebuchet ms', 'courier', 'courier new', 'menlo', 'monaco', 'consolas',
-  'sf pro text', 'sf pro display', 'sf mono', 'sfmono-regular', 'noto sans', 'noto serif',
-]);
-
 export function resolveCustomFonts(
   declared: string[],
-  fontFiles: string[],
+  loadedFamilies: string[],
   usedFamilies: string[],
   hostedFamilies: string[],
 ): string[] {
   if (declared.length) return [...new Set(declared)].sort();
-  if (!fontFiles.length) return [];
-  const hosted = new Set(hostedFamilies.map((f) => f.toLowerCase()));
+  const loaded = new Set(loadedFamilies.map((f) => f.trim().toLowerCase()));
+  const hosted = new Set(hostedFamilies.map((f) => f.trim().toLowerCase()));
   const own = usedFamilies.filter((f) => {
     const key = f.trim().toLowerCase();
-    return key && !PLATFORM_FAMILIES.has(key) && !hosted.has(key);
+    return loaded.has(key) && !hosted.has(key);
   });
   return [...new Set(own)].sort();
 }
@@ -299,7 +291,6 @@ export async function extractTypography(page) {
         if (fontDisplay) break;
       }
     } catch (e) {}
-    (sources as any).fontDisplay = fontDisplay;
 
     // Computed font-size is resolved to px at the capture viewport, so a fluid
     // ramp is invisible there. Collect the selectors that author one instead.
@@ -478,7 +469,12 @@ export async function extractTypography(page) {
         googleFonts: sources.googleFonts,
         adobeFonts: sources.adobeFonts,
         variableFonts: [...sources.variableFonts].length > 0,
+        customFonts: sources.customFonts,
+        ...(fontDisplay ? { fontDisplay } : {}),
       },
+      loadedFamilies: [...document.fonts]
+        .filter((f) => f.status === 'loaded')
+        .map((f) => f.family.replace(/['"]/g, '').trim()),
       variationSettings,
       featureSettings,
       familyBodyWeight,
@@ -508,10 +504,19 @@ export async function extractTypography(page) {
 
   const { styles, filteredFamilies } = applyFamilyUsageFloor(data.styles);
 
+  const hosted = [
+    ...data.sources.googleFonts,
+    ...(Array.isArray(data.sources.adobeFonts) ? data.sources.adobeFonts : []),
+  ];
+  const customFonts = resolveCustomFonts(
+    data.sources.customFonts, data.loadedFamilies, styles.map((s) => s.family), hosted,
+  );
+
   return {
     styles,
     sources: {
       ...data.sources,
+      customFonts,
       ...(variableAxes.length ? { variableAxes } : {}),
       ...(openTypeFeatures.length ? { openTypeFeatures } : {}),
       urls,
