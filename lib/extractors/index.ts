@@ -849,6 +849,14 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       ].filter(Boolean);
 
       const { normalizeCssColor } = await import('../color-parse.js');
+      const { manifestPrimary } = await import('./color-heuristics.js');
+      const themeHex = manifest.themeColor ? (normalizeCssColor(manifest.themeColor)?.hex ?? null) : null;
+      const primaryHex = colors.semantic?.primary ? (normalizeCssColor(colors.semantic.primary)?.hex ?? null) : null;
+      const promoted = manifestPrimary(themeHex, primaryHex, colors.palette);
+      if (promoted) {
+        colors.semantic.primary = colors.palette.find(c => c.normalized === promoted)?.color ?? manifest.themeColor;
+        log(color.success(`  ✓ Primary: manifest theme_color ${promoted} over painted pick ${primaryHex ?? 'none'}`));
+      }
       for (const { color: raw, label } of manifestColorEntries) {
         const normalized = normalizeCssColor(raw)?.hex ?? raw.toLowerCase();
         if (!colors.palette.some(c => c.normalized === normalized)) {

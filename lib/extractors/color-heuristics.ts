@@ -135,3 +135,23 @@ export function classifyStructural(
 
   return false;
 }
+
+/**
+ * The manifest's theme_color is the site's own statement of its brand colour.
+ * When it is chromatic and actually painted on the page, it outranks a primary
+ * picked by paint count: on a site with several coloured sections the most
+ * painted hue is a section colour, not the brand's. Returns the hex to use as
+ * primary, or null to leave the pick alone.
+ *
+ * @param {string|null|undefined} themeHex   normalized "#rrggbb"
+ * @param {string|null|undefined} primaryHex normalized "#rrggbb" of the current pick
+ * @param {Array<{normalized:string,count:number}>} palette painted palette, before injection
+ */
+export function manifestPrimary(themeHex: string | null | undefined, primaryHex: string | null | undefined, palette: Array<{ normalized: string; count: number }>): string | null {
+  if (!themeHex || !/^#[0-9a-f]{6}$/.test(themeHex) || themeHex === primaryHex) return null;
+  if (saturationFromHex(themeHex) < 0.35) return null;
+  const max = Math.max(...[1, 3, 5].map((i) => parseInt(themeHex.substring(i, i + 2), 16))) / 255;
+  if (max < 0.15 || max > 0.95) return null;
+  const painted = palette.find((c) => c.normalized === themeHex);
+  return painted && painted.count >= 5 ? themeHex : null;
+}
