@@ -636,11 +636,7 @@ export async function extractColors(page) {
       }
     }
 
-    // A primary painted once is a guess. When the elected colour is in the
-    // palette with a count of one and is not a declared token, and a colour of
-    // the same hue is there at least five times, the frequent one is the
-    // brand's. One site's homepage elected #0066ff, painted once, over
-    // #0099ff, painted 22 times.
+    // A primary painted once yields to a same-hue colour painted often.
     if (semanticColors.primary) {
       const primaryNorm = normalizeColor(semanticColors.primary);
       const entry = perceptuallyDeduped.find((c) => c.normalized === primaryNorm);
