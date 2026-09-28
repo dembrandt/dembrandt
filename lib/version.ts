@@ -36,13 +36,10 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
- *  (unversioned) — typography.sources.customFonts names families. The
- *          extractor never returned the @font-face families it collected, and
- *          the assembly fell back to the fetched file names. Declared families
- *          now come through, and when cross-origin stylesheets hide them the
- *          field lists the families set on text that document.fonts reports as
- *          loaded, minus font-host families. selfHostedFonts keeps the file
- *          names; sources.fontDisplay is emitted for the first time.
+ *  1.17.0 — typography.sources.customFonts names families, not the fetched
+ *          file names it fell back to; selfHostedFonts keeps the file names.
+ *          sources.fontDisplay is emitted for the first time. Drift ignores
+ *          both fields: dembrandt.com scores 0 against a 0.36.0 baseline.
  *  1.16.0 — meta.crawl gains `pages`: the landed URL of every page merged into
  *          the result, in merge order. A count cannot be checked, reproduced or
  *          re-read, and a merged palette is not interpretable without knowing
@@ -248,7 +245,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.16.0';
+export const SCHEMA_VERSION = '1.17.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
