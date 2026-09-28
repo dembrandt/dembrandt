@@ -239,6 +239,8 @@ export async function extractColors(page) {
     const elements = document.querySelectorAll("*");
     const totalElements = elements.length;
     const ctaPrimaryMap = new Map(); // normalized hex → original color for CTA backgrounds
+    // Black and white CTA fills never compete with a chromatic candidate.
+    const ctaNeutralMap = new Map();
 
     // Mirror of CONTEXT_SCORES (lib/extractors/color-heuristics.ts) — kept inline
     // because page.evaluate runs in an isolated realm and cannot import. Card /
@@ -367,10 +369,14 @@ export async function extractColors(page) {
 
       const isStatus = statusContext.test(context);
 
-      const isCta = (context.includes('button') || context.includes('btn') || context.includes('cta')) &&
-        bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent' &&
-        bgColor !== 'rgb(255, 255, 255)' && bgColor !== 'rgb(0, 0, 0)' && bgColor !== 'rgb(239, 239, 239)' &&
-        colorAlpha(bgColor) >= 0.7;
+      const ctaShaped = (context.includes('button') || context.includes('btn') || context.includes('cta')) &&
+        bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent' && colorAlpha(bgColor) >= 0.7;
+      const isCta = ctaShaped &&
+        bgColor !== 'rgb(255, 255, 255)' && bgColor !== 'rgb(0, 0, 0)' && bgColor !== 'rgb(239, 239, 239)';
+      if (ctaShaped && (bgColor === 'rgb(0, 0, 0)' || bgColor === 'rgb(255, 255, 255)')) {
+        const n = normalizeColor(bgColor);
+        if (n) { const e = ctaNeutralMap.get(n) || { original: bgColor, count: 0 }; e.count++; ctaNeutralMap.set(n, e); }
+      }
 
       if (isCta) {
         score = Math.max(score, 25);
@@ -612,6 +618,11 @@ export async function extractColors(page) {
           ((b.c.count + (b.isToken ? 20 : 0)) - (a.c.count + (a.isToken ? 20 : 0)))
           || (b.chroma - a.chroma))[0];
       if (best) semanticColors.primary = best.c.color;
+    }
+    // A monochrome site: the shared button fill is the primary.
+    if (!semanticColors.primary && ctaNeutralMap.size > 0) {
+      const top = [...ctaNeutralMap.values()].sort((a, b) => b.count - a.count)[0];
+      if (top.count >= 2) semanticColors.primary = top.original;
     }
 
     // Near-neutral primaries are the dominant mis-pick: a dark text/background
