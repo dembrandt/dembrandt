@@ -38,6 +38,13 @@ function mergeMeta(results) {
 
 const DELTA_E_THRESHOLD = 15;
 
+// rgb(56, 89, 255) and #3859ff are one colour; the palette stores the latter.
+function normalizeHex(c: string): string | null {
+  const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c);
+  if (m) return '#' + [m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, '0')).join('');
+  return /^#[0-9a-f]{6}$/i.test(c) ? c.toLowerCase() : null;
+}
+
 function mergeColors(results) {
   const base = results[0].colors;
 
@@ -72,8 +79,10 @@ function mergeColors(results) {
     }
     used.add(i);
 
-    // Keep variant with highest count as canonical
-    const best = similar.sort((a, b) => b.count - a.count)[0];
+    // The elected primary stays canonical for its cluster even when a shade counts higher.
+    const primaryNorm = base.semantic?.primary ? normalizeHex(base.semantic.primary) : null;
+    const best = similar.find((x) => primaryNorm && x.normalized === primaryNorm)
+      ?? similar.sort((a, b) => b.count - a.count)[0];
     const totalCount = similar.reduce((s, x) => s + (x.count || 0), 0);
     const pageCount = pagesSeen.size;
 
