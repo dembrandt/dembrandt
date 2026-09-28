@@ -117,9 +117,7 @@ export async function extractColors(page) {
       const l = (max + min) / 2;
       if (max === min) return 0;
       const s = l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
-      // Ink is ink whatever its hue. vimeo.com's #141a20 (L 0.10) read as
-      // chromatic at 0.08 and kept the primary from the CTA cyan #17d5ff that
-      // the brand publishes.
+      // Below L 0.15 a colour is ink whatever its hue.
       if (l < 0.15 || l > 0.92) return 0;
       return s;
     }
@@ -635,11 +633,7 @@ export async function extractColors(page) {
           .sort((a, b) =>
             ((b.c.count + (b.isToken ? 20 : 0) + (b.isCta ? 20 : 0)) - (a.c.count + (a.isToken ? 20 : 0) + (a.isCta ? 20 : 0)))
             || (b.ch - a.ch))[0];
-        // calendly.com's ink #071a31 is its CTA fill (six buttons) and the
-        // light blue it declares is used four times at medium confidence; the
-        // ink is the primary. clickup.com's dark is also a CTA fill, but its
-        // purple #6647f0 is high confidence and takes over. A neutral that is
-        // painted on CTAs gives way only to a high-confidence colour.
+        // A neutral painted on CTAs yields only to a high-confidence colour.
         const own = ctaPrimaryMap.get(primaryNorm)?.count ?? 0;
         if (chromatic && (own === 0 || chromatic.c.confidence === 'high')) semanticColors.primary = chromatic.c.color;
       }
