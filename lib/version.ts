@@ -43,6 +43,10 @@
  *          values resolve. Unprefixed semantic tokens (--primary,
  *          --background) and body-scoped kit tokens now count as provenance,
  *          so primaries move on sites that theme through them.
+ *          Also: typography.sources.customFonts names families, not the fetched
+ *          file names it fell back to; selfHostedFonts keeps the file names.
+ *          sources.fontDisplay is emitted for the first time. Drift ignores
+ *          both fields: dembrandt.com scores 0 against a 0.36.0 baseline.
  *  1.16.0 — meta.crawl gains `pages`: the landed URL of every page merged into
  *          the result, in merge order. A count cannot be checked, reproduced or
  *          re-read, and a merged palette is not interpretable without knowing

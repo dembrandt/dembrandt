@@ -574,11 +574,7 @@
         "69971a1551eb6cda0d656e8a_AnthropicSerif-Roman-Web.woff2",
         "69971a2e55d24d61bc045b1a_AnthropicMono-Roman-Web.woff2"
       ],
-      "customFonts": [
-        "69971a00a3295036497e1a28_AnthropicSans-Roman-Web.woff2",
-        "69971a1551eb6cda0d656e8a_AnthropicSerif-Roman-Web.woff2",
-        "69971a2e55d24d61bc045b1a_AnthropicMono-Roman-Web.woff2"
-      ]
+      "customFonts": ["Anthropic Mono", "Anthropic Sans", "Anthropic Serif"]
     }
   },
   "spacing": {

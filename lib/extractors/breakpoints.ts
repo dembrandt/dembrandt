@@ -163,9 +163,10 @@ export async function detectFrameworks(page) {
     }
 
     // Headless UI
-    const headlessCount = document.querySelectorAll('[aria-controls][aria-expanded], [role="dialog"][data-headlessui]').length;
-    if (tailwindEvidence.length >= 2 && headlessCount > 2) {
-      frameworks.push({ name: 'Headless UI', confidence: 'high', evidence: `${headlessCount} headless components with Tailwind` });
+    // aria-controls+aria-expanded is plain accessible markup; only Headless UI stamps data-headlessui-state and headlessui- ids
+    const headlessCount = document.querySelectorAll('[data-headlessui-state], [id^="headlessui-"]').length;
+    if (headlessCount > 0) {
+      frameworks.push({ name: 'Headless UI', confidence: 'high', evidence: `${headlessCount} Headless UI components` });
     }
 
     // PrimeReact/Vue/NG

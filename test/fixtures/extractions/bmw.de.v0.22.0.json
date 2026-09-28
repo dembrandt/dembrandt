@@ -568,13 +568,7 @@
         "bmw_next_icons_light.woff2",
         "bmw_next_icons_regular.woff2"
       ],
-      "customFonts": [
-        "BMWTypeNext-Bold.woff2",
-        "BMWTypeNext-Light.woff2",
-        "BMWTypeNext-Medium.woff2",
-        "bmw_next_icons_light.woff2",
-        "bmw_next_icons_regular.woff2"
-      ]
+      "customFonts": ["bmwTypeNextWeb"]
     }
   },
   "spacing": {

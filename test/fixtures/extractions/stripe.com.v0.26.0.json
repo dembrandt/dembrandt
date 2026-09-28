@@ -2150,10 +2150,7 @@
         "Sohne.cb178166.woff2",
         "SourceCodePro-Medium.f5ba3e6a.woff2"
       ],
-      "customFonts": [
-        "Sohne.cb178166.woff2",
-        "SourceCodePro-Medium.f5ba3e6a.woff2"
-      ]
+      "customFonts": ["SourceCodePro", "sohne-var"]
     }
   },
   "spacing": {
