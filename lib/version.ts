@@ -40,6 +40,11 @@
  *          file names it fell back to; selfHostedFonts keeps the file names.
  *          sources.fontDisplay is emitted for the first time. Drift ignores
  *          both fields: dembrandt.com scores 0 against a 0.36.0 baseline.
+ *          BEHAVIOR: a black or white fill shared by two or more buttons is
+ *          the primary when nothing chromatic was elected, so a monochrome
+ *          site that reported no primary now reports one. Two corpus sites
+ *          move from no primary to their black; a baseline with a null
+ *          primary drifts on that role. Drift on dembrandt.com: 0.
  *  1.16.0 — meta.crawl gains `pages`: the landed URL of every page merged into
  *          the result, in merge order. A count cannot be checked, reproduced or
  *          re-read, and a merged palette is not interpretable without knowing
