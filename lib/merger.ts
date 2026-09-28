@@ -79,9 +79,7 @@ function mergeColors(results) {
     }
     used.add(i);
 
-    // The homepage's primary stays the canonical of its cluster. miro.com's
-    // #3859ff was the elected primary and still vanished from the merged
-    // palette, because a near shade from an inner page had the higher count.
+    // The elected primary stays canonical for its cluster even when a shade counts higher.
     const primaryNorm = base.semantic?.primary ? normalizeHex(base.semantic.primary) : null;
     const best = similar.find((x) => primaryNorm && x.normalized === primaryNorm)
       ?? similar.sort((a, b) => b.count - a.count)[0];
