@@ -239,9 +239,7 @@ export async function extractColors(page) {
     const elements = document.querySelectorAll("*");
     const totalElements = elements.length;
     const ctaPrimaryMap = new Map(); // normalized hex → original color for CTA backgrounds
-    // Black and white CTA fills, kept apart: they never compete with a
-    // chromatic candidate, but a site whose buttons are all black has a
-    // primary, and it is black.
+    // Black and white CTA fills never compete with a chromatic candidate.
     const ctaNeutralMap = new Map();
 
     // Mirror of CONTEXT_SCORES (lib/extractors/color-heuristics.ts) — kept inline
@@ -621,9 +619,7 @@ export async function extractColors(page) {
           || (b.chroma - a.chroma))[0];
       if (best) semanticColors.primary = best.c.color;
     }
-    // Still nothing: a monochrome site. Its primary is the fill its buttons
-    // share, when at least two of them share it. One site's homepage has every
-    // CTA in black and four accents of equal count; the answer is black.
+    // A monochrome site: the shared button fill is the primary.
     if (!semanticColors.primary && ctaNeutralMap.size > 0) {
       const top = [...ctaNeutralMap.values()].sort((a, b) => b.count - a.count)[0];
       if (top.count >= 2) semanticColors.primary = top.original;
