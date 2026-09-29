@@ -121,7 +121,7 @@ All extraction functions use `page.evaluate()` to run analysis in browser contex
 ```javascript
 {
   url, extractedAt,
-  meta: { dembrandtVersion, stealth, locale, timezoneId, ... },
+  meta: { dembrandtVersion, schemaVersion, snapshotId, viewport, flags: { stealth, locale, timezone, ... }, ... },
   logo, favicons,
   colors: { semantic, palette, cssVariables, detected },
   typography: { styles, sources },
