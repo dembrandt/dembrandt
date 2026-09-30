@@ -36,8 +36,10 @@ const UA_DEFAULT_FAMILIES = new Set(['times', 'times new roman', 'serif']);
  */
 const MIN_FAMILY_SHARE = 0.02;
 const MIN_FAMILY_COUNT = 3;
+// A display face sets a few headings by design, and an embed does not set the page's headings.
+const DISPLAY_CONTEXTS = new Set(['display', 'heading-1', 'heading-2']);
 
-export function applyFamilyUsageFloor<T extends { family: string; count?: number }>(
+export function applyFamilyUsageFloor<T extends { family: string; count?: number; context?: string }>(
   styles: T[],
 ): { styles: T[]; filteredFamilies: string[] } {
   const totals: Record<string, number> = {};
@@ -53,6 +55,7 @@ export function applyFamilyUsageFloor<T extends { family: string; count?: number
   // Never strip the page down to nothing: if no family clears the floor, the
   // page is small enough that every family it uses is part of its type system.
   if (keep.size === 0) return { styles, filteredFamilies: [] };
+  for (const s of styles) if (DISPLAY_CONTEXTS.has(s.context ?? '')) keep.add(s.family);
 
   return {
     styles: styles.filter((s) => keep.has(s.family)),

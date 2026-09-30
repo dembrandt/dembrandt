@@ -159,6 +159,23 @@ test('applyFamilyUsageFloor drops an embed face that covers a sliver of the page
   assert.deepEqual(filteredFamilies, ['Inter', 'Montserrat', 'Nohemi']);
 });
 
+test('applyFamilyUsageFloor keeps a display face that sets only the headings', () => {
+  const { styles, filteredFamilies } = applyFamilyUsageFloor([
+    style('Inter', 300),
+    { ...style('ABC Arizona Mix', 2), context: 'heading-1' },
+    { ...style('Widget Sans', 2), context: 'body' },
+  ]);
+  assert.deepEqual(styles.map((s) => s.family), ['Inter', 'ABC Arizona Mix']);
+  assert.deepEqual(filteredFamilies, ['Widget Sans']);
+});
+
+test('applyFamilyUsageFloor still keeps every family on a small page that sets headings', () => {
+  const input = [{ ...style('Brand Sans', 1), context: 'heading-1' }, style('Brand Mono', 1), style('Inter', 1)];
+  const { styles, filteredFamilies } = applyFamilyUsageFloor(input);
+  assert.equal(styles.length, 3);
+  assert.deepEqual(filteredFamilies, []);
+});
+
 test('applyFamilyUsageFloor keeps a genuine second family on a small page', () => {
   const { styles, filteredFamilies } = applyFamilyUsageFloor([
     style('Inter', 30),
