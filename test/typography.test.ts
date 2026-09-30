@@ -169,6 +169,15 @@ test('applyFamilyUsageFloor keeps a display face that sets only the headings', (
   assert.deepEqual(filteredFamilies, ['Widget Sans']);
 });
 
+test('applyFamilyUsageFloor does not keep a generic keyword a heading fell back to', () => {
+  const { filteredFamilies } = applyFamilyUsageFloor([
+    style('Inter', 300),
+    { ...style('sans-serif', 1), context: 'heading-2' },
+    { ...style('ui-sans-serif', 1), context: 'display' },
+  ]);
+  assert.deepEqual(filteredFamilies, ['sans-serif', 'ui-sans-serif']);
+});
+
 test('applyFamilyUsageFloor still keeps every family on a small page that sets headings', () => {
   const input = [{ ...style('Brand Sans', 1), context: 'heading-1' }, style('Brand Mono', 1), style('Inter', 1)];
   const { styles, filteredFamilies } = applyFamilyUsageFloor(input);

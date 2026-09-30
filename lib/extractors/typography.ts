@@ -38,6 +38,8 @@ const MIN_FAMILY_SHARE = 0.02;
 const MIN_FAMILY_COUNT = 3;
 // A display face sets a few headings by design, and an embed does not set the page's headings.
 const DISPLAY_CONTEXTS = new Set(['display', 'heading-1', 'heading-2']);
+// A heading set in a CSS generic keyword is a fallback, not a display face.
+const CSS_GENERIC = /^(serif|sans-serif|monospace|cursive|fantasy|system-ui|ui-serif|ui-sans-serif|ui-monospace|ui-rounded|-apple-system|blinkmacsystemfont)$/i;
 
 export function applyFamilyUsageFloor<T extends { family: string; count?: number; context?: string }>(
   styles: T[],
@@ -55,7 +57,7 @@ export function applyFamilyUsageFloor<T extends { family: string; count?: number
   // Never strip the page down to nothing: if no family clears the floor, the
   // page is small enough that every family it uses is part of its type system.
   if (keep.size === 0) return { styles, filteredFamilies: [] };
-  for (const s of styles) if (DISPLAY_CONTEXTS.has(s.context ?? '')) keep.add(s.family);
+  for (const s of styles) if (DISPLAY_CONTEXTS.has(s.context ?? '') && !CSS_GENERIC.test(s.family.trim())) keep.add(s.family);
 
   return {
     styles: styles.filter((s) => keep.has(s.family)),
