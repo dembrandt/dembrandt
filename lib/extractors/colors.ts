@@ -477,6 +477,9 @@ export async function extractColors(page) {
     }
 
     const threshold = Math.max(3, Math.floor(totalElements * 0.01));
+    // A chromatic fill over a tenth of the viewport is a deliberate section colour however few elements carry it.
+    const sectionArea = window.innerWidth * window.innerHeight * 0.1;
+    const paintsSection = (norm, data) => data.bgArea >= sectionArea && chroma(norm) > 0.2;
 
     // Mirror of classifyStructural (lib/extractors/color-heuristics.ts). Saturation
     // is computed once and reused. The high-usage branch now only fires for
@@ -551,7 +554,7 @@ export async function extractColors(page) {
         if (!data.isToken && !isCtaPrimary && data.statusCount > 0 && data.nonStatusCount === 0) return false;
         // Declared brand tokens always qualify regardless of element count.
         const highScore = data.isToken || data.score >= 10 || (data.count > 0 && data.score / data.count >= 3);
-        if (!highScore && data.count < threshold) return false;
+        if (!highScore && data.count < threshold && !paintsSection(norm, data)) return false;
         if (isStructuralColor(data, totalElements)) return false;
         return true;
       })

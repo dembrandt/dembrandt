@@ -36,6 +36,11 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  (unversioned) — BEHAVIOR, contract unchanged: a chromatic background over a
+ *          tenth of the viewport reaches colors.palette however few elements
+ *          paint it. 1.16.0 stopped counting inherited colours, and the count
+ *          gate, still scaled to page size, then dropped section fills. Drift
+ *          on dembrandt.com: 0.
  *  1.17.0 — colors.palette entries gain `tokens`: the custom property names
  *          that declare this exact colour. Additive: 1.16.x consumers ignore
  *          it. BEHAVIOR: declared tokens are read from body as well as :root,
