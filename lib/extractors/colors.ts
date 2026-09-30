@@ -326,6 +326,16 @@ export async function extractColors(page) {
         computed.borderBottomWidth, computed.borderLeftWidth]
         .some((w) => parseFloat(w) > 0);
       const borderColor = hasBorder ? toLegacy(computed.borderColor) : "";
+      // An SVG shape paints with fill and stroke, never with color, so the logo's colour was not read.
+      // The logo only: rows of partner logos, flags and icons carry dozens of colours that are not the brand's.
+      const svgHost = el instanceof SVGElement && el.tagName.toLowerCase() !== 'svg' ? (el as SVGElement).ownerSVGElement : null;
+      const svgBox = svgHost?.getBoundingClientRect();
+      const inLogo = Boolean(svgBox && svgBox.width <= 240 && svgBox.height <= 240)
+        && Boolean(el.closest('[class*="logo" i], [id*="logo" i], [aria-label*="logo" i], a[href="/"]'))
+        // The site's own mark sits in its header; a wall of partner logos further down carries the same class.
+        && Boolean(el.closest('header, nav, [role="banner"]'));
+      // A paint server such as url(#gradient) is not a colour.
+      const svgColors = inLogo ? [computed.fill, computed.stroke].filter((v) => /^(rgb|#)/.test(v || '')).map(toLegacy) : [];
 
       const context = (
         el.className + " " + el.id + " " +
@@ -344,6 +354,7 @@ export async function extractColors(page) {
       // colours aren't later discarded as structural noise (e.g. a plain styled
       // <a> link colour the heuristic would otherwise drop).
       if (el.tagName === 'A') score = Math.max(score, contextScores.link);
+      if (inLogo) score = Math.max(score, contextScores.logo);
       if (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button') score = Math.max(score, contextScores.button);
 
       // Deep-nested brand colours: lift via ANCESTOR context (card/section/
@@ -407,6 +418,7 @@ export async function extractColors(page) {
         ...extractColorsFromValue(bgColor),
         ...extractColorsFromValue(textColor),
         ...extractColorsFromValue(borderColor),
+        ...svgColors.flatMap(extractColorsFromValue),
       ];
 
       allColors.forEach((color) => {

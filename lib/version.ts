@@ -36,6 +36,10 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  (unversioned) — BEHAVIOR, contract unchanged: the fill and stroke of an SVG
+ *          logo in the header or navigation reach colors.palette. SVG shapes
+ *          paint with fill, never with color, so a logo's own colour was not
+ *          read. Drift on dembrandt.com: 0.
  *  1.17.0 — colors.palette entries gain `tokens`: the custom property names
  *          that declare this exact colour. Additive: 1.16.x consumers ignore
  *          it. BEHAVIOR: declared tokens are read from body as well as :root,
