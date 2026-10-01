@@ -36,6 +36,12 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  (unversioned) — BEHAVIOR, contract unchanged: elements whose class says
+ *          primary vote with their fill, and the most shared fill wins. The
+ *          last one read used to win, and an element with no colour reset
+ *          the pick. Text colours, textless chips and -dark/-light variants
+ *          do not vote; a near-black loses to a bright fill of its hue.
+ *          Drift on dembrandt.com: 0.
  *  1.17.0 — colors.palette entries gain `tokens`: the custom property names
  *          that declare this exact colour. Additive: 1.16.x consumers ignore
  *          it. BEHAVIOR: declared tokens are read from body as well as :root,
