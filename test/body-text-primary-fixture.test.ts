@@ -45,3 +45,17 @@ test('the body text colour is still reported as the text role', async () => {
   const result = await extractColors(p!);
   assert.match(String(result.semantic?.text ?? ''), /226, 236, 239/);
 });
+
+// The guard is for a near-grey ink. A brand that sets its body copy in its own dark
+// colour (a navy publisher) must keep that colour in the running: that is the case
+// #232 regressed on.
+test('a coloured body ink that is the brand colour still competes for primary', async () => {
+  const NAVY = '#133174';
+  const copy = Array.from({ length: 16 }, () => `<a href="#">Read the issue</a>`).join(' ');
+  const marks = Array.from({ length: 4 }, () => `<a href="#" style="color:#ca8a04">New</a>`).join(' ');
+  await p!.setContent(`<!doctype html><html><head><style>*{margin:0;padding:0}a{color:inherit}</style></head>` +
+    `<body style="background:#ffffff;color:${NAVY}">${copy}${marks}</body></html>`);
+  const result = await extractColors(p!);
+  const primary = String(result.semantic?.primary ?? '').toLowerCase();
+  assert.ok(primary.includes('19, 49, 116') || primary.includes(NAVY), `the navy brand ink lost the slot: ${primary}`);
+});

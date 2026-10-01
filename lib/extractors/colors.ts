@@ -608,9 +608,17 @@ export async function extractColors(page) {
 
     // Fallback: pick most chromatic non-gray palette color as primary
     if (!semanticColors.primary && perceptuallyDeduped.length > 0) {
-      // The body's own ink and surface are the most used colours on any page, and a
-      // cool off-white reads as saturated in HSL. They are text and background, not brand.
-      const bodyPaint = new Set([semanticColors.text, semanticColors.background].map(c => normalizeColor(c)));
+      // The body's ink and surface are the most used colours on any page, and a cool
+      // off-white reads as saturated in HSL. Skip them only when they are near-grey by
+      // channel spread: a brand that sets its copy in its own navy keeps it in the running.
+      const spread = (hex) => {
+        if (typeof hex !== 'string' || !/^#[0-9a-f]{6}$/i.test(hex)) return 1;
+        const ch = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+        return Math.max(...ch) - Math.min(...ch);
+      };
+      const bodyPaint = new Set([semanticColors.text, semanticColors.background]
+        .map(c => normalizeColor(c))
+        .filter(n => spread(n) < 0.1));
       const best = perceptuallyDeduped
         .filter(c => c.confidence !== 'low' && !bodyPaint.has(c.normalized))
         .map(c => ({ c, chroma: chroma(c.normalized), isToken: tokenHexes.has(c.normalized) }))
