@@ -8,7 +8,8 @@ import { MENU_TRIGGER_SELECTOR, CAROUSEL_NEXT_SELECTOR } from './menu-triggers.j
 import { extractTypography } from './typography.js';
 import { extractSpacing, extractBorderRadius, extractBorders, extractShadows } from './spacing.js';
 import { extractButtonStyles, extractInputStyles, extractLinkStyles, extractBadgeStyles } from './components.js';
-import { extractBreakpoints, detectIconSystem, detectFrameworks, extractGradients, extractMotion, extractMotionStatic, FREEZE_STYLE_ID } from './breakpoints.js';
+import { detectFrameworks, detectIconSystem, watchTechSources } from '../tech/index.js';
+import { extractBreakpoints, extractGradients, extractMotion, extractMotionStatic, FREEZE_STYLE_ID } from './breakpoints.js';
 import { extractTeach } from './teach.js';
 import { extractWcagPairs, bindContrastToPalette } from './colors.js';
 import { SCHEMA_VERSION } from '../version.js';
@@ -423,6 +424,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
   }
 
   const page = await closingOnError(context.newPage());
+  await watchTechSources(page).catch(() => {});
 
   // Track font requests to identify self-hosted custom fonts
   const fontRequests = new Set<string>();
@@ -581,8 +583,18 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
                 return false;
               }
             };
+            const leavesPage = (el: Element): boolean => {
+              try {
+                const link = el.closest('a[href]');
+                const href = link?.getAttribute('href') ?? '';
+                if (!href || href.startsWith('#') || /^javascript:/i.test(href)) return false;
+                const target = new URL(href, location.href);
+                return target.origin !== location.origin;
+              } catch { return false; }
+            };
             const safeClick = (el: Element | null): boolean => {
               try {
+                if (el && leavesPage(el)) return false;
                 if (el && typeof (el as HTMLElement).click === "function") {
                   (el as HTMLElement).click();
                   return true;

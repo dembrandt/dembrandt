@@ -316,6 +316,14 @@ test('icon systems and frameworks dedup by name, first occurrence wins', () => {
   assert.deepEqual(merged.frameworks.map(f => f.name), ['Tailwind', 'MUI']);
 });
 
+test('a later page that states more about a framework replaces the earlier reading', () => {
+  const a = page('https://a.com/', { frameworks: [{ name: 'React', confidence: 'high', coverage: 0.2 }, { name: 'Bootstrap', confidence: 'medium', version: '5' }] });
+  const b = page('https://a.com/x', { frameworks: [{ name: 'React', confidence: 'high', version: '19.1.0', coverage: 0.9 }, { name: 'Bootstrap', confidence: 'high', version: '5.3.3' }] });
+
+  const merged = mergeResults([a, b]);
+  assert.deepEqual(merged.frameworks.map(f => [f.name, f.version, f.confidence, f.coverage]), [['React', '19.1.0', 'high', 0.9], ['Bootstrap', '5.3.3', 'high', undefined]]);
+});
+
 test('motion unions durations by value, easings and animations by count', () => {
   const a = page('https://a.com/', {
     motion: { durations: [{ value: '150ms', ms: 150, count: 1 }], easings: [{ value: 'ease-out', count: 1 }], animations: [{ name: 'fade', count: 1 }], contexts: {}, interactiveDeltas: [] },

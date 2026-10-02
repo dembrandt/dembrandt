@@ -660,8 +660,9 @@ function wcagSection(result: BrandingResult): string {
 }
 
 function metaSection(result: BrandingResult): string {
-  const fw = (result.frameworks ?? []).map((f) => f.name);
-  const icons = (result.iconSystem ?? []).map((i) => i.name);
+  const named = (t: { name: string; version?: string }) => (t.version ? `${t.name} ${t.version}` : t.name);
+  const fw = (result.frameworks ?? []).map(named);
+  const icons = (result.iconSystem ?? []).map(named);
   const bps = (result.breakpoints ?? []).map((b) => {
     // b.px may be a bare number (360) or already a CSS length ("360px", "20rem").
     // Only append the unit when it is a bare number, else we get "360pxpx".

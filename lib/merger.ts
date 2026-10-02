@@ -324,15 +324,19 @@ function mergeShadows(results) {
 }
 
 function mergeByName(results, getter) {
-  const seen = new Set();
-  const out = [];
+  const byKey = new Map();
+  const rank = (item) => (item.version ? String(item.version).split('.').length : 0) * 10 + (item.confidence === 'high' ? 2 : item.confidence === 'medium' ? 1 : 0);
   results.forEach(r => {
     (getter(r) || []).forEach(item => {
       const key = item.name || item.library || JSON.stringify(item);
-      if (!seen.has(key)) { seen.add(key); out.push(item); }
+      const held = byKey.get(key);
+      if (!held) { byKey.set(key, item); return; }
+      const best = rank(item) > rank(held) ? item : held;
+      const coverage = Math.max(held.coverage ?? -1, item.coverage ?? -1);
+      byKey.set(key, coverage >= 0 ? { ...best, coverage } : best);
     });
   });
-  return out;
+  return [...byKey.values()];
 }
 
 function mergeGradients(results) {

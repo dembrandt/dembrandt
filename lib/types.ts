@@ -234,12 +234,29 @@ export interface IconSystem {
   name: string;
   type: string;
   sizes?: string[];
+  version?: string;
 }
+
+export type TechCategory =
+  | 'js-framework'
+  | 'meta-framework'
+  | 'js-library'
+  | 'css-framework'
+  | 'ui-library'
+  | 'css-in-js'
+  | 'web-components'
+  | 'site-builder'
+  | 'icon-set';
 
 export interface Framework {
   name: string;
   confidence: Confidence;
   evidence?: string;
+  category?: TechCategory;
+  /** As precise as the evidence allows: "5", "5.3" or "5.3.3". */
+  version?: string;
+  /** Share of the page's elements under this framework's mount points, 0 to 1. Absent when it has none. */
+  coverage?: number;
 }
 
 export interface Logo {
