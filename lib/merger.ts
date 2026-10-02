@@ -325,15 +325,18 @@ function mergeShadows(results) {
 
 function mergeByName(results, getter) {
   const byKey = new Map();
-  const rank = (item) => (item.version ? String(item.version).split('.').length : 0) * 10 + (item.confidence === 'high' ? 2 : item.confidence === 'medium' ? 1 : 0);
+  const trust = (item) => (item.confidence === 'high' ? 2 : item.confidence === 'medium' ? 1 : 0);
+  const detail = (item) => (item.version ? String(item.version).split('.').length : 0);
   results.forEach(r => {
     (getter(r) || []).forEach(item => {
       const key = item.name || item.library || JSON.stringify(item);
       const held = byKey.get(key);
       if (!held) { byKey.set(key, item); return; }
-      const best = rank(item) > rank(held) ? item : held;
+      const better = trust(item) > trust(held) || (trust(item) === trust(held) && detail(item) > detail(held));
+      const [best, other] = better ? [item, held] : [held, item];
+      const version = best.version ?? other.version;
       const coverage = Math.max(held.coverage ?? -1, item.coverage ?? -1);
-      byKey.set(key, coverage >= 0 ? { ...best, coverage } : best);
+      byKey.set(key, { ...best, ...(version ? { version } : {}), ...(coverage >= 0 ? { coverage } : {}) });
     });
   });
   return [...byKey.values()];

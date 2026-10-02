@@ -57,7 +57,7 @@ test('frameworks and icon systems come from one page read', async () => {
   assert.ok(frameworks.some((f) => f.name === 'React'));
   assert.ok(frameworks.every((f) => f.category !== 'icon-set'));
   assert.deepEqual(icons.find((i) => i.name === 'Font Awesome'), { name: 'Font Awesome', type: 'icon-font', version: '6' });
-  assert.ok(icons.some((i) => i.name === 'SVG Icons'));
+  assert.ok(!icons.some((i) => i.name === 'SVG Icons'));
 });
 
 test('open shadow roots are read, and a mount element states its framework version', async () => {

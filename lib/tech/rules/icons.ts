@@ -9,7 +9,7 @@ const fontAwesomeFamily: VersionProbe = (s) => {
 
 const usesFontAwesome = all(cls(/^(fa[srlbd]?|fa-(solid|regular|brands|light|thin|duotone))$/), cls(/^fa-[a-z]/));
 
-export const ICON_RULES: TechRule[] = [
+const NAMED_ICON_RULES: TechRule[] = [
   {
     name: 'Font Awesome', category: 'icon-set',
     iconType: (s) => (s.classes['svg-inline--fa'] ? 'svg' : 'icon-font'),
@@ -103,8 +103,10 @@ export const ICON_RULES: TechRule[] = [
     name: 'Hugeicons', category: 'icon-set', iconType: 'svg',
     strong: [cls(/hugeicons/)],
   },
-  {
-    name: 'SVG Icons', category: 'icon-set', iconType: 'svg',
-    strong: [svg('class~icon')],
-  },
+];
+
+/** The generic entry says "inline SVGs classed as icons, set unknown"; once a set is named it adds nothing. */
+export const ICON_RULES: TechRule[] = [
+  ...NAMED_ICON_RULES,
+  { name: 'SVG Icons', category: 'icon-set', iconType: 'svg', strong: [svg('class~icon')], yieldsTo: NAMED_ICON_RULES.map((rule) => rule.name) },
 ];

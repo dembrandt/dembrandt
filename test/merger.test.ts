@@ -324,6 +324,14 @@ test('a later page that states more about a framework replaces the earlier readi
   assert.deepEqual(merged.frameworks.map(f => [f.name, f.version, f.confidence, f.coverage]), [['React', '19.1.0', 'high', 0.9], ['Bootstrap', '5.3.3', 'high', undefined]]);
 });
 
+test('a confident reading is not replaced by a less confident one with a longer version', () => {
+  const a = page('https://a.com/', { frameworks: [{ name: 'Tailwind CSS', confidence: 'high', version: '4' }, { name: 'Vue', confidence: 'high' }] });
+  const b = page('https://a.com/x', { frameworks: [{ name: 'Tailwind CSS', confidence: 'medium', version: '3.4.1' }, { name: 'Vue', confidence: 'medium', version: '3.5.0' }] });
+
+  const merged = mergeResults([a, b]);
+  assert.deepEqual(merged.frameworks.map(f => [f.name, f.version, f.confidence]), [['Tailwind CSS', '4', 'high'], ['Vue', '3.5.0', 'high']]);
+});
+
 test('motion unions durations by value, easings and animations by count', () => {
   const a = page('https://a.com/', {
     motion: { durations: [{ value: '150ms', ms: 150, count: 1 }], easings: [{ value: 'ease-out', count: 1 }], animations: [{ name: 'fade', count: 1 }], contexts: {}, interactiveDeltas: [] },
