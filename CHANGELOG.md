@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.38.0] - 2026-10-03
+
+Detection now names what builds the page, with versions.
+
+### Added
+- `frameworks` names what builds the UI: JS and meta frameworks, CSS frameworks, component libraries, web components, CSS-in-JS and site builders. Entries carry `category`, a `version` where the page states one, and `coverage`, the share of the page under that framework's mount points (#256)
+- `iconSystem` entries carry `version`, and more icon sets are named
+- The terminal and the HTML report show the versions
+
+### Changed
+- Every run installs an inert React devtools hook before the page loads and reads the script and stylesheet responses the page fetched, capped at 4 MB a file and 40 MB a page. Versions come from what the page states: a global, a licence banner, a constant that survives minification, the renderer's hook
+- A match on weak evidence alone is reported with medium confidence, and `evidence` quotes the marker that matched
+- The generic `SVG Icons` entry is reported only when no icon set was named
+- Across crawled pages the more confident reading of a framework is kept, with any version another page stated
+
+### Fixed
+- Consent dismissal could click a link to another origin and carry the run to a different site. It no longer clicks such a link
+- A frame that never answers no longer hangs consent dismissal
+
+### Upgrading
+Output contract 1.17.0 to 1.18.0, additive. Baseline churn on `dembrandt.com` against 0.37.0: stable 0, and the drift engine reads neither field. A consumer that compares `frameworks` or `iconSystem` names across snapshots will see them differ once: more is named, and `SVG Icons` drops out where a set was named.
+
 ## [0.37.0] - 2026-09-29
 
 What the page declares now reaches the output: token names, font families, a monochrome primary.
