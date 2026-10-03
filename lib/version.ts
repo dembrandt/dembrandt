@@ -50,6 +50,10 @@
  *          almost never painted as a fill gives way to a chromatic fill that two
  *          or more links or buttons share. Buttons are recognised by shape as
  *          well as by class name. Drift on dembrandt.com: 0.
+ *  (unversioned) — BEHAVIOR, contract unchanged: the fill and stroke of an SVG
+ *          logo in the header or navigation reach colors.palette. SVG shapes
+ *          paint with fill, never with color, so a logo's own colour was not
+ *          read. Drift on dembrandt.com: 0.
  *  1.17.0 — colors.palette entries gain `tokens`: the custom property names
  *          that declare this exact colour. Additive: 1.16.x consumers ignore
  *          it. BEHAVIOR: declared tokens are read from body as well as :root,
