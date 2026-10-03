@@ -91,6 +91,12 @@ test('the text colour inside a "primary" layout column is not the primary', asyn
     `a pale text colour in a primary-named column must not take the slot, got ${primary}`);
 });
 
+test('a text utility naming a primary tone does not vote with the fill behind it', async () => {
+  const link = `<a class="text-impact-primary" style="background:#1e3a8a;color:#00ffff;padding:12px">Read the report</a>`;
+  const primary = await primaryOf(doc(link + ctas(BRAND, 3)));
+  assert.ok(!primary.includes('30, 58, 138') && !primary.includes('#1e3a8a'), `a text-role class must not vote, got ${primary}`);
+});
+
 test('the fill most "primary" elements share wins, not the last one read; a textless chip and a dark variant do not vote', async () => {
   const buttons = Array.from({ length: 3 }, () => `<a class="button--primary" style="background:${BRAND};color:#fff;padding:12px">Start</a>`).join('');
   const panel = `<div class="panel-primary" style="background:#2563eb;color:#fff;width:400px">Plans</div>`;

@@ -146,7 +146,7 @@ export async function extractColors(page) {
     // "primary" qualified by a rendering role names a slot on a surface — the
     // text on the primary button, a border — not the brand primary itself.
     const ROLE_QUALIFIED_PRIMARY =
-      /(?:foreground|fg|text|ink|label|caption|border|outline|ring|divider|icon|placeholder|muted|hover|active|disabled)[-_ ]?primary|primary[-_ ]?(?:foreground|fg|text|ink|label|border|outline|ring|icon|content|hover|active|disabled|dark|darker|light|lighter|subtle|soft)/;
+      /(?:foreground|fg|text|ink|label|caption|border|outline|ring|divider|icon|placeholder|muted|hover|active|disabled)[-_ ]?primary|(?:^|[\s:])(?:text|fg|border|outline|ring)-[a-z0-9]+-primary|primary[-_ ]?(?:foreground|fg|text|ink|label|border|outline|ring|icon|content|hover|active|disabled|dark|darker|light|lighter|subtle|soft)/;
 
     function isRoleQualified(context) {
       return ROLE_QUALIFIED_PRIMARY.test(context);
