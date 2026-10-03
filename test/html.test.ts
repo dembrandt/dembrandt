@@ -64,6 +64,17 @@ test('frameworks and icon sets are listed with the version the page stated', () 
   assert.ok(html.includes('Heroicons 2'), 'icon set version missing');
 });
 
+test('a framework is listed with the share of the page it renders', () => {
+  const html = generateHtmlReport(fixture({
+    frameworks: [
+      { name: 'React', confidence: 'high', version: '19.2.0', coverage: 0.4 },
+      { name: 'Next.js', confidence: 'high', version: '16.2.9' },
+      { name: 'Vue', confidence: 'high', coverage: 0 },
+    ],
+  }) as never);
+  assert.ok(html.includes('React 19.2.0 (40% of page), Next.js 16.2.9, Vue (0% of page)'), 'page share missing');
+});
+
 test('escapes untrusted extracted strings (no breakout into the document)', () => {
   const evil = '</style><img src=x onerror=alert(1)>';
   const html = generateHtmlReport(fixture({

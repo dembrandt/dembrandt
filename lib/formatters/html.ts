@@ -661,7 +661,8 @@ function wcagSection(result: BrandingResult): string {
 
 function metaSection(result: BrandingResult): string {
   const named = (t: { name: string; version?: string }) => (t.version ? `${t.name} ${t.version}` : t.name);
-  const fw = (result.frameworks ?? []).map(named);
+  const fw = (result.frameworks ?? []).map((t) =>
+    typeof t.coverage === 'number' ? `${named(t)} (${Math.round(t.coverage * 100)}% of page)` : named(t));
   const icons = (result.iconSystem ?? []).map(named);
   const bps = (result.breakpoints ?? []).map((b) => {
     // b.px may be a bare number (360) or already a CSS length ("360px", "20rem").
