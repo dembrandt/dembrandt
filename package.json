@@ -118,15 +118,15 @@
   "author": "thevangelist <info@esajuhana.com>",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@modelcontextprotocol/sdk": "1.31.0",
     "chalk": "^6.0.0",
     "commander": "15.0.0",
     "ora": "9.4.1",
-    "playwright-core": "1.62.1",
-    "zod": "4.5.4"
+    "playwright-core": "1.63.0",
+    "zod": "4.6.5"
   },
   "optionalDependencies": {
-    "onnxruntime-node": "1.29.0"
+    "onnxruntime-node": "1.30.0"
   },
   "peerDependencies": {
     "playwright": "^1.60.0"
@@ -143,13 +143,13 @@
     "@eslint/js": "10.0.1",
     "@google/design.md": "0.4.0",
     "@tailwindcss/cli": "4.3.3",
-    "@types/node": "26.4.0",
-    "eslint": "10.9.1",
-    "playwright": "1.62.1",
-    "playwright-core": "1.62.1",
+    "@types/node": "26.6.3",
+    "eslint": "10.11.0",
+    "playwright": "1.63.0",
+    "playwright-core": "1.63.0",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.68.0"
+    "typescript-eslint": "8.71.0"
   },
   "overrides": {
     "hono": "^4.12.32",
