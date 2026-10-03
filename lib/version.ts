@@ -46,6 +46,10 @@
  *          of the page it covers. The usage floor meant for embed faces was
  *          dropping display faces, which set a few headings by design.
  *          Drift on dembrandt.com: 0.
+ *  (unversioned) — BEHAVIOR, contract unchanged: a near-black primary that is
+ *          almost never painted as a fill gives way to a chromatic fill that two
+ *          or more links or buttons share. Buttons are recognised by shape as
+ *          well as by class name. Drift on dembrandt.com: 0.
  *  1.17.0 — colors.palette entries gain `tokens`: the custom property names
  *          that declare this exact colour. Additive: 1.16.x consumers ignore
  *          it. BEHAVIOR: declared tokens are read from body as well as :root,

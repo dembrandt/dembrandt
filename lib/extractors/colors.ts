@@ -241,6 +241,8 @@ export async function extractColors(page) {
     const ctaPrimaryMap = new Map(); // normalized hex → original color for CTA backgrounds
     // Black and white CTA fills never compete with a chromatic candidate.
     const ctaNeutralMap = new Map();
+    // Fills of anything shaped like a button, whatever its class names say: a link or role=button with an opaque fill.
+    const buttonFillMap = new Map();
 
     // Mirror of CONTEXT_SCORES (lib/extractors/color-heuristics.ts) — kept inline
     // because page.evaluate runs in an isolated realm and cannot import. Card /
@@ -373,6 +375,12 @@ export async function extractColors(page) {
         bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent' && colorAlpha(bgColor) >= 0.7;
       const isCta = ctaShaped &&
         bgColor !== 'rgb(255, 255, 255)' && bgColor !== 'rgb(0, 0, 0)' && bgColor !== 'rgb(239, 239, 239)';
+      const buttonShaped = (ctaShaped || el.tagName === 'A' || el.tagName === 'BUTTON' || el.getAttribute('role') === 'button')
+        && bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent' && colorAlpha(bgColor) >= 0.7;
+      if (buttonShaped) {
+        const n = normalizeColor(bgColor);
+        if (n) { const e = buttonFillMap.get(n) || { original: bgColor, count: 0 }; e.count++; buttonFillMap.set(n, e); }
+      }
       if (ctaShaped && (bgColor === 'rgb(0, 0, 0)' || bgColor === 'rgb(255, 255, 255)')) {
         const n = normalizeColor(bgColor);
         if (n) { const e = ctaNeutralMap.get(n) || { original: bgColor, count: 0 }; e.count++; ctaNeutralMap.set(n, e); }
@@ -648,6 +656,22 @@ export async function extractColors(page) {
             ((b.c.count + (b.isToken ? 20 : 0) + (b.isCta ? 20 : 0)) - (a.c.count + (a.isToken ? 20 : 0) + (a.isCta ? 20 : 0)))
             || (b.ch - a.ch))[0];
         if (chromatic) semanticColors.primary = chromatic.c.color;
+      }
+    }
+
+    // A near-black with a faint hue is often the brand's dark variant, and saturation near black clears the
+    // rescue above. How it is painted decides: one almost never used as a fill is not the primary when two or
+    // more button-shaped elements share a chromatic fill. A dark primary that is itself a fill stays.
+    if (semanticColors.primary) {
+      const norm = normalizeColor(semanticColors.primary);
+      const data = typeof norm === 'string' ? colorMap.get(norm) : null;
+      const dark = typeof norm === 'string' && /^#[0-9a-f]{6}$/i.test(norm)
+        && Math.max(...[1, 3, 5].map((i) => parseInt(norm.slice(i, i + 2), 16))) / 255 < 0.3;
+      if (data && dark && data.bgCount <= data.count * 0.1) {
+        const cta = [...buttonFillMap.entries()]
+          .filter(([n, e]) => e.count >= 2 && chroma(n) > 0.25)
+          .sort((a, b) => b[1].count - a[1].count)[0];
+        if (cta) semanticColors.primary = cta[1].original;
       }
     }
 
