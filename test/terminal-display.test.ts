@@ -73,6 +73,16 @@ test('a full payload renders every section', () => {
   assert.ok(out.includes('✓ Complete'), 'missing completion line');
 });
 
+test('a framework line states its version and its share of the page', () => {
+  const out = render({
+    ...FULL,
+    frameworks: [{ name: 'React', confidence: 'high', evidence: 'window.renderer:react-dom', category: 'js-framework', version: '19.1.0', coverage: 0.97 }] as never,
+    iconSystem: [{ name: 'Lucide', type: 'svg', version: '0.577.0' }] as never,
+  }).join('\n');
+  assert.ok(/React 19\.1\.0.* 97% of page/.test(out), out);
+  assert.ok(out.includes('Lucide 0.577.0'), out);
+});
+
 test('section data reaches the output, not just the headings', () => {
   const out = render(FULL).join('\n');
   assert.ok(out.includes('120×32px'), 'logo dimensions');

@@ -969,7 +969,7 @@ function displayIconSystem(iconSystem) {
     const isLast = index === iconSystem.length - 1;
     const branch = isLast ? '└─' : '├─';
     const sizes = system.sizes ? ` · ${system.sizes.join(', ')}` : '';
-    console.log(chalk.dim(`│  ${branch}`) + ' ' + `${system.name} ${chalk.dim(system.type)}${sizes}`);
+    console.log(chalk.dim(`│  ${branch}`) + ' ' + `${system.name}${system.version ? ` ${system.version}` : ''} ${chalk.dim(system.type)}${sizes}`);
   });
   console.log(chalk.dim('│'));
 }
@@ -982,7 +982,8 @@ function displayFrameworks(frameworks) {
     const isLast = index === frameworks.length - 1;
     const branch = isLast ? '└─' : '├─';
     const conf = fw.confidence === 'high' ? color.success('●') : color.warning('●');
-    console.log(chalk.dim(`│  ${branch}`) + ' ' + `${conf} ${fw.name} ${chalk.dim(fw.evidence)}`);
+    const share = typeof fw.coverage === 'number' ? chalk.dim(` · ${Math.round(fw.coverage * 100)}% of page`) : '';
+    console.log(chalk.dim(`│  ${branch}`) + ' ' + `${conf} ${fw.name}${fw.version ? ` ${fw.version}` : ''}${share} ${chalk.dim(fw.evidence)}`);
   });
   console.log(chalk.dim('│'));
 }

@@ -68,8 +68,9 @@ hand-labeled gold sites are archived in dembrandt-ml/data/archive/gold-import.
 - `extractInputStyles()` — input styles and focus states
 - `extractLinkStyles()` — link colors and decorations
 - `extractBreakpoints()` — responsive breakpoints from CSS
-- `detectIconSystem()` — Font Awesome, Material Icons, SVG
-- `detectFrameworks()` — Tailwind, Bootstrap, MUI, Chakra, etc.
+- `detectIconSystem()` — icon sets with type and version (`lib/tech/`)
+- `detectFrameworks()` — what builds the UI: JS and meta frameworks, CSS
+  frameworks, component libraries, web-component kits, CSS-in-JS, site builders
 - `extractBadgeStyles()` — badge/tag/chip variants
 - `extractGradients()` — gradient stops and directions
 - `extractMotion()` — durations, easings, named keyframes
@@ -81,6 +82,23 @@ hand-labeled gold sites are archived in dembrandt-ml/data/archive/gold-import.
 - Structural color filtering: ignores colors on >40% of elements with low semantic score
 - Context scoring: logo=5, brand=5, primary=4, CTA=4, hero=3, button=3
 - Primary color fallback: most chromatic non-gray palette entry if semantic detection fails
+
+### Technology detection (`lib/tech/`)
+
+- `signals.ts` reads the page once into plain data (`TechSignals`), open shadow
+  roots included; `rules/*.ts` are declarative tables matched in Node, so rules
+  are unit-tested without a browser
+- `sources.ts` reads the files the page loaded: licence banners and version
+  constants that survive minification. `watchTechSources(page)` must run before
+  navigation; it also installs an inert React devtools hook, the only place a
+  bundled React states its version
+- One strong sign is high confidence; two weak signs are medium; one weak sign
+  is nothing. A version is claimed only on a marker that version leaves, never
+  on the absence of one
+- `coverage` is the share of the page under a framework's mount points: it
+  separates the framework that builds the page from one that runs a widget
+- `evidence` is text taken from the page: it is cut to printable ASCII before
+  it reaches any output
 
 ### Display Layer (`lib/formatters/terminal.ts`)
 

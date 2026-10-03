@@ -74,8 +74,18 @@ function dismissInFrame(
         (typeof h.getClientRects === 'function' && h.getClientRects().length > 0);
     } catch { return false; }
   };
+  const leavesPage = (el: Element): boolean => {
+    try {
+      const link = el.closest('a[href]');
+      const href = link?.getAttribute('href') ?? '';
+      if (!href || href.startsWith('#') || /^javascript:/i.test(href)) return false;
+      const target = new URL(href, location.href);
+      return target.origin !== location.origin;
+    } catch { return false; }
+  };
   const safeClick = (el: Element): boolean => {
     try {
+      if (leavesPage(el)) return false;
       if (typeof (el as HTMLElement).click === 'function') {
         (el as HTMLElement).click();
         return true;
@@ -140,6 +150,17 @@ function dismissInFrame(
   return null;
 }
 
+const FRAME_TIMEOUT_MS = 2500;
+const MAX_FRAMES = 12;
+
+/** A frame that never gets an execution context never answers; without a limit one embed hangs the run. */
+function within<T>(ms: number, work: Promise<T>): Promise<T | null> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve(null), ms);
+    work.then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); });
+  });
+}
+
 /**
  * Try the main document first, then every child frame. Returns a label for the
  * dismissal that succeeded, or null if no banner was found. Never throws: a
@@ -152,14 +173,14 @@ export async function dismissConsent(page: Page): Promise<string | null> {
 
   // frames[0] is the main frame, so the main document is tried first and a
   // top-level banner still wins before any iframe is touched.
-  for (const frame of frames) {
+  for (const frame of frames.slice(0, MAX_FRAMES)) {
     let hit: string | null = null;
     try {
-      hit = await frame.evaluate(dismissInFrame, {
+      hit = await within(FRAME_TIMEOUT_MS, frame.evaluate(dismissInFrame, {
         selectors: ACCEPT_SELECTORS,
         acceptSrc: ACCEPT_TEXT.source,
         rejectSrc: REJECT_TEXT.source,
-      });
+      }));
     } catch {
       // Detached frame, cross-origin eval refusal, or a click that navigated
       // the page and destroyed the execution context. Only the last is a

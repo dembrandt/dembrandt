@@ -105,3 +105,64 @@ test('dismissConsent accepts rather than rejects', async () => {
     await page.close().catch(() => {});
   }
 });
+
+test('dismissConsent never clicks a link that leaves the page', async () => {
+  const page = await browser!.newPage();
+  try {
+    await page.setContent(
+      '<html><body><p>We use cookies.</p><a href="https://elsewhere.test/post/1" aria-label="I agree with this take">a quoted post</a></body></html>',
+      { waitUntil: 'load' },
+    );
+    assert.equal(await dismissConsent(page), null);
+    assert.equal(page.url(), 'about:blank');
+  } finally {
+    await page.close();
+  }
+});
+
+test('dismissConsent follows an accept link on the same origin', async () => {
+  const page = await browser!.newPage();
+  try {
+    await page.route('https://shop.test/**', (route) => route.fulfill({
+      contentType: 'text/html',
+      body: route.request().url().includes('accept')
+        ? '<html><body><p id="done">Thanks</p></body></html>'
+        : '<html><body><p>We use cookies.</p><a href="/cookies/accept?all=1" aria-label="agree">Accept</a></body></html>',
+    }));
+    await page.goto('https://shop.test/');
+    assert.notEqual(await dismissConsent(page), null);
+    await page.waitForSelector('#done');
+  } finally {
+    await page.close();
+  }
+});
+
+test('dismissConsent still clicks a banner link that stays on the page', async () => {
+  const page = await browser!.newPage();
+  try {
+    await page.setContent(
+      '<html><body><div id="banner"><p>We use cookies.</p><a href="#" aria-label="agree" onclick="document.getElementById(\'banner\').remove(); return false;">OK</a></div></body></html>',
+      { waitUntil: 'load' },
+    );
+    assert.notEqual(await dismissConsent(page), null);
+    assert.equal(await page.locator('#banner').count(), 0);
+  } finally {
+    await page.close();
+  }
+});
+
+test('dismissConsent gives up on a frame that never answers', { timeout: 30000 }, async () => {
+  const page = await browser!.newPage();
+  try {
+    await page.route('https://stalled.test/**', () => {});
+    await page.setContent(
+      '<html><body><p>Plain page.</p><iframe src="https://stalled.test/embed"></iframe></body></html>',
+      { waitUntil: 'domcontentloaded' },
+    );
+    const started = Date.now();
+    assert.equal(await dismissConsent(page), null);
+    assert.ok(Date.now() - started < 15000);
+  } finally {
+    await page.close().catch(() => {});
+  }
+});

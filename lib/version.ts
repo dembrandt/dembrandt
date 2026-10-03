@@ -36,6 +36,24 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.18.0 — frameworks entries gain `category`, `version` and `coverage` (the
+ *          share of the page under that framework's mount points), iconSystem
+ *          entries gain `version`. Additive: 1.17.x consumers ignore them.
+ *          BEHAVIOR: detection also reads the files the page loaded, and
+ *          `frameworks` now also names
+ *          JS frameworks, meta-frameworks, component libraries, web-component
+ *          kits, CSS-in-JS engines and site builders, and `evidence` quotes
+ *          the marker that matched. Weak-only matches are reported as medium
+ *          instead of high.
+ *          DRIFT: the engine reads neither field, so a baseline is unmoved:
+ *          stable 0 on dembrandt.com against the previous build. A consumer
+ *          that compares `iconSystem` names across snapshots will see them
+ *          differ once: more sets are named, and the generic `SVG Icons`
+ *          entry is dropped when a set was named.
+ *          Also: consent and interstitial dismissal no longer click a link
+ *          that leaves the page, and give up on a frame that never answers.
+ *          Sites where a click used to carry the run to another site, or a
+ *          stalled embed hung it, now extract from the page that was asked for.
  *  1.17.0 — colors.palette entries gain `tokens`: the custom property names
  *          that declare this exact colour. Additive: 1.16.x consumers ignore
  *          it. BEHAVIOR: declared tokens are read from body as well as :root,
@@ -257,7 +275,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.17.0';
+export const SCHEMA_VERSION = '1.18.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';

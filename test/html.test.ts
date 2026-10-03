@@ -55,6 +55,15 @@ test('a logo and favicons never become external resources either', () => {
   assert.doesNotMatch(html, /src="https?:/i);
 });
 
+test('frameworks and icon sets are listed with the version the page stated', () => {
+  const html = generateHtmlReport(fixture({
+    frameworks: [{ name: 'Next.js', confidence: 'high', version: '16.2.9' }, { name: 'React', confidence: 'high' }],
+    iconSystem: [{ name: 'Heroicons', type: 'svg', version: '2' }],
+  }) as never);
+  assert.ok(html.includes('Next.js 16.2.9, React'), 'framework versions missing');
+  assert.ok(html.includes('Heroicons 2'), 'icon set version missing');
+});
+
 test('escapes untrusted extracted strings (no breakout into the document)', () => {
   const evil = '</style><img src=x onerror=alert(1)>';
   const html = generateHtmlReport(fixture({
