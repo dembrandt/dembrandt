@@ -75,3 +75,39 @@ test('an accent with no token or CTA backing does not displace a neutral primary
   assert.ok(!primary.includes('168, 85, 247'),
     `a merely chromatic accent is not a brand signal, got ${primary}`);
 });
+
+test('a "primary" element with no fill and no text of its own does not clear the primary found before it', async () => {
+  const link = `<a class="nav-link nav-link--primary" style="background:${BRAND};color:#fff;padding:12px">Contact us</a>`;
+  const wrapper = `<div class="card-button--primary" style="width:200px;height:60px"><span>Watch now</span></div>`;
+  const primary = await primaryOf(doc(link + wrapper + ctas('#f2f2f2', 3)));
+  assert.ok(primary.includes('255, 84, 22') || primary.includes(BRAND),
+    `the brand fill read from the first primary element must survive, got ${primary}`);
+});
+
+test('the text colour inside a "primary" layout column is not the primary', async () => {
+  const column = `<div class="layout__primary" style="width:600px"><p class="layout__primary" style="color:#ffcdcd">Release notes</p></div>`;
+  const primary = await primaryOf(doc(column + ctas(BRAND, 3)));
+  assert.ok(primary.includes('255, 84, 22') || primary.includes(BRAND),
+    `a pale text colour in a primary-named column must not take the slot, got ${primary}`);
+});
+
+test('the fill most "primary" elements share wins, not the last one read; a textless chip and a dark variant do not vote', async () => {
+  const buttons = Array.from({ length: 3 }, () => `<a class="button--primary" style="background:${BRAND};color:#fff;padding:12px">Start</a>`).join('');
+  const panel = `<div class="panel-primary" style="background:#2563eb;color:#fff;width:400px">Plans</div>`;
+  const chips = Array.from({ length: 5 }, () => `<span class="chip-primary" style="background:#16a34a;display:inline-block;width:24px;height:24px"></span>`).join('');
+  const dark = Array.from({ length: 5 }, () => `<span class="bg-primary-dark" style="background:#7c2d12;color:#fff">x</span>`).join('');
+  const primary = await primaryOf(doc(buttons + panel + chips + dark));
+  assert.ok(primary.includes('255, 84, 22') || primary.includes(BRAND), `expected the shared button fill, got ${primary}`);
+});
+
+test('a near-black "primary" fill of the brand hue gives way to the bright one it is a variant of', async () => {
+  const button = (bg: string) => `<a class="button --primary" style="background:${bg};color:#fff;padding:12px">Demo</a>`;
+  const primary = await primaryOf(doc([...Array(6)].map(() => button('#0f1c14')).join('') + [...Array(3)].map(() => button('#19f578')).join('')));
+  assert.ok(primary.includes('25, 245, 120'), `expected the bright green, got ${primary}`);
+});
+
+test('a submit input labels itself with its value and votes like a button', async () => {
+  const inputs = [...Array(2)].map(() => `<input type="submit" class="btn btn-primary" value="Extract" style="background:${BRAND};color:#fff">`).join('');
+  const primary = await primaryOf(doc(inputs));
+  assert.ok(primary.includes('255, 84, 22') || primary.includes(BRAND), `expected the input fill, got ${primary}`);
+});

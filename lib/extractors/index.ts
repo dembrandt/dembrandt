@@ -59,9 +59,10 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
  * fixed wait while typical pages finish in a fraction of the time. Every error
  * is swallowed: readiness is best-effort and must never abort extraction.
  */
-async function waitForSettled(page: Page, capMs: number, quietMs = 500) {
+export async function waitForSettled(page: Page, capMs: number, quietMs = 500) {
   const start = Date.now();
-  try { await page.waitForLoadState("networkidle", { timeout: capMs }); } catch {}
+  // Beacons and polling keep many pages from ever reaching networkidle.
+  try { await page.waitForLoadState("networkidle", { timeout: Math.min(capMs, 2500) }); } catch {}
   // fonts.ready resolves only when no face is loading; a hung font request
   // would stall it past every cap, so race it against the remaining budget.
   try {
@@ -78,7 +79,8 @@ async function waitForSettled(page: Page, capMs: number, quietMs = 500) {
       let quiet;
       const finish = () => { try { obs.disconnect(); } catch {} resolve(); };
       const obs = new MutationObserver(() => { clearTimeout(quiet); quiet = setTimeout(finish, quietMs); });
-      obs.observe(target, { childList: true, subtree: true, attributes: true, characterData: true });
+      // Structure only: animated attributes never go quiet and would pin every wait to the cap.
+      obs.observe(target, { childList: true, subtree: true });
       quiet = setTimeout(finish, quietMs);       // already quiet -> resolve after one window
       setTimeout(finish, remaining);             // hard cap
     }), { quietMs, remaining });

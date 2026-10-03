@@ -36,6 +36,17 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  (unversioned) — BEHAVIOR, contract unchanged. Palette: a chromatic
+ *          background over a tenth of the viewport reaches colors.palette
+ *          however few elements paint it, and so do the fill and stroke of
+ *          the header logo's SVG shapes. Primary: elements whose class says
+ *          primary vote with their fill and the most shared fill wins; a
+ *          near-black primary that is almost never painted as a fill gives
+ *          way to a chromatic fill that two or more links or buttons share.
+ *          Typography: a family that sets an h1, an h2 or display text stays
+ *          in typography.styles whatever its share. Readiness: settling
+ *          watches added and removed nodes only, so an animating page no
+ *          longer waits out the cap. Drift on dembrandt.com: 0.
  *  1.17.0 — colors.palette entries gain `tokens`: the custom property names
  *          that declare this exact colour. Additive: 1.16.x consumers ignore
  *          it. BEHAVIOR: declared tokens are read from body as well as :root,

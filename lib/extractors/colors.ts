@@ -146,7 +146,7 @@ export async function extractColors(page) {
     // "primary" qualified by a rendering role names a slot on a surface — the
     // text on the primary button, a border — not the brand primary itself.
     const ROLE_QUALIFIED_PRIMARY =
-      /(?:foreground|fg|text|ink|label|caption|border|outline|ring|divider|icon|placeholder|muted|hover|active|disabled)[-_ ]?primary|primary[-_ ]?(?:foreground|fg|text|ink|label|border|outline|ring|icon|content|hover|active|disabled)/;
+      /(?:foreground|fg|text|ink|label|caption|border|outline|ring|divider|icon|placeholder|muted|hover|active|disabled)[-_ ]?primary|primary[-_ ]?(?:foreground|fg|text|ink|label|border|outline|ring|icon|content|hover|active|disabled|dark|darker|light|lighter|subtle|soft)/;
 
     function isRoleQualified(context) {
       return ROLE_QUALIFIED_PRIMARY.test(context);
@@ -239,8 +239,12 @@ export async function extractColors(page) {
     const elements = document.querySelectorAll("*");
     const totalElements = elements.length;
     const ctaPrimaryMap = new Map(); // normalized hex → original color for CTA backgrounds
+    // Fills of elements whose class says primary, counted. The last one read used to win outright.
+    const classPrimaryMap = new Map();
     // Black and white CTA fills never compete with a chromatic candidate.
     const ctaNeutralMap = new Map();
+    // Fills of anything shaped like a button, whatever its class names say: a link or role=button with an opaque fill.
+    const buttonFillMap = new Map();
 
     // Mirror of CONTEXT_SCORES (lib/extractors/color-heuristics.ts) — kept inline
     // because page.evaluate runs in an isolated realm and cannot import. Card /
@@ -326,6 +330,18 @@ export async function extractColors(page) {
         computed.borderBottomWidth, computed.borderLeftWidth]
         .some((w) => parseFloat(w) > 0);
       const borderColor = hasBorder ? toLegacy(computed.borderColor) : "";
+      // An SVG shape paints with fill and stroke, never with color, so the logo's colour was not read.
+      // The logo only: rows of partner logos, flags and icons carry dozens of colours that are not the brand's.
+      const paints = el instanceof SVGElement && /^(path|rect|circle|ellipse|polygon|polyline|line|text|tspan)$/i.test(el.tagName)
+        && !el.closest('defs, clipPath, mask, symbol, pattern, marker');
+      const svgHost = paints ? (el as SVGElement).ownerSVGElement : null;
+      const svgBox = svgHost?.getBoundingClientRect();
+      const inLogo = Boolean(svgBox && svgBox.width <= 240 && svgBox.height <= 240)
+        && Boolean(el.closest('[class*="logo" i], [id*="logo" i], [aria-label*="logo" i], a[href="/"]'))
+        // The site's own mark sits in its header; a wall of partner logos further down carries the same class.
+        && Boolean(el.closest('header, nav, [role="banner"]'));
+      // A paint server such as url(#gradient) is not a colour.
+      const svgColors = inLogo ? [computed.fill, computed.stroke].filter((v) => /^(rgb|#)/.test(v || '')).map(toLegacy) : [];
 
       const context = (
         el.className + " " + el.id + " " +
@@ -344,6 +360,7 @@ export async function extractColors(page) {
       // colours aren't later discarded as structural noise (e.g. a plain styled
       // <a> link colour the heuristic would otherwise drop).
       if (el.tagName === 'A') score = Math.max(score, contextScores.link);
+      if (inLogo) score = Math.max(score, contextScores.logo);
       if (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button') score = Math.max(score, contextScores.button);
 
       // Deep-nested brand colours: lift via ANCESTOR context (card/section/
@@ -373,6 +390,12 @@ export async function extractColors(page) {
         bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent' && colorAlpha(bgColor) >= 0.7;
       const isCta = ctaShaped &&
         bgColor !== 'rgb(255, 255, 255)' && bgColor !== 'rgb(0, 0, 0)' && bgColor !== 'rgb(239, 239, 239)';
+      const buttonShaped = (ctaShaped || el.tagName === 'A' || el.tagName === 'BUTTON' || el.getAttribute('role') === 'button')
+        && bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent' && colorAlpha(bgColor) >= 0.7;
+      if (buttonShaped) {
+        const n = normalizeColor(bgColor);
+        if (n) { const e = buttonFillMap.get(n) || { original: bgColor, count: 0 }; e.count++; buttonFillMap.set(n, e); }
+      }
       if (ctaShaped && (bgColor === 'rgb(0, 0, 0)' || bgColor === 'rgb(255, 255, 255)')) {
         const n = normalizeColor(bgColor);
         if (n) { const e = ctaNeutralMap.get(n) || { original: bgColor, count: 0 }; e.count++; ctaNeutralMap.set(n, e); }
@@ -407,6 +430,7 @@ export async function extractColors(page) {
         ...extractColorsFromValue(bgColor),
         ...extractColorsFromValue(textColor),
         ...extractColorsFromValue(borderColor),
+        ...svgColors.flatMap(extractColorsFromValue),
       ];
 
       allColors.forEach((color) => {
@@ -432,8 +456,13 @@ export async function extractColors(page) {
       });
 
       if ((context.includes("primary") || el.matches('[class*="primary"]')) && !isRoleQualified(context)) {
-        const candidate = bgColor !== "rgba(0, 0, 0, 0)" && bgColor !== "transparent" ? bgColor : textColor;
-        if (colorAlpha(candidate) >= 0.7 && colorLightness(candidate) <= 0.95) semanticColors.primary = candidate;
+        // A fill behind text: the class also names layout columns and nav panels, whose text colour is not the
+        // brand, and icon chips, whose fill is decoration.
+        const fill = bgColor !== "rgba(0, 0, 0, 0)" && bgColor !== "transparent" ? bgColor : "";
+        const label = (el.textContent || el.getAttribute("value") || "").trim();
+        const n = fill && label && colorAlpha(fill) >= 0.7 && colorLightness(fill) <= 0.95
+          ? normalizeColor(fill) : null;
+        if (n) { const e = classPrimaryMap.get(n) || { original: fill, count: 0 }; e.count++; classPrimaryMap.set(n, e); }
       }
       if (context.includes("secondary")) {
         const a = colorAlpha(bgColor);
@@ -462,6 +491,16 @@ export async function extractColors(page) {
       if (txt && colorAlpha(txt) >= 0.5) semanticColors.text = txt;
     }
 
+    const votes = [...classPrimaryMap.entries()].sort((a, b) => b[1].count - a[1].count);
+    const nearBlack = (hex) => Math.max(...[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))) / 255 < 0.3;
+    const hueGap = (a, b) => { const d = Math.abs(hueOf(a) - hueOf(b)); return Math.min(d, 360 - d); };
+    // A near-black of the same hue as a bright voted fill is the brand's dark variant; the bright one is the primary.
+    const bright = votes[0] && nearBlack(votes[0][0]) && hueOf(votes[0][0]) >= 0
+      ? votes.find(([hex, e]) => e.count >= 2 && !nearBlack(hex) && chroma(hex) > 0.25 && hueGap(hex, votes[0][0]) <= 30)
+      : null;
+    const voted = (bright ?? votes[0])?.[1];
+    if (voted) semanticColors.primary = voted.original;
+
     // Use most-common CTA background as primary if class-based detection missed it
     // Require at least 2 CTA occurrences to avoid single "Sign up" buttons dominating
     if (!semanticColors.primary && ctaPrimaryMap.size > 0) {
@@ -477,6 +516,9 @@ export async function extractColors(page) {
     }
 
     const threshold = Math.max(3, Math.floor(totalElements * 0.01));
+    // A chromatic fill over a tenth of the viewport is a deliberate section colour however few elements carry it.
+    const sectionArea = window.innerWidth * window.innerHeight * 0.1;
+    const paintsSection = (norm, data) => data.bgArea >= sectionArea && chroma(norm) > 0.2;
 
     // Mirror of classifyStructural (lib/extractors/color-heuristics.ts). Saturation
     // is computed once and reused. The high-usage branch now only fires for
@@ -551,7 +593,7 @@ export async function extractColors(page) {
         if (!data.isToken && !isCtaPrimary && data.statusCount > 0 && data.nonStatusCount === 0) return false;
         // Declared brand tokens always qualify regardless of element count.
         const highScore = data.isToken || data.score >= 10 || (data.count > 0 && data.score / data.count >= 3);
-        if (!highScore && data.count < threshold) return false;
+        if (!highScore && data.count < threshold && !paintsSection(norm, data)) return false;
         if (isStructuralColor(data, totalElements)) return false;
         return true;
       })
@@ -645,6 +687,22 @@ export async function extractColors(page) {
             ((b.c.count + (b.isToken ? 20 : 0) + (b.isCta ? 20 : 0)) - (a.c.count + (a.isToken ? 20 : 0) + (a.isCta ? 20 : 0)))
             || (b.ch - a.ch))[0];
         if (chromatic) semanticColors.primary = chromatic.c.color;
+      }
+    }
+
+    // A near-black with a faint hue is often the brand's dark variant, and saturation near black clears the
+    // rescue above. How it is painted decides: one almost never used as a fill is not the primary when two or
+    // more button-shaped elements share a chromatic fill. A dark primary that is itself a fill stays.
+    if (semanticColors.primary) {
+      const norm = normalizeColor(semanticColors.primary);
+      const data = typeof norm === 'string' ? colorMap.get(norm) : null;
+      const dark = typeof norm === 'string' && /^#[0-9a-f]{6}$/i.test(norm)
+        && Math.max(...[1, 3, 5].map((i) => parseInt(norm.slice(i, i + 2), 16))) / 255 < 0.3;
+      if (data && dark && data.bgCount <= data.count * 0.1) {
+        const cta = [...buttonFillMap.entries()]
+          .filter(([n, e]) => e.count >= 2 && chroma(n) > 0.25)
+          .sort((a, b) => b[1].count - a[1].count)[0];
+        if (cta) semanticColors.primary = cta[1].original;
       }
     }
 
