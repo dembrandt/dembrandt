@@ -20,7 +20,7 @@ export const CODE_PATTERNS = codePatterns();
 
 export const detectAll = (signals: TechSignals): DetectedTech[] => detectTech(signals, TECH_RULES);
 
-export function toFrameworks(detected: DetectedTech[]): Framework[] {
+function toFrameworks(detected: DetectedTech[]): Framework[] {
   return detected
     .filter((tech) => tech.category !== 'icon-set')
     .map(({ name, confidence, evidence, category, version, coverage }) => ({
@@ -28,7 +28,7 @@ export function toFrameworks(detected: DetectedTech[]): Framework[] {
     }));
 }
 
-export function toIconSystems(detected: DetectedTech[]): IconSystem[] {
+function toIconSystems(detected: DetectedTech[]): IconSystem[] {
   return detected
     .filter((tech) => tech.category === 'icon-set')
     .map(({ name, iconType, version }) => ({ name, type: iconType ?? 'svg', ...(version ? { version } : {}) }));

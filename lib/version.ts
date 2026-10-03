@@ -45,6 +45,11 @@
  *          kits, CSS-in-JS engines and site builders, and `evidence` quotes
  *          the marker that matched. Weak-only matches are reported as medium
  *          instead of high.
+ *          DRIFT: the engine reads neither field, so a baseline is unmoved:
+ *          stable 0 on dembrandt.com against the previous build. A consumer
+ *          that compares `iconSystem` names across snapshots will see them
+ *          differ once: more sets are named, and the generic `SVG Icons`
+ *          entry is dropped when a set was named.
  *          Also: consent and interstitial dismissal no longer click a link
  *          that leaves the page, and give up on a frame that never answers.
  *          Sites where a click used to carry the run to another site, or a

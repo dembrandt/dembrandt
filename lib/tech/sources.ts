@@ -61,7 +61,7 @@ export function scanSource(text: string, patterns: CodePattern[], facts: SourceF
  * React hands its version to whatever sits on the devtools hook, in production
  * builds too. An inert hook is the only place a bundled React states it.
  */
-export const RENDERER_HOOK_SCRIPT = `(() => {
+const RENDERER_HOOK_SCRIPT = `(() => {
   if (window.__REACT_DEVTOOLS_GLOBAL_HOOK__) return;
   const renderers = new Map();
   const noop = () => {};
