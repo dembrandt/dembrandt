@@ -146,7 +146,7 @@ export async function extractColors(page) {
     // "primary" qualified by a rendering role names a slot on a surface — the
     // text on the primary button, a border — not the brand primary itself.
     const ROLE_QUALIFIED_PRIMARY =
-      /(?:foreground|fg|text|ink|label|caption|border|outline|ring|divider|icon|placeholder|muted|hover|active|disabled)[-_ ]?primary|primary[-_ ]?(?:foreground|fg|text|ink|label|border|outline|ring|icon|content|hover|active|disabled)/;
+      /(?:foreground|fg|text|ink|label|caption|border|outline|ring|divider|icon|placeholder|muted|hover|active|disabled)[-_ ]?primary|primary[-_ ]?(?:foreground|fg|text|ink|label|border|outline|ring|icon|content|hover|active|disabled|dark|darker|light|lighter|subtle|soft)/;
 
     function isRoleQualified(context) {
       return ROLE_QUALIFIED_PRIMARY.test(context);
@@ -239,6 +239,8 @@ export async function extractColors(page) {
     const elements = document.querySelectorAll("*");
     const totalElements = elements.length;
     const ctaPrimaryMap = new Map(); // normalized hex → original color for CTA backgrounds
+    // Fills of elements whose class says primary, counted. The last one read used to win outright.
+    const classPrimaryMap = new Map();
     // Black and white CTA fills never compete with a chromatic candidate.
     const ctaNeutralMap = new Map();
     // Fills of anything shaped like a button, whatever its class names say: a link or role=button with an opaque fill.
@@ -454,8 +456,13 @@ export async function extractColors(page) {
       });
 
       if ((context.includes("primary") || el.matches('[class*="primary"]')) && !isRoleQualified(context)) {
-        const candidate = bgColor !== "rgba(0, 0, 0, 0)" && bgColor !== "transparent" ? bgColor : textColor;
-        if (colorAlpha(candidate) >= 0.7 && colorLightness(candidate) <= 0.95) semanticColors.primary = candidate;
+        // A fill behind text: the class also names layout columns and nav panels, whose text colour is not the
+        // brand, and icon chips, whose fill is decoration.
+        const fill = bgColor !== "rgba(0, 0, 0, 0)" && bgColor !== "transparent" ? bgColor : "";
+        const label = (el.textContent || el.getAttribute("value") || "").trim();
+        const n = fill && label && colorAlpha(fill) >= 0.7 && colorLightness(fill) <= 0.95
+          ? normalizeColor(fill) : null;
+        if (n) { const e = classPrimaryMap.get(n) || { original: fill, count: 0 }; e.count++; classPrimaryMap.set(n, e); }
       }
       if (context.includes("secondary")) {
         const a = colorAlpha(bgColor);
@@ -483,6 +490,16 @@ export async function extractColors(page) {
       const txt = toLegacy(getComputedStyle(surfaceEl).color);
       if (txt && colorAlpha(txt) >= 0.5) semanticColors.text = txt;
     }
+
+    const votes = [...classPrimaryMap.entries()].sort((a, b) => b[1].count - a[1].count);
+    const nearBlack = (hex) => Math.max(...[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))) / 255 < 0.3;
+    const hueGap = (a, b) => { const d = Math.abs(hueOf(a) - hueOf(b)); return Math.min(d, 360 - d); };
+    // A near-black of the same hue as a bright voted fill is the brand's dark variant; the bright one is the primary.
+    const bright = votes[0] && nearBlack(votes[0][0]) && hueOf(votes[0][0]) >= 0
+      ? votes.find(([hex, e]) => e.count >= 2 && !nearBlack(hex) && chroma(hex) > 0.25 && hueGap(hex, votes[0][0]) <= 30)
+      : null;
+    const voted = (bright ?? votes[0])?.[1];
+    if (voted) semanticColors.primary = voted.original;
 
     // Use most-common CTA background as primary if class-based detection missed it
     // Require at least 2 CTA occurrences to avoid single "Sign up" buttons dominating
