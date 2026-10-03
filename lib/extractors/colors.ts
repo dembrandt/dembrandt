@@ -328,7 +328,9 @@ export async function extractColors(page) {
       const borderColor = hasBorder ? toLegacy(computed.borderColor) : "";
       // An SVG shape paints with fill and stroke, never with color, so the logo's colour was not read.
       // The logo only: rows of partner logos, flags and icons carry dozens of colours that are not the brand's.
-      const svgHost = el instanceof SVGElement && el.tagName.toLowerCase() !== 'svg' ? (el as SVGElement).ownerSVGElement : null;
+      const paints = el instanceof SVGElement && /^(path|rect|circle|ellipse|polygon|polyline|line|text|tspan)$/i.test(el.tagName)
+        && !el.closest('defs, clipPath, mask, symbol, pattern, marker');
+      const svgHost = paints ? (el as SVGElement).ownerSVGElement : null;
       const svgBox = svgHost?.getBoundingClientRect();
       const inLogo = Boolean(svgBox && svgBox.width <= 240 && svgBox.height <= 240)
         && Boolean(el.closest('[class*="logo" i], [id*="logo" i], [aria-label*="logo" i], a[href="/"]'))

@@ -39,3 +39,17 @@ test('the fills of a large illustration and of a row of small partner logos stay
   const got = await hexes();
   assert.deepEqual(ART.filter((c) => got.includes(c)), []);
 });
+
+test('groups, definitions and clip shapes in a logo add no colour of their own', async () => {
+  const grouped = await browser.newPage();
+  try {
+    await grouped.setContent(`<!doctype html><html><body style="margin:0;background:#ffffff;color:#1d0c17">
+<header><a href="/" class="logo"><svg width="120" height="30" viewBox="0 0 120 30"><title>Brand</title><defs><clipPath id="c"><rect width="120" height="30"/></clipPath></defs><g clip-path="url(#c)"><g><path fill="${LOGO}" d="M0 0h120v30H0z"/></g></g></svg></a></header>
+<div>${cells}</div></body></html>`, { waitUntil: 'load' });
+    const got = (await extractColors(grouped)).palette.map((c: { normalized: string }) => c.normalized.toLowerCase());
+    assert.ok(got.includes(LOGO), got.join(' '));
+    assert.ok(!got.includes('#000000'), got.join(' '));
+  } finally {
+    await grouped.close();
+  }
+});
