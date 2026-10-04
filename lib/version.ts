@@ -36,6 +36,15 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  (unversioned) — BEHAVIOR, contract unchanged: the drift engine compares
+ *          `frameworks` and `iconSystem` as a `tech` category. A technology
+ *          added or removed, or a major version, raises the score; a minor or
+ *          patch version is listed and scores nothing. The category can only
+ *          raise a score, never dilute one. It is skipped unless both
+ *          snapshots are 1.18.0 or later and come from the same CLI version:
+ *          a baseline taken before the fields existed is unmoved, and a
+ *          detection rule changed between releases does not read as a
+ *          technology the site dropped.
  *  1.18.0 — frameworks entries gain `category`, `version` and `coverage` (the
  *          share of the page under that framework's mount points), iconSystem
  *          entries gain `version`. Additive: 1.17.x consumers ignore them.
