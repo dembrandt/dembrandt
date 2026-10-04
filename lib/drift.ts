@@ -30,7 +30,7 @@ export interface DriftConfig {
   /** Percent change at or below this (and above dimPct): "shifted". Beyond: removed/added. */
   dimShiftPct: number;
   /** Relative weight of each category in the overall score. */
-  weights: { color: number; typography: number; spacing: number; radius: number; shadow: number; logo: number };
+  weights: { color: number; typography: number; spacing: number; radius: number; shadow: number; logo: number; tech: number };
   /** score > failThreshold => fail. */
   failThreshold: number;
 }
@@ -40,12 +40,12 @@ export const DEFAULT_DRIFT_CONFIG: DriftConfig = {
   colorShift: 15,
   dimPct: 4,
   dimShiftPct: 25,
-  weights: { color: 1, typography: 1, spacing: 0.8, radius: 0.6, shadow: 0.6, logo: 0.8 },
+  weights: { color: 1, typography: 1, spacing: 0.8, radius: 0.6, shadow: 0.6, logo: 0.8, tech: 0.6 },
   failThreshold: 10,
 };
 
 export type DriftKind = "changed" | "added" | "removed";
-export type DriftCategory = "color" | "typography" | "spacing" | "radius" | "shadow" | "logo";
+export type DriftCategory = "color" | "typography" | "spacing" | "radius" | "shadow" | "logo" | "tech";
 
 export interface DriftChange {
   category: DriftCategory;
@@ -594,6 +594,51 @@ function compareLogo(base: LogoId | null, cand: LogoId | null): { changes: Drift
   return none;
 }
 
+function techEntries(e: ExtractionResult): Map<string, string | undefined> {
+  const out = new Map<string, string | undefined>();
+  for (const f of e.frameworks ?? []) if (f.confidence === "high") out.set(f.name, f.version);
+  for (const i of e.iconSystem ?? []) if (i.name !== "SVG Icons") out.set(i.name, i.version);
+  return out;
+}
+
+function statesTech(e: ExtractionResult): boolean {
+  const [major, minor] = String(e.meta?.schemaVersion ?? "").split(".").map(Number);
+  return major > 1 || (major === 1 && minor >= 18);
+}
+
+const majorOf = (version: string) => version.match(/\d+/)?.[0];
+
+function compareTech(baseline: ExtractionResult, candidate: ExtractionResult): { changes: DriftChange[]; result: CategoryResult } {
+  const changes: DriftChange[] = [];
+  const result: CategoryResult = { category: "tech", score: 0, changed: 0, added: 0, removed: 0 };
+  const sameRules = baseline.meta?.dembrandtVersion === candidate.meta?.dembrandtVersion;
+  if (!sameRules || !statesTech(baseline) || !statesTech(candidate)) return { changes, result };
+  const base = techEntries(baseline);
+  const cand = techEntries(candidate);
+  let penalty = 0;
+  for (const [name, before] of base) {
+    if (!cand.has(name)) {
+      changes.push({ category: "tech", kind: "removed", label: name, ...(before ? { before } : {}) });
+      result.removed++;
+      penalty += 1;
+      continue;
+    }
+    const after = cand.get(name);
+    if (!before || !after || before === after) continue;
+    changes.push({ category: "tech", kind: "changed", label: name, before, after });
+    result.changed++;
+    if (majorOf(before) !== majorOf(after)) penalty += 1;
+  }
+  for (const [name, after] of cand) {
+    if (base.has(name)) continue;
+    changes.push({ category: "tech", kind: "added", label: name, ...(after ? { after } : {}) });
+    result.added++;
+    penalty += 0.5;
+  }
+  result.score = clamp01(penalty / Math.max(base.size, 1));
+  return { changes, result };
+}
+
 /* ------------------------------- entry -------------------------------- */
 
 /** Map the palette to weighted entries: keep usage count, and attach a brand
@@ -732,6 +777,8 @@ const STAGE_CATEGORY: Record<string, DriftCategory> = {
   borderRadius: "radius",
   shadows: "shadow",
   logo: "logo",
+  frameworks: "tech",
+  iconSystem: "tech",
   "dark-mode": "color",
   mobile: "color",
   reveal: "color",
@@ -819,6 +866,7 @@ export function computeDrift(
       w: cfg.weights.logo,
       comparable: Boolean(baseLogo || candLogo),
     },
+    { ...compareTech(baseline, candidate), w: cfg.weights.tech, comparable: false },
   ];
 
   const warnings: string[] = [];
@@ -874,7 +922,10 @@ export function computeDrift(
     );
   }
 
-  const score = totalW > 0 ? Math.round((weighted / totalW) * 100) : 0;
+  const techScore = categories.find((c) => c.category === "tech")?.score ?? 0;
+  const tokens = totalW > 0 ? weighted / totalW : 0;
+  const withTech = techScore > 0 ? (weighted + techScore * cfg.weights.tech) / (totalW + cfg.weights.tech) : 0;
+  const score = Math.round(Math.max(tokens, withTech) * 100);
   const summary = changes.reduce(
     (acc, c) => {
       acc[c.kind]++;
