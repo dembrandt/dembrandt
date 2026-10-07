@@ -43,7 +43,9 @@
  *          per value, so a dark-mode run or an alias token (--a and --b with
  *          one value) lost names. palette.tokens now carries the names of
  *          every colour merged into an entry, not only the representative's.
- *          Palette and semantic values are unmoved; drift ignores both fields.
+ *          Palette and semantic values are unmoved; drift ignores both fields:
+ *          dembrandt.com scores 0 against a 0.38.0 baseline. The --ai token
+ *          features stay constant 0, their trained meaning, until a retrain.
  *  1.18.0 — frameworks entries gain `category`, `version` and `coverage` (the
  *          share of the page under that framework's mount points), iconSystem
  *          entries gain `version`. Additive: 1.17.x consumers ignore them.
