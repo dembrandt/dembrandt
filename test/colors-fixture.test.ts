@@ -134,3 +134,30 @@ function toOpaqueHex(color: string | undefined): string | undefined {
   const h = (n: string) => Number(n).toString(16).padStart(2, '0');
   return `#${h(m[1])}${h(m[2])}${h(m[3])}`;
 }
+
+const NEAR_BADGE = '#c11ebc';
+const ALIAS_FIXTURE =
+  `<!doctype html><html><head><style>:root{--primary:${BADGE};--brand:${BADGE};--primary-hover:${NEAR_BADGE};--surface:#ffffff}` +
+  `body{--surface:#f4f4f4}</style></head><body style="margin:0;background:#ffffff;color:#111111">` +
+  Array.from({ length: 4 }, () => `<span class="badge" style="background:${BADGE};color:#fff">New</span>`).join('') +
+  Array.from({ length: 3 }, () => `<span class="badge" style="background:${NEAR_BADGE};color:#fff">Hot</span>`).join('') +
+  `</body></html>`;
+
+test('cssVariables keeps aliases, near-palette values and the body scope', async (t) => {
+  if (browserUnavailable(t)) return;
+  const aliasPage = await browser!.newPage();
+  try {
+    await aliasPage.setContent(ALIAS_FIXTURE, { waitUntil: 'load' });
+    const { cssVariables, palette } = await extractColors(aliasPage);
+    const vars = cssVariables as Record<string, { value: string; scope?: string }>;
+    assert.deepEqual(Object.keys(vars).sort(), ['--brand', '--primary', '--primary-hover', '--surface']);
+    assert.equal(vars['--surface'].value, '#f4f4f4');
+    assert.equal(vars['--surface'].scope, 'body');
+    assert.equal(vars['--primary'].scope, 'root');
+    const badge = palette.find((c: PaletteColor) => c.normalized === BADGE);
+    assert.deepEqual(badge?.tokens?.sort(), ['--brand', '--primary', '--primary-hover']);
+    assert.equal(palette.some((c: PaletteColor) => c.normalized === NEAR_BADGE), false);
+  } finally {
+    await aliasPage.close().catch(() => {});
+  }
+});

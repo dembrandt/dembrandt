@@ -36,6 +36,14 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.19.0 — colors.cssVariables entries gain `scope` (`root` or `body`).
+ *          Additive: 1.18.x consumers ignore it. BEHAVIOR: cssVariables is
+ *          now the complete declared colour-token map. It used to drop every
+ *          variable within deltaE 15 of a palette entry and keep one name
+ *          per value, so a dark-mode run or an alias token (--a and --b with
+ *          one value) lost names. palette.tokens now carries the names of
+ *          every colour merged into an entry, not only the representative's.
+ *          Palette and semantic values are unmoved; drift ignores both fields.
  *  1.18.0 — frameworks entries gain `category`, `version` and `coverage` (the
  *          share of the page under that framework's mount points), iconSystem
  *          entries gain `version`. Additive: 1.17.x consumers ignore them.
@@ -275,7 +283,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.18.0';
+export const SCHEMA_VERSION = '1.19.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
