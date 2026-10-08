@@ -164,6 +164,7 @@ export async function extractColors(page) {
     }
 
     const colorMap = new Map();
+    const occurrenceMap = new Map<string, { hex: string; paints: string; count: number; area: number }>();
     const semanticColors: Record<string, string> = {};
     let primaryRule: string | null = null;
     const cssVariables = {};
@@ -404,11 +405,20 @@ export async function extractColors(page) {
         );
       }
 
-      const allColors = [
-        ...extractColorsFromValue(bgColor),
-        ...extractColorsFromValue(textColor),
-        ...extractColorsFromValue(borderColor),
-      ];
+      const paints: [string, string][] = [[bgColor, 'fill'], [textColor, 'text'], [borderColor, 'border']];
+      for (const [value, paint] of paints) {
+        for (const color of extractColorsFromValue(value)) {
+          if (colorAlpha(color) < 0.3) continue;
+          const hex = normalizeColor(color);
+          if (typeof hex !== 'string') continue;
+          const key = hex + '|' + paint;
+          const row = occurrenceMap.get(key) || { hex, paints: paint, count: 0, area: 0 };
+          row.count++;
+          if (paint === 'fill') row.area += rect.width * rect.height;
+          occurrenceMap.set(key, row);
+        }
+      }
+      const allColors = paints.flatMap(([value]) => extractColorsFromValue(value));
 
       allColors.forEach((color) => {
         if (color && color !== "rgba(0, 0, 0, 0)" && color !== "transparent" && colorAlpha(color) >= 0.3) {
@@ -719,7 +729,12 @@ export async function extractColors(page) {
       }))
       .sort((a, b) => b.count - a.count);
 
-    return { semantic: semanticColors, semanticEvidence, palette: perceptuallyDeduped, cssVariables: filteredCssVariables, detected, _raw: rawColors };
+    const occurrences = Array.from(occurrenceMap.values())
+      .filter((o) => /^#[0-9a-f]{6}$/i.test(o.hex))
+      .map((o) => ({ hex: o.hex, paints: o.paints, slot: null, count: o.count, area: Math.round(o.area), cssVar: tokenNames.get(o.hex)?.[0] ?? null, state: null }))
+      .sort((a, b) => b.count - a.count || a.hex.localeCompare(b.hex) || a.paints.localeCompare(b.paints));
+
+    return { semantic: semanticColors, semanticEvidence, palette: perceptuallyDeduped, cssVariables: filteredCssVariables, detected, occurrences, _raw: rawColors };
   });
 
   if (result && result.palette) {

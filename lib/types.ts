@@ -74,6 +74,24 @@ export interface DetectedColor {
   isToken: boolean;
 }
 
+/**
+ * One colour on one kind of paint, counted over the page. The measurement
+ * layer: palette and semantic are interpretations of it. `slot` and `state`
+ * are reserved for landmark and interaction classification and stay null
+ * until that lands.
+ */
+export interface ColorOccurrence {
+  hex: string;
+  paints: 'fill' | 'text' | 'border';
+  slot: string | null;
+  count: number;
+  /** Summed element box area for fills, 0 for text and borders. */
+  area: number;
+  /** The first declared custom property carrying this exact colour. */
+  cssVar: string | null;
+  state: string | null;
+}
+
 export interface Colors {
   palette: PaletteColor[];
   /** e.g. { primary: '#hex' } */
@@ -86,6 +104,7 @@ export interface Colors {
    * and are not in it.
    */
   detected?: DetectedColor[];
+  occurrences?: ColorOccurrence[];
   /**
    * CSS custom properties. Older extractions carry a bare colour string; current
    * ones carry a CssVariable object, so consumers must handle both.

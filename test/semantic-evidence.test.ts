@@ -113,3 +113,26 @@ test('DESIGN.md carries the election reason and a refusal', () => {
   } as never);
   assert.match(refused, /\*\*Primary\*\*: not elected, 2 chromatic logo colours of equal weight, none painted as a surface\. Candidates: #00b6ff, #ff7237\./);
 });
+
+test('occurrences count each colour per paint, with fill area and the declaring token', async (t) => {
+  if (browserUnavailable(t)) return;
+  const p = await browser!.newPage();
+  try {
+    await p.setContent(ELECTED, { waitUntil: 'load' });
+    const { occurrences, palette } = await extractColors(p);
+    const brandFill = occurrences.find((o) => o.hex === BRAND && o.paints === 'fill');
+    const orangeText = occurrences.find((o) => o.hex === ORANGE && o.paints === 'text');
+    assert.ok(brandFill && orangeText, `expected fill and text rows, got ${JSON.stringify(occurrences)}`);
+    assert.equal(brandFill.count, 3);
+    assert.ok(brandFill.area > 0);
+    assert.equal(brandFill.cssVar, '--brand');
+    assert.equal(orangeText.count, 4);
+    assert.equal(orangeText.area, 0);
+    assert.equal(orangeText.cssVar, null);
+    assert.ok(occurrences.every((o) => o.slot === null && o.state === null));
+    assert.ok(!occurrences.some((o) => o.hex === BRAND && o.paints === 'text'));
+    for (const c of palette) assert.ok(occurrences.some((o) => o.hex === c.normalized), `${c.normalized} in palette but not in occurrences`);
+  } finally {
+    await p.close().catch(() => {});
+  }
+});
