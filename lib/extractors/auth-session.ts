@@ -177,7 +177,7 @@ export function loadAuthSession(
     text = read(absolute);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`cookie file: cannot read ${absolute}: ${msg}`);
+    throw new Error(`cookie file: cannot read ${absolute}: ${msg}`, { cause: err });
   }
   return parseCookieFileText(text, targetUrl);
 }
