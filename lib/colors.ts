@@ -317,6 +317,16 @@ function ciede2000(lab1, lab2) {
  * @param {string} hex - Hex color (#fff, #ffffff, #ffffffaa)
  * @returns {{ r: number, g: number, b: number, a?: number } | null}
  */
+/** HSL saturation of a 6-digit hex, 0 for greys and for near-black or near-white. */
+export function hslChroma(hex: string): number {
+  const m = /^#([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!m) return 0;
+  const r = parseInt(m[1], 16) / 255, g = parseInt(m[2], 16) / 255, b = parseInt(m[3], 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
+  if (max === min || l < 0.08 || l > 0.92) return 0;
+  return l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
+}
+
 export function hexToRgb(hex) {
   if (!hex || !hex.startsWith('#')) return null;
 

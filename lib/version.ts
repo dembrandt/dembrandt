@@ -36,6 +36,10 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.19.0 — colors.semanticEvidence.primary records how the primary was
+ *          decided: `elected` with the rule and reason, or `refused` with the
+ *          candidates that lost. colors.detected is now typed and documented.
+ *          Additive: semantic values do not move.
  *  1.18.0 — frameworks entries gain `category`, `version` and `coverage` (the
  *          share of the page under that framework's mount points), iconSystem
  *          entries gain `version`. Additive: 1.17.x consumers ignore them.
@@ -275,7 +279,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.18.0';
+export const SCHEMA_VERSION = '1.19.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';

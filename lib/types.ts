@@ -53,10 +53,38 @@ export interface CssVariable {
   oklch?: string;
 }
 
+export interface SemanticEvidence {
+  decision: 'elected' | 'refused';
+  rule: string | null;
+  reason: string;
+  /** Custom properties that declare the elected colour. */
+  tokens: string[];
+  alternates: { color: string; count: number; sources: string[] }[];
+}
+
+export interface DetectedColor {
+  color: string;
+  normalized: string;
+  count: number;
+  usageFrac: number;
+  areaFrac: number;
+  confidence: 'high' | 'medium' | 'low';
+  sources: string[];
+  isToken: boolean;
+}
+
 export interface Colors {
   palette: PaletteColor[];
   /** e.g. { primary: '#hex' } */
   semantic: Record<string, string>;
+  /** How each semantic role was decided; a refused role is recorded, not absent. */
+  semanticEvidence?: Record<string, SemanticEvidence>;
+  /**
+   * Every colour painted on a DOM element, no frequency threshold, no perceptual
+   * merge. Logo, manifest and gradient colours join `palette` after this scan
+   * and are not in it.
+   */
+  detected?: DetectedColor[];
   /**
    * CSS custom properties. Older extractions carry a bare colour string; current
    * ones carry a CssVariable object, so consumers must handle both.
