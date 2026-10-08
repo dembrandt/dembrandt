@@ -36,6 +36,10 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.21.0 — colors.occurrences: one row per colour per paint (fill, text,
+ *          border) with count, summed fill area and the declaring custom
+ *          property. The measurement layer the palette is read from; slot and
+ *          state are null until classification lands. Additive.
  *  1.20.0 — meta.context records the browser context the run was measured
  *          under: viewport, deviceScaleFactor, isMobile, hasTouch, colorScheme,
  *          reducedMotion, forcedColors, locale, timezoneId, userAgent. Drift
@@ -283,7 +287,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.20.0';
+export const SCHEMA_VERSION = '1.21.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
