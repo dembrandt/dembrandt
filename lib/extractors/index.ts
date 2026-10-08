@@ -14,7 +14,7 @@ import { extractTeach } from './teach.js';
 import { extractWcagPairs, bindContrastToPalette } from './colors.js';
 import { SCHEMA_VERSION } from '../version.js';
 import { hslChroma } from '../colors.js';
-import { buildContextOptions, parseCookies, parseScreenSize, DEFAULT_LOCALE } from './context-config.js';
+import { buildContextOptions, describeContext, parseCookies, parseScreenSize, DEFAULT_LOCALE } from './context-config.js';
 import { guardExtractor } from './guard.js';
 import { dismissConsent } from './consent.js';
 import type { Browser, Page } from 'playwright';
@@ -1430,6 +1430,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         dembrandtVersion: options._version || null,
         schemaVersion: SCHEMA_VERSION,
         viewport: { width: screenW, height: screenH },
+        context: describeContext(contextOptions),
         fontsReady,
         ...(pendingFonts.length ? { pendingFonts } : {}),
         // top-level `url` is post-redirect; this is what was passed in.

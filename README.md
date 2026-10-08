@@ -96,7 +96,7 @@ reference is **[docs/usage.md](docs/usage.md)**.
 | Flag | What you get |
 |---|---|
 | `--cookie <string>` | Reach pages behind a session |
-| `--header <string>` | Any extra request header |
+| `--header <string>` | Any extra request header, repeat for several |
 | `--user-agent <string>` | Custom user agent |
 | `--locale <string>` | Locale for the fingerprint |
 | `--timezone <string>` | Timezone for the fingerprint |
