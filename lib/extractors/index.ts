@@ -14,6 +14,13 @@ import { extractTeach } from './teach.js';
 import { extractWcagPairs, bindContrastToPalette } from './colors.js';
 import { SCHEMA_VERSION } from '../version.js';
 import { buildContextOptions, parseCookies, parseScreenSize, DEFAULT_LOCALE } from './context-config.js';
+import {
+  loadAuthSession,
+  mergeSessionCookies,
+  parseBasicAuth,
+  waitForEnter,
+  emptyAuthSession,
+} from './auth-session.js';
 import { guardExtractor } from './guard.js';
 import { dismissConsent } from './consent.js';
 import type { Browser, Page } from 'playwright';
@@ -298,9 +305,24 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
   const locale = options.locale || DEFAULT_LOCALE;
   const { width: screenW, height: screenH } = parseScreenSize(options.screenSize);
 
-  const contextOptions = buildContextOptions(options, browser.browserType().name());
+  const fileSession = options.cookieFile
+    ? loadAuthSession(options.cookieFile, url)
+    : (options.storageState
+      ? { cookies: [] as import('./auth-session.js').SessionCookie[], storageState: options.storageState }
+      : emptyAuthSession());
+  const httpCredentials = options.httpCredentials
+    ?? parseBasicAuth(options.basicAuth);
 
-  const context = await browser.newContext(contextOptions);
+  const contextOptions = buildContextOptions(
+    {
+      ...options,
+      ...(httpCredentials ? { httpCredentials } : {}),
+      ...(fileSession.storageState ? { storageState: fileSession.storageState } : {}),
+    },
+    browser.browserType().name(),
+  );
+
+  const context = await browser.newContext(contextOptions as Parameters<Browser['newContext']>[0]);
 
   // Setup between context creation and the main try/finally below runs outside
   // the finally that closes the context; a throw here (malformed cookie, dead
@@ -314,9 +336,16 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
     }
   };
 
-  const parsedCookies = parseCookies(options.cookie, url);
-  if (parsedCookies.length > 0) {
-    await closingOnError(context.addCookies(parsedCookies));
+  // storageState already applied its cookies; file-only cookies merge over --cookie.
+  const cliCookies = parseCookies(options.cookie, url);
+  const fileCookies = fileSession.storageState ? [] : fileSession.cookies;
+  const extraCookies = options.sessionCookies ?? [];
+  const cookiesToAdd = mergeSessionCookies(
+    cliCookies,
+    mergeSessionCookies(extraCookies, fileCookies),
+  );
+  if (cookiesToAdd.length > 0) {
+    await closingOnError(context.addCookies(cookiesToAdd));
   }
 
   if (options.stealth) {
@@ -479,6 +508,14 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
 
         spinner.stop();
         log(color.success(`  ✓ Page loaded`));
+
+        if (options.login && attempts === 1) {
+          await waitForEnter();
+          if (options.saveStorageState) {
+            await context.storageState({ path: options.saveStorageState });
+            log(color.success(`  ✓ Storage state saved to ${options.saveStorageState}`));
+          }
+        }
 
         spinner.start("Waiting for body content to render...");
         try {
@@ -1442,6 +1479,9 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
           ...(options.timezoneId && { timezone: options.timezoneId }),
           ...(options.acceptLanguage && { acceptLanguage: options.acceptLanguage }),
           ...(options.screenSize && { screenSize: options.screenSize }),
+          ...((options.cookieFile || options.storageState || options.cookie || (options.sessionCookies?.length ?? 0) > 0) && { session: true }),
+          ...((options.basicAuth || options.httpCredentials) && { basicAuth: true }),
+          ...(options.login && { login: true }),
         },
       },
       siteName,

@@ -32,6 +32,8 @@ const PARAM_FOR_FLAG: Record<string, string> = {
   '--crawl': 'pages',
   '--sitemap': 'sitemap',
   '--cookie': 'cookie',
+  '--cookie-file': 'cookieFile',
+  '--basic-auth': 'basicAuth',
   '--header': 'header',
   '--user-agent': 'userAgent',
   '--no-sandbox': 'noSandbox',
@@ -48,6 +50,8 @@ const CLI_ONLY: Record<string, string> = {
   '--approve': 'Rewrites a baseline file on disk, which belongs to the CI job, not the agent.',
   '--browser': 'Engine selection is a local install concern.',
   '--stealth': 'Opt-in anti-detection. Deliberately not offered to an autonomous caller.',
+  '--login': 'Interactive TTY pause in a headed window. An agent cannot press Enter.',
+  '--save-storage-state': 'Writes a session file after --login; belongs to the operator, not the agent.',
   '--key': 'Account sync. An agent is not the account holder.',
   '--locale': 'Fingerprint detail with no agent-facing use yet.',
   '--timezone': 'Fingerprint detail with no agent-facing use yet.',
@@ -111,7 +115,7 @@ test('every CLI flag is answered over MCP or declared CLI-only', () => {
 });
 
 test('every extraction tool takes the whole navigation surface, not just one of them', () => {
-  const shared = ['slow', 'mobile', 'darkMode', 'cookie', 'header', 'userAgent', 'noSandbox', 'pages', 'paths', 'sitemap'];
+  const shared = ['slow', 'mobile', 'darkMode', 'cookie', 'cookieFile', 'basicAuth', 'header', 'userAgent', 'noSandbox', 'pages', 'paths', 'sitemap'];
   // An extraction tool opens a browser: url plus sync. check_robots does not.
   const extraction = tools.filter((t) => {
     const props = Object.keys(t.inputSchema.properties ?? {});

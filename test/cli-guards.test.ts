@@ -5,6 +5,8 @@ import {
   colorFormatWarning,
   guardWarnings,
   ignoredDiscoveryWarning,
+  loginMultiPageWarning,
+  saveStorageStateWarning,
   voiceNeedsOutputFile,
 } from '../lib/cli-guards.js';
 
@@ -67,6 +69,19 @@ test('--voice needs a sink of its own because no formatter prints it', () => {
 
 test('--html and --tailwind do not count as voice sinks: neither renders voice', () => {
   assert.equal(voiceNeedsOutputFile({ voice: true, html: true, tailwind: true }, false), true);
+});
+
+test('--save-storage-state is only meaningful with --login', () => {
+  assert.match(saveStorageStateWarning({ saveStorageState: 's.json' }) ?? '', /--save-storage-state has no effect/);
+  assert.equal(saveStorageStateWarning({ saveStorageState: 's.json', login: true }), null);
+  assert.equal(saveStorageStateWarning({}), null);
+});
+
+test('--login on a multi-page run warns that only the first page pauses', () => {
+  assert.match(loginMultiPageWarning({ login: true, crawl: 3 }, undefined) ?? '', /first page only/);
+  assert.match(loginMultiPageWarning({ login: true }, ['/pricing']) ?? '', /--cookie-file/);
+  assert.equal(loginMultiPageWarning({ login: true }, undefined), null);
+  assert.equal(loginMultiPageWarning({}, ['/pricing']), null);
 });
 
 test('guardWarnings emits every applicable warning in emit order', () => {

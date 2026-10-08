@@ -142,3 +142,19 @@ test('buildContextOptions is deterministic for identical input', () => {
   const opts: ExtractOptions = { locale: 'de-DE', screenSize: '1024x768', header: 'X-Z: y' };
   assert.deepEqual(buildContextOptions(opts, 'chromium'), buildContextOptions(opts, 'chromium'));
 });
+
+test('buildContextOptions forwards httpCredentials and storageState when set', () => {
+  const storageState = { cookies: [], origins: [] };
+  const opts = buildContextOptions({
+    httpCredentials: { username: 'u', password: 'p' },
+    storageState,
+  }, 'chromium');
+  assert.deepEqual(opts.httpCredentials, { username: 'u', password: 'p' });
+  assert.equal(opts.storageState, storageState);
+});
+
+test('buildContextOptions omits httpCredentials and storageState when unset', () => {
+  const opts = buildContextOptions({}, 'chromium');
+  assert.ok(!('httpCredentials' in opts));
+  assert.ok(!('storageState' in opts));
+});
