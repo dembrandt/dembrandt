@@ -5,6 +5,7 @@
  * YAML design tokens in front matter plus ordered markdown rationale sections.
  */
 import { convertColor, deltaE } from '../colors.js';
+import type { SemanticEvidence } from '../types.js';
 
 /**
  * The @google/design.md release this emitter is known to satisfy.
@@ -48,7 +49,7 @@ export function generateDesignMd(result: any, options: { version?: string } = {}
   const sections = [
     '# Design System',
     buildOverviewSection(domain),
-    hasKeys(colorRoles) ? buildColorsSection(colorRoles) : null,
+    hasKeys(colorRoles) || result.colors?.semanticEvidence?.primary ? buildColorsSection(colorRoles, result.colors?.semanticEvidence) : null,
     hasKeys(typographyTokens) ? buildTypographySection(result, typographyTokens) : null,
     hasLayoutEvidence(result, spacingTokens) ? buildLayoutSection(result, spacingTokens) : null,
     hasElevationEvidence(result) ? buildElevationSection(result) : null,
@@ -266,10 +267,19 @@ function buildComponentTokens(result, colorRoles, roundedTokens) {
   return components;
 }
 
-function buildColorsSection(colorRoles) {
+function buildColorsSection(colorRoles, evidence?: Record<string, SemanticEvidence>) {
   const lines = ['## Colors'];
   for (const [role, hex] of (Object.entries(colorRoles) as any[])) {
-    lines.push(`- **${titleize(role)}** (${hex}): Observed color token extracted from the site's palette, semantic CSS, or component styles.`);
+    const ev = evidence?.[role];
+    const why = ev?.decision === 'elected'
+      ? `Elected: ${ev.reason}${ev.tokens.length ? ` (${ev.tokens.slice(0, 2).join(', ')})` : ''}.`
+      : "Observed color token extracted from the site's palette, semantic CSS, or component styles.";
+    lines.push(`- **${titleize(role)}** (${hex}): ${why}`);
+  }
+  const refused = evidence?.primary?.decision === 'refused' ? evidence.primary : null;
+  if (refused && !colorRoles.primary) {
+    const candidates = refused.alternates.length ? ` Candidates: ${refused.alternates.map((a) => a.color).join(', ')}.` : '';
+    lines.push(`- **Primary**: not elected, ${refused.reason}.${candidates}`);
   }
   return lines.join('\n');
 }

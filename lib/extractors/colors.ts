@@ -165,6 +165,7 @@ export async function extractColors(page) {
 
     const colorMap = new Map();
     const semanticColors: Record<string, string> = {};
+    let primaryRule: string | null = null;
     const cssVariables = {};
 
     const domain = window.location.hostname;
@@ -433,7 +434,7 @@ export async function extractColors(page) {
 
       if ((context.includes("primary") || el.matches('[class*="primary"]')) && !isRoleQualified(context)) {
         const candidate = bgColor !== "rgba(0, 0, 0, 0)" && bgColor !== "transparent" ? bgColor : textColor;
-        if (colorAlpha(candidate) >= 0.7 && colorLightness(candidate) <= 0.95) semanticColors.primary = candidate;
+        if (colorAlpha(candidate) >= 0.7 && colorLightness(candidate) <= 0.95) { semanticColors.primary = candidate; primaryRule = 'class'; }
       }
       if (context.includes("secondary")) {
         const a = colorAlpha(bgColor);
@@ -472,6 +473,7 @@ export async function extractColors(page) {
         if (data && data.score > bestScore) {
           bestScore = data.score;
           semanticColors.primary = entry.original;
+          primaryRule = 'cta';
         }
       }
     }
@@ -618,12 +620,12 @@ export async function extractColors(page) {
         .sort((a, b) =>
           ((b.c.count + (b.isToken ? 20 : 0)) - (a.c.count + (a.isToken ? 20 : 0)))
           || (b.chroma - a.chroma))[0];
-      if (best) semanticColors.primary = best.c.color;
+      if (best) { semanticColors.primary = best.c.color; primaryRule = best.isToken ? 'token' : 'chromatic'; }
     }
     // A monochrome site: the shared button fill is the primary.
     if (!semanticColors.primary && ctaNeutralMap.size > 0) {
       const top = [...ctaNeutralMap.values()].sort((a, b) => b.count - a.count)[0];
-      if (top.count >= 2) semanticColors.primary = top.original;
+      if (top.count >= 2) { semanticColors.primary = top.original; primaryRule = 'monochrome-cta'; }
     }
 
     // Near-neutral primaries are the dominant mis-pick: a dark text/background
@@ -644,9 +646,34 @@ export async function extractColors(page) {
           .sort((a, b) =>
             ((b.c.count + (b.isToken ? 20 : 0) + (b.isCta ? 20 : 0)) - (a.c.count + (a.isToken ? 20 : 0) + (a.isCta ? 20 : 0)))
             || (b.ch - a.ch))[0];
-        if (chromatic) semanticColors.primary = chromatic.c.color;
+        if (chromatic) { semanticColors.primary = chromatic.c.color; primaryRule = chromatic.isToken ? 'neutral-rescue-token' : 'neutral-rescue-cta'; }
       }
     }
+
+    const PRIMARY_REASONS: Record<string, string> = {
+      'class': 'an element class names it primary',
+      'cta': 'recurring call-to-action background',
+      'token': 'most used chromatic colour, declared as a custom property',
+      'chromatic': 'most used chromatic palette colour',
+      'monochrome-cta': 'shared button fill on a monochrome page',
+      'neutral-rescue-token': 'near-neutral pick replaced by a declared chromatic token',
+      'neutral-rescue-cta': 'near-neutral pick replaced by a recurring chromatic CTA',
+    };
+    const primaryNormalized = semanticColors.primary ? normalizeColor(semanticColors.primary) : null;
+    const primaryCandidates = perceptuallyDeduped
+      .filter(c => chroma(c.normalized) > 0.15 && c.normalized !== primaryNormalized)
+      .slice(0, 5)
+      .map(c => ({ color: c.normalized, count: c.count, sources: (c.sources || []).slice(0, 3) }));
+    const semanticEvidence = {
+      primary: semanticColors.primary
+        ? { decision: 'elected', rule: primaryRule, reason: PRIMARY_REASONS[primaryRule] || primaryRule,
+            tokens: tokenNames.get(primaryNormalized) || [], alternates: primaryCandidates }
+        : { decision: 'refused', rule: null,
+            reason: primaryCandidates.length === 0
+              ? 'no chromatic colour reached the palette'
+              : `${primaryCandidates.length} chromatic colours in the palette, all at low confidence`,
+            tokens: [], alternates: primaryCandidates },
+    };
 
     // Accent vs primary. A brand often runs a primary alongside a distinct, more
     // saturated accent (e.g. a cyan brand mark beside a navy primary). Surface
@@ -692,7 +719,7 @@ export async function extractColors(page) {
       }))
       .sort((a, b) => b.count - a.count);
 
-    return { semantic: semanticColors, palette: perceptuallyDeduped, cssVariables: filteredCssVariables, detected, _raw: rawColors };
+    return { semantic: semanticColors, semanticEvidence, palette: perceptuallyDeduped, cssVariables: filteredCssVariables, detected, _raw: rawColors };
   });
 
   if (result && result.palette) {

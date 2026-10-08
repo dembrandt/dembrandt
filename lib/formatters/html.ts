@@ -402,7 +402,11 @@ function semanticSection(result: BrandingResult): string {
     )
     .join("");
   const all = sem.map(([role, hex]) => `${role}: ${hex}`).join("\n");
-  return section("Semantic colors", `<div class="colors">${chips}</div>`, undefined, all);
+  const ev = result.colors?.semanticEvidence?.primary;
+  const note = ev
+    ? `<p class="muted">primary ${esc(ev.decision)}: ${esc(ev.reason)}${ev.tokens?.length ? ` (${esc(ev.tokens.slice(0, 2).join(", "))})` : ""}${ev.decision === "refused" && ev.alternates?.length ? `. Candidates: ${esc(ev.alternates.map((a) => a.color).join(" "))}` : ""}</p>`
+    : "";
+  return section("Semantic colors", `<div class="colors">${chips}</div>${note}`, undefined, all);
 }
 
 /**

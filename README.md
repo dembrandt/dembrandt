@@ -31,7 +31,7 @@ Requires Node.js 18+
 
 ## What you get
 
-- Colors (semantic, palette, CSS variables, gradients)
+- Colors (semantic roles with the evidence behind each pick, curated palette, every detected colour, CSS variables, gradients)
 - Typography (fonts, sizes, weights, sources, font file URLs)
 - Spacing (margin/padding scales)
 - Borders (radius, widths, styles, colors)

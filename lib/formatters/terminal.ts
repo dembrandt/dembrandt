@@ -323,6 +323,14 @@ function displayColors(colors, colorFormat: ColorFormat = 'hex') {
     );
   });
 
+  const primaryEvidence = colors.semanticEvidence?.primary;
+  if (primaryEvidence) {
+    const tokens = primaryEvidence.tokens?.length ? ` (${primaryEvidence.tokens.slice(0, 2).join(', ')})` : '';
+    const alternates = primaryEvidence.decision === 'refused' && primaryEvidence.alternates?.length
+      ? ': ' + primaryEvidence.alternates.map((a) => a.color).join(' ') : '';
+    console.log(chalk.dim(`│  primary ${primaryEvidence.decision}, ${primaryEvidence.reason}${tokens}${alternates}`));
+  }
+
   const cssVarLimit = 15;
   const paletteLimit = 20;
   const remaining = (colors.cssVariables ? Math.max(0, Object.keys(colors.cssVariables).length - cssVarLimit) : 0) +
