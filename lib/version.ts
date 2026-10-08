@@ -36,23 +36,21 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
- *  1.22.0 — a crawl tags every merged palette, typography, spacing, radius,
- *          border and shadow value with pageCount and scope (site, section,
- *          page), and carries `coverage`: a 0-100 agreement score, per family
- *          means, and the page-local outliers. Absent on a single page.
- *          Additive.
- *  1.21.0 — colors.occurrences: one row per colour per paint (fill, text,
- *          border) with count, summed fill area and the declaring custom
- *          property. The measurement layer the palette is read from; slot and
- *          state are null until classification lands. Additive.
- *  1.20.0 — meta.context records the browser context the run was measured
- *          under: viewport, deviceScaleFactor, isMobile, hasTouch, colorScheme,
- *          reducedMotion, forcedColors, locale, timezoneId, userAgent. Drift
- *          warns when two snapshots differ in a rendering dial. Additive.
- *  1.19.0 — colors.semanticEvidence.primary records how the primary was
- *          decided: `elected` with the rule and reason, or `refused` with the
- *          candidates that lost. colors.detected is now typed and documented.
- *          Additive: semantic values do not move.
+ *  1.19.0 — four additions in one unreleased step. colors.semanticEvidence
+ *          .primary records how the primary was decided: `elected` with the
+ *          rule, reason, declaring tokens and runners-up, or `refused` with the
+ *          candidates that lost. colors.occurrences counts every colour per
+ *          paint (fill, text, border) with summed fill area and the declaring
+ *          custom property; slot and state are null until classification
+ *          lands. meta.context records the browser context the run was
+ *          measured under (viewport, deviceScaleFactor, isMobile, hasTouch,
+ *          colorScheme, reducedMotion, forcedColors, locale, timezoneId,
+ *          userAgent) and drift warns when two snapshots differ in a dial.
+ *          A crawl tags every merged value with pageCount and scope (site,
+ *          section, page) and carries `coverage`: a 0-100 agreement score,
+ *          per-family means and the page-local outliers. No semantic value
+ *          moves: 163 of 175 corpus sites identical against a same-evening
+ *          0.38.0 control, the remaining 12 moved on the control too.
  *  1.18.0 — frameworks entries gain `category`, `version` and `coverage` (the
  *          share of the page under that framework's mount points), iconSystem
  *          entries gain `version`. Additive: 1.17.x consumers ignore them.
@@ -292,7 +290,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.22.0';
+export const SCHEMA_VERSION = '1.19.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
