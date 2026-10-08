@@ -1,3 +1,4 @@
+import type { ContextDescription } from './extractors/context-config.js';
 /**
  * Shared types for dembrandt extraction output and CLI options.
  * These were JSDoc @typedefs; promoted to real exported interfaces so the rest
@@ -425,6 +426,11 @@ export interface ExtractionMeta {
    */
   viewport?: { width: number; height: number };
   /**
+   * The browser context the run was measured under. Two extractions whose
+   * contexts differ are two measurements, not one design and its drift.
+   */
+  context?: ContextDescription;
+  /**
    * False when web fonts had not finished loading when styles were read:
    * typography families may be OS fallbacks, and family drift against this
    * snapshot is suspect. Consumers must not have to infer this from generic
@@ -696,7 +702,8 @@ export interface ExtractOptions {
   acceptLanguage?: string;
   screenSize?: string;
   cookie?: string;
-  header?: string;
+  /** One "Name: value" header, or several when the flag is repeated. */
+  header?: string | string[];
   /** Internal: collect raw :root tokens + interactive-state styles to a sidecar. */
   teach?: boolean;
   /** Injected CLI version, surfaced as meta.dembrandtVersion. */

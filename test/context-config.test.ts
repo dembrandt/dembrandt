@@ -11,6 +11,7 @@ import {
   parseScreenSize,
   deriveAcceptLanguage,
   buildContextOptions,
+  describeContext,
   DEFAULT_SCREEN,
   DEFAULT_USER_AGENT,
 } from '../lib/extractors/context-config.js';
@@ -141,4 +142,44 @@ test('buildContextOptions keeps viewport and screen as separate objects', () => 
 test('buildContextOptions is deterministic for identical input', () => {
   const opts: ExtractOptions = { locale: 'de-DE', screenSize: '1024x768', header: 'X-Z: y' };
   assert.deepEqual(buildContextOptions(opts, 'chromium'), buildContextOptions(opts, 'chromium'));
+});
+
+test('parseHeader takes a repeated flag and keeps the last value of a repeated name', () => {
+  assert.deepEqual(parseHeader(['Authorization: Bearer x', 'X-Flag: new-nav', 'X-Flag: old-nav']), {
+    Authorization: 'Bearer x',
+    'X-Flag': 'old-nav',
+  });
+  assert.deepEqual(parseHeader(['no colon', ': empty']), {});
+  assert.deepEqual(parseHeader([]), {});
+});
+
+test('buildContextOptions applies every header of a repeated flag', () => {
+  const opts = buildContextOptions({ header: ['X-A: 1', 'X-B: 2'] }, 'chromium');
+  assert.equal(opts.extraHTTPHeaders['X-A'], '1');
+  assert.equal(opts.extraHTTPHeaders['X-B'], '2');
+  assert.ok(opts.extraHTTPHeaders['Accept-Language']);
+});
+
+test('describeContext echoes the dials a default run is measured under', () => {
+  const described = describeContext(buildContextOptions({}, 'chromium'));
+  assert.deepEqual(described, {
+    viewport: { width: DEFAULT_SCREEN.width, height: DEFAULT_SCREEN.height },
+    deviceScaleFactor: 1,
+    isMobile: false,
+    hasTouch: false,
+    colorScheme: 'light',
+    reducedMotion: 'no-preference',
+    forcedColors: 'none',
+    locale: 'en-US',
+    timezoneId: 'America/New_York',
+    userAgent: DEFAULT_USER_AGENT,
+  });
+});
+
+test('describeContext carries the locale, timezone and viewport the caller set', () => {
+  const described = describeContext(buildContextOptions({ locale: 'fi-FI', timezoneId: 'Europe/Helsinki', screenSize: '390x844' }, 'chromium'));
+  assert.equal(described.locale, 'fi-FI');
+  assert.equal(described.timezoneId, 'Europe/Helsinki');
+  assert.deepEqual(described.viewport, { width: 390, height: 844 });
+  assert.notEqual(described.viewport, buildContextOptions({ screenSize: '390x844' }, 'chromium').viewport);
 });

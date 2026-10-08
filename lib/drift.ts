@@ -702,6 +702,23 @@ function flagMismatchWarnings(baseline: ExtractionResult, candidate: ExtractionR
   return out;
 }
 
+const CONTEXT_DIALS = ["deviceScaleFactor", "isMobile", "hasTouch", "colorScheme", "reducedMotion", "forcedColors", "locale"] as const;
+
+/** Two contexts that differ in a rendering dial are two measurements of the
+ * same brand, not a before and an after. Old snapshots lack meta.context. */
+function contextMismatchWarning(baseline: ExtractionResult, candidate: ExtractionResult): string | null {
+  const b = baseline.meta?.context;
+  const c = candidate.meta?.context;
+  if (!b || !c) return null;
+  const moved = CONTEXT_DIALS.filter((d) => String(b[d]) !== String(c[d]))
+    .map((d) => `${d} ${String(b[d])} -> ${String(c[d])}`);
+  if (moved.length === 0) return null;
+  return (
+    `baseline and candidate were measured under different browser contexts (${moved.join(", ")}) — ` +
+    `the diff compares two renderings, not one design over time. Re-extract both under the same context.`
+  );
+}
+
 /** A snapshot taken before web fonts finished loading carries fallback
  * families; family drift against it is suspect. */
 function fontsWarning(baseline: ExtractionResult, candidate: ExtractionResult): string | null {
@@ -826,6 +843,7 @@ export function computeDrift(
     viewportWarning(baseline, candidate),
     pageMismatchWarning(baseline, candidate),
     ...flagMismatchWarnings(baseline, candidate),
+    contextMismatchWarning(baseline, candidate),
     fontsWarning(baseline, candidate),
   ]) {
     if (w) warnings.push(w);

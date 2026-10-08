@@ -110,7 +110,7 @@ program
   })
   .option("--sitemap", "Discover pages from sitemap.xml instead of DOM links; use alone or combine with --crawl to set page limit")
   .option("--cookie <string>", "Cookie string for authenticated pages, e.g. \"session=abc; token=xyz\"")
-  .option("--header <string>", "Extra HTTP header, e.g. \"Authorization: Bearer eyJ...\"")
+  .option("--header <string>", "Extra HTTP header, e.g. \"Authorization: Bearer eyJ...\"; repeat the flag for several", (v: string, all: string[] = []) => [...all, v])
   .option("--stealth", "Enable anti-detection: navigator spoofing, human mouse simulation, randomized fingerprint (use only when authorized)")
   .option("--user-agent <string>", "Custom user agent string")
   .option("--locale <string>", "Browser locale for fingerprint, e.g. en-GB, fi-FI; affects content only if the site reacts to Accept-Language (default: en-US)")
