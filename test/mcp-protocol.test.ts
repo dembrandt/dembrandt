@@ -72,7 +72,7 @@ test('extraction tools expose the crawl and auth surface', () => {
     const tool = tools.find(t => t.name === name);
     assert.ok(tool, `${name} is missing`);
     const props = Object.keys(tool.inputSchema.properties ?? {});
-    for (const param of ['url', 'pages', 'paths', 'sitemap', 'header', 'userAgent', 'noSandbox']) {
+    for (const param of ['url', 'pages', 'paths', 'sitemap', 'header', 'cookieFile', 'basicAuth', 'userAgent', 'noSandbox']) {
       assert.ok(props.includes(param), `${name} is missing ${param}`);
     }
   }

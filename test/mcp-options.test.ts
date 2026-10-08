@@ -54,13 +54,23 @@ test('extractOptions normalises absent booleans instead of forwarding undefined'
 test('extractOptions omits auth fields entirely when unset, so no empty header is sent', () => {
   const opts = extractOptions({}, '1.0.0');
   assert.ok(!('cookie' in opts));
+  assert.ok(!('cookieFile' in opts));
+  assert.ok(!('basicAuth' in opts));
   assert.ok(!('header' in opts));
   assert.ok(!('userAgent' in opts));
 });
 
 test('extractOptions forwards auth fields when set', () => {
-  const opts = extractOptions({ cookie: 'a=b', header: 'Authorization: Bearer x', userAgent: 'ua' }, '1.0.0');
+  const opts = extractOptions({
+    cookie: 'a=b',
+    cookieFile: './session.json',
+    basicAuth: 'user:pass',
+    header: 'Authorization: Bearer x',
+    userAgent: 'ua',
+  }, '1.0.0');
   assert.equal(opts.cookie, 'a=b');
+  assert.equal(opts.cookieFile, './session.json');
+  assert.equal(opts.basicAuth, 'user:pass');
   assert.equal(opts.header, 'Authorization: Bearer x');
   assert.equal(opts.userAgent, 'ua');
 });

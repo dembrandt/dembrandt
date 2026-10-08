@@ -27,6 +27,8 @@ The tables below list the only exceptions: combinations that change each other's
 | `--color-format` + `--json-only` / `--save-output` / `--dtcg` / `--design-md` / `--html` / `--brand-guide` | Ignored by those paths. The flag is presentational and covers terminal output only; the payload carries hex, rgb, lch and oklch for every color. A warning names the paths it misses. |
 | `--no-sandbox` + `--browser firefox` | Ignored. Sandbox flags are Chromium-only. |
 | `BROWSER_CDP_ENDPOINT` (env) + `--browser firefox` | Error. CDP connect is Chromium-only. CDP mode also disables the visible-browser retry on navigation failure. |
+| `--save-storage-state` without `--login` | No effect. A warning is printed. |
+| `--login` + `--crawl` / `--sitemap` / extra paths | Login pause runs on the first page only. A warning names the reuse path (`--save-storage-state` then `--cookie-file`). |
 
 ## Multi-page runs: which flags reach every page
 
@@ -39,6 +41,8 @@ In a multi-page run (`--crawl`, `--sitemap`, or extra `[paths...]`), some flags 
 | `--slow` | |
 | `--stealth` | |
 | `--cookie` | |
+| `--cookie-file` | |
+| `--basic-auth` | |
 | `--header` | |
 | `--user-agent` | |
 | `--locale` | |

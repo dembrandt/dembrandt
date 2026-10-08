@@ -96,6 +96,10 @@ reference is **[docs/usage.md](docs/usage.md)**.
 | Flag | What you get |
 |---|---|
 | `--cookie <string>` | Reach pages behind a session |
+| `--cookie-file <path>` | JSON cookies, Playwright storageState (incl. localStorage), or Netscape cookies.txt |
+| `--basic-auth <user:pass>` | HTTP Basic for the browser context |
+| `--login` | Open a visible browser to sign in; press Enter when ready, then extract (interactive terminal only) |
+| `--save-storage-state <path>` | With `--login`, save the signed-in session to a file; reuse it later with `--cookie-file` |
 | `--header <string>` | Any extra request header |
 | `--user-agent <string>` | Custom user agent |
 | `--locale <string>` | Locale for the fingerprint |
@@ -145,7 +149,7 @@ Or add to your project's `.mcp.json`:
 
 Available tools include `get_design_tokens`, `get_color_palette`, `get_typography`, `get_component_styles`, `get_surfaces`, `get_spacing`, and `get_brand_identity`, plus pure analysis tools (`compute_drift`, `get_findings`, `export_dtcg`, `generate_design_md`, `render_report`) and job-control tools.
 
-Extraction tools accept `slow`, `mobile`, `darkMode`, `wcag`, `cookie` and `header` (for authenticated pages), `userAgent`, and `noSandbox` (Docker and most CI containers). Set `pages` above 1 to crawl and merge several pages, which produces a markedly stronger token set than one page; `paths` names them explicitly and `sitemap` discovers them from sitemap.xml.
+Extraction tools accept `slow`, `mobile`, `darkMode`, `wcag`, `cookie`, `cookieFile`, `basicAuth` and `header` (for authenticated pages), `userAgent`, and `noSandbox` (Docker and most CI containers). Interactive `--login` stays CLI-only. Set `pages` above 1 to crawl and merge several pages, which produces a markedly stronger token set than one page; `paths` names them explicitly and `sitemap` discovers them from sitemap.xml.
 
 Extraction returns a `job_id`. Poll it with `get_job_status`, then hand that same id to the pure tools instead of passing the extraction back as an argument:
 

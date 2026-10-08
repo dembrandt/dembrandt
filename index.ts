@@ -110,6 +110,10 @@ program
   })
   .option("--sitemap", "Discover pages from sitemap.xml instead of DOM links; use alone or combine with --crawl to set page limit")
   .option("--cookie <string>", "Cookie string for authenticated pages, e.g. \"session=abc; token=xyz\"")
+  .option("--cookie-file <path>", "Cookie export for authenticated pages: JSON array, Playwright storageState (cookies + localStorage), or Netscape cookies.txt")
+  .option("--basic-auth <user:password>", "HTTP Basic credentials for the browser context, e.g. \"staging:secret\"")
+  .option("--login", "Open a visible browser to sign in; press Enter when ready, then continue extraction (interactive terminal only)")
+  .option("--save-storage-state <path>", "With --login, save the signed-in session to a file for later runs via --cookie-file")
   .option("--header <string>", "Extra HTTP header, e.g. \"Authorization: Bearer eyJ...\"")
   .option("--stealth", "Enable anti-detection: navigator spoofing, human mouse simulation, randomized fingerprint (use only when authorized)")
   .option("--user-agent <string>", "Custom user agent string")
@@ -187,7 +191,7 @@ program
     let browser = null;
 
     try {
-      let useHeaded = false;
+      let useHeaded = !!opts.login;
       let result;
       // The browser is installed at most once per run. Without this a install
       // that succeeds but still cannot launch would loop on the same download.
@@ -269,6 +273,10 @@ program
             includeRawColors: opts.rawColors,
             stealth: opts.stealth,
             cookie: opts.cookie,
+            cookieFile: opts.cookieFile,
+            basicAuth: opts.basicAuth,
+            login: opts.login,
+            saveStorageState: opts.saveStorageState,
             header: opts.header,
             userAgent: opts.userAgent,
             locale: opts.locale,
@@ -402,6 +410,8 @@ program
                   slow: opts.slow,
                   stealth: opts.stealth,
                   cookie: opts.cookie,
+                  cookieFile: opts.cookieFile,
+                  basicAuth: opts.basicAuth,
                   header: opts.header,
                   screenSize: opts.screenSize,
                   wcag: opts.wcag,
@@ -849,7 +859,7 @@ const OPTION_GROUPS = [
   ["Extraction", ["--dark-mode", "--mobile", "--slow", "--crawl", "--sitemap", "--browser"]],
   ["Output & export", ["--json-only", "--save-output", "--dtcg", "--brand-guide", "--design-md", "--tailwind", "--shadcn", "--html", "--screenshot", "--raw-colors"]],
   ["Analysis", ["--wcag", "--compare", "--approve"]],
-  ["Network & auth", ["--cookie", "--header", "--user-agent", "--locale", "--timezone", "--accept-language", "--screen-size"]],
+  ["Network & auth", ["--cookie", "--cookie-file", "--basic-auth", "--login", "--save-storage-state", "--header", "--user-agent", "--locale", "--timezone", "--accept-language", "--screen-size"]],
   ["Anti-detection", ["--stealth", "--no-sandbox"]],
 ];
 

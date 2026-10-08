@@ -18,6 +18,8 @@ export interface GuardOptions {
   shadcn?: string | boolean;
   html?: string | boolean;
   brandGuide?: boolean;
+  login?: boolean;
+  saveStorageState?: string;
 }
 
 /** No formatter prints voice, so a lone --voice needs a JSON sink of its own. */
@@ -56,9 +58,26 @@ export function approveWarning(opts: GuardOptions): string | null {
   return opts.approve && !opts.compare ? "! --approve has no effect without --compare <file>." : null;
 }
 
+export function saveStorageStateWarning(opts: GuardOptions): string | null {
+  return opts.saveStorageState && !opts.login
+    ? "! --save-storage-state has no effect without --login."
+    : null;
+}
+
+export function loginMultiPageWarning(opts: GuardOptions, paths: string[] | undefined): string | null {
+  if (!opts.login) return null;
+  const multi = !!opts.crawl || !!opts.sitemap || (paths?.length ?? 0) > 0;
+  if (!multi) return null;
+  return "! --login applies to the first page only; for a crawl, --save-storage-state then re-run with --cookie-file.";
+}
+
 /** Every applicable warning, in emit order. */
 export function guardWarnings(opts: GuardOptions, paths: string[] | undefined): string[] {
-  return [approveWarning(opts), ignoredDiscoveryWarning(opts, paths), colorFormatWarning(opts)].filter(
-    (w): w is string => w !== null,
-  );
+  return [
+    approveWarning(opts),
+    ignoredDiscoveryWarning(opts, paths),
+    colorFormatWarning(opts),
+    saveStorageStateWarning(opts),
+    loginMultiPageWarning(opts, paths),
+  ].filter((w): w is string => w !== null);
 }

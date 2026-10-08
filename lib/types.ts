@@ -668,6 +668,36 @@ export interface ExtractOptions {
   acceptLanguage?: string;
   screenSize?: string;
   cookie?: string;
+  cookieFile?: string;
+  basicAuth?: string;
+  login?: boolean;
+  saveStorageState?: string;
+  httpCredentials?: { username: string; password: string };
+  storageState?: {
+    cookies: Array<{
+      name: string;
+      value: string;
+      url?: string;
+      domain?: string;
+      path?: string;
+      expires?: number;
+      httpOnly?: boolean;
+      secure?: boolean;
+      sameSite?: 'Strict' | 'Lax' | 'None';
+    }>;
+    origins: Array<{ origin: string; localStorage: Array<{ name: string; value: string }> }>;
+  };
+  sessionCookies?: Array<{
+    name: string;
+    value: string;
+    url?: string;
+    domain?: string;
+    path?: string;
+    expires?: number;
+    httpOnly?: boolean;
+    secure?: boolean;
+    sameSite?: 'Strict' | 'Lax' | 'None';
+  }>;
   header?: string;
   /** Internal: collect raw :root tokens + interactive-state styles to a sidecar. */
   teach?: boolean;
