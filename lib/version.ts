@@ -36,6 +36,11 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.22.0 — a crawl tags every merged palette, typography, spacing, radius,
+ *          border and shadow value with pageCount and scope (site, section,
+ *          page), and carries `coverage`: a 0-100 agreement score, per family
+ *          means, and the page-local outliers. Absent on a single page.
+ *          Additive.
  *  1.21.0 — colors.occurrences: one row per colour per paint (fill, text,
  *          border) with count, summed fill area and the declaring custom
  *          property. The measurement layer the palette is read from; slot and
@@ -287,7 +292,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.21.0';
+export const SCHEMA_VERSION = '1.22.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';

@@ -1,3 +1,4 @@
+import type { CoverageSummary, TokenScope } from './coverage.js';
 import type { ContextDescription } from './extractors/context-config.js';
 /**
  * Shared types for dembrandt extraction output and CLI options.
@@ -8,6 +9,9 @@ import type { ContextDescription } from './extractors/context-config.js';
 export type Confidence = 'high' | 'medium' | 'low';
 
 export interface PaletteColor {
+  /** Pages of a crawl that carry this value, and what that share of the crawl makes it. */
+  pageCount?: number;
+  scope?: TokenScope;
   /** Original color string */
   color: string;
   /** Hex color (#rrggbb) */
@@ -117,6 +121,9 @@ export interface Colors {
 }
 
 export interface TypographyStyle {
+  /** Pages of a crawl that carry this value, and what that share of the crawl makes it. */
+  pageCount?: number;
+  scope?: TokenScope;
   /** 'heading-1' | 'body' | 'button' | 'caption' | 'display' | 'link' */
   context: string;
   family: string;
@@ -161,6 +168,9 @@ export interface Typography {
 }
 
 export interface SpacingValue {
+  /** Pages of a crawl that carry this value, and what that share of the crawl makes it. */
+  pageCount?: number;
+  scope?: TokenScope;
   /**
    * Numeric pixels for math and diffing. Raw extraction emits the "16px" string;
    * normalizeExtraction() coerces it to a number. Read `display` for rendering.
@@ -181,6 +191,9 @@ export interface Spacing {
 }
 
 export interface TokenValue {
+  /** Pages of a crawl that carry this value, and what that share of the crawl makes it. */
+  pageCount?: number;
+  scope?: TokenScope;
   value: string;
   count: number;
   confidence: Confidence;
@@ -191,6 +204,9 @@ export interface BorderRadius {
 }
 
 export interface BorderCombination {
+  /** Pages of a crawl that carry this value, and what that share of the crawl makes it. */
+  pageCount?: number;
+  scope?: TokenScope;
   width: string;
   style: string;
   color: string;
@@ -206,6 +222,9 @@ export interface Borders {
 }
 
 export interface Shadow {
+  /** Pages of a crawl that carry this value, and what that share of the crawl makes it. */
+  pageCount?: number;
+  scope?: TokenScope;
   shadow: string;
   count: number;
   confidence: Confidence;
@@ -538,6 +557,8 @@ export interface BrandingResult {
    * Per-page results in a multi-page run. Voice sits here rather than being
    * merged: the variation between pages is the finding, not noise to average.
    */
+  /** Site-wide agreement across a crawl; absent for a single page. */
+  coverage?: CoverageSummary;
   pages?: {
     url: string;
     extractedAt?: string;

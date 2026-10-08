@@ -8,6 +8,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { coverageEntry, scopeOf, summarizeCoverage, type TokenScope } from './coverage.js';
 import { deltaE } from './colors.js';
 import { applyBudget, computeMetrics, totalWords, WORD_FLOOR } from './voice/metrics.js';
 
@@ -125,9 +126,10 @@ function mergeTypography(results) {
     (r.typography?.styles || []).forEach(s => {
       const key = `${s.family}|${s.size}|${s.weight}`;
       if (!styleMap.has(key)) {
-        styleMap.set(key, { ...s, count: 1 });
+        styleMap.set(key, { ...s, count: 1, pageCount: 1 });
       } else {
         styleMap.get(key).count++;
+        styleMap.get(key).pageCount++;
       }
     });
   });
@@ -253,11 +255,12 @@ function mergeValueArrays(results, getter, valueKey = 'value') {
     (getter(r) || []).forEach(item => {
       const key = item[valueKey];
       if (!map.has(key)) {
-        map.set(key, { ...item });
+        map.set(key, { ...item, pageCount: 1 });
       } else {
         const e = map.get(key);
         e.count = (e.count || 0) + (item.count || 1);
         e.frequency = (e.frequency || 0) + (item.frequency || 0);
+        e.pageCount++;
       }
     });
   });
@@ -287,10 +290,11 @@ function mergeBorders(results) {
     (r.borders?.combinations || []).forEach(item => {
       const key = `${item.width}|${item.style}|${item.color}`;
       if (!map.has(key)) {
-        map.set(key, { ...item, elements: [...(item.elements || [])] });
+        map.set(key, { ...item, elements: [...(item.elements || [])], pageCount: 1 });
       } else {
         const e = map.get(key);
         e.count += (item.count || 1);
+        e.pageCount++;
         const elementSet = new Set([...(e.elements || []), ...(item.elements || [])]);
         e.elements = [...elementSet].slice(0, 5);
         if (e.count > 10) e.confidence = 'high';
@@ -309,9 +313,10 @@ function mergeShadows(results) {
     (r.shadows || []).forEach(s => {
       const key = s.shadow || s.value || JSON.stringify(s);
       if (!map.has(key)) {
-        map.set(key, { ...s, count: s.count || 1 });
+        map.set(key, { ...s, count: s.count || 1, pageCount: 1 });
       } else {
         map.get(key).count += (s.count || 1);
+        map.get(key).pageCount++;
       }
     });
   });
@@ -483,11 +488,43 @@ function mergeVoice(results) {
  * @param {Object[]} results - Array of extractBranding() result objects
  * @returns {Object} Merged result with same shape as single-page result
  */
+const COVERAGE_FAMILIES: [string, (m) => { pageCount?: number; scope?: TokenScope }[] | undefined, (v) => string][] = [
+  ['color', (m) => m.colors?.palette, (v) => v.normalized || v.color],
+  ['typography', (m) => m.typography?.styles, (v) => `${v.family} ${v.size}/${v.weight}`],
+  ['spacing', (m) => m.spacing?.commonValues, (v) => String(v.px)],
+  ['radius', (m) => m.borderRadius?.values, (v) => String(v.value)],
+  ['border', (m) => m.borders?.combinations, (v) => `${v.width} ${v.style} ${v.color}`],
+  ['shadow', (m) => m.shadows, (v) => v.shadow || v.value],
+];
+
+/** Tags every merged value with its scope and sums the crawl's agreement. */
+function attachCoverage(merged, totalPages: number) {
+  const entries = [];
+  for (const [family, getter, nameOf] of COVERAGE_FAMILIES) {
+    for (const value of getter(merged) || []) {
+      if (!value.pageCount) continue;
+      value.scope = scopeOf(value.pageCount, totalPages);
+      entries.push(coverageEntry(family, nameOf(value), value.pageCount, totalPages));
+    }
+  }
+  const coverage = summarizeCoverage(entries, totalPages);
+  return coverage ? { coverage } : {};
+}
+
 export function mergeResults(results) {
   if (results.length === 0) throw new Error('No results to merge');
   if (results.length === 1) return results[0];
 
   const home = results[0];
+
+  const merged = {
+    colors: mergeColors(results),
+    typography: mergeTypography(results),
+    spacing: mergeSpacing(results),
+    borderRadius: mergeBorderRadius(results),
+    borders: mergeBorders(results),
+    shadows: mergeShadows(results),
+  };
 
   return {
     url: home.url,
@@ -496,12 +533,8 @@ export function mergeResults(results) {
     siteName: home.siteName,
     logo: home.logo,
     favicons: home.favicons,
-    colors: mergeColors(results),
-    typography: mergeTypography(results),
-    spacing: mergeSpacing(results),
-    borderRadius: mergeBorderRadius(results),
-    borders: mergeBorders(results),
-    shadows: mergeShadows(results),
+    ...merged,
+    ...attachCoverage(merged, results.length),
     gradients: mergeGradients(results),
     motion: mergeMotion(results),
     components: mergeComponents(results),
