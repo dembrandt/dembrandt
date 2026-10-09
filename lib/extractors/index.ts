@@ -819,7 +819,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       motion,
     ] = await Promise.all([
       guardExtractor('logo', extractLogo(page, url), { logo: null, instances: [], favicons: [], manifest: null }, extractorErrors),
-      guardExtractor('colors', extractColors(page), { semantic: {}, palette: [], cssVariables: [], _raw: [] }, extractorErrors),
+      guardExtractor('colors', extractColors(page), { semantic: {}, palette: [], cssVariables: {}, _raw: [] }, extractorErrors),
       guardExtractor('typography', extractTypography(page), { styles: [], sources: {} }, extractorErrors),
       guardExtractor('spacing', extractSpacing(page), { scaleType: 'unknown', commonValues: [] }, extractorErrors),
       guardExtractor('borderRadius', extractBorderRadius(page), { values: [] }, extractorErrors),

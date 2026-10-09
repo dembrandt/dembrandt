@@ -1,4 +1,5 @@
 import { convertColor } from '../colors.js';
+import type { CssVariable } from '../types.js';
 
 export async function extractColors(page) {
   const result = await page.evaluate(() => {
@@ -165,19 +166,23 @@ export async function extractColors(page) {
 
     const colorMap = new Map();
     const semanticColors: Record<string, string> = {};
-    const cssVariables = {};
+    const cssVariables: Record<string, { value: string; scope: 'root' | 'body' }> = {};
 
     const domain = window.location.hostname;
-    const declared = new Map<string, string>();
-    for (const el of [document.documentElement, document.body]) {
+    const declared = new Map<string, { value: string; scope: 'root' | 'body' }>();
+    for (const scope of ['root', 'body'] as const) {
+      const el = scope === 'root' ? document.documentElement : document.body;
       if (!el) continue;
       const cs = getComputedStyle(el);
       for (let i = 0; i < cs.length; i++) {
-        if (cs[i].startsWith("--")) declared.set(cs[i], cs.getPropertyValue(cs[i]).trim());
+        if (!cs[i].startsWith("--")) continue;
+        const value = cs.getPropertyValue(cs[i]).trim();
+        if (declared.get(cs[i])?.value === value) continue;
+        declared.set(cs[i], { value, scope });
       }
     }
 
-    for (const [prop, value] of declared) {
+    for (const [prop, { value, scope }] of declared) {
       if (prop.startsWith("--wp--preset")) continue;
       if (
         prop.startsWith("--el-") || prop.startsWith("--p-") ||
@@ -223,15 +228,15 @@ export async function extractColors(page) {
         value.includes("darken(") || value.includes("saturate(")
       ) continue;
 
-      if (isValidColorValue(value)) cssVariables[prop] = value;
+      if (isValidColorValue(value)) cssVariables[prop] = { value, scope };
     }
 
-    // Declared :root custom properties carry brand-token provenance: the author
+    // Declared custom properties carry brand-token provenance: the author
     // named these colours deliberately. They outweigh ad-hoc computed colours in
     // ranking, are never treated as structural, and are preferred as primary.
     const tokenNames = new Map<string, string[]>();
     for (const [name, v] of Object.entries(cssVariables)) {
-      const n = normalizeColor(v as string);
+      const n = normalizeColor(v.value);
       if (typeof n === 'string' && /^#[0-9a-f]{6}$/.test(n)) tokenNames.set(n, [...(tokenNames.get(n) || []), name]);
     }
     const tokenHexes = new Set(tokenNames.keys());
@@ -582,29 +587,12 @@ export async function extractColors(page) {
       // Prefer a declared brand token as the canonical representative of a merged
       // cluster, then highest usage. Keeps the author's exact brand hex rather
       // than an incidental computed value 1-2 levels off (quantization drift).
-      perceptuallyDeduped.push(
-        similar.sort((a, b) =>
-          ((tokenHexes.has(b.normalized) ? 1 : 0) - (tokenHexes.has(a.normalized) ? 1 : 0))
-          || (b.count - a.count))[0]
-      );
+      const representative = similar.sort((a, b) =>
+        ((tokenHexes.has(b.normalized) ? 1 : 0) - (tokenHexes.has(a.normalized) ? 1 : 0))
+        || (b.count - a.count))[0];
+      const tokens = similar.flatMap((c) => c.tokens ?? []);
+      perceptuallyDeduped.push(tokens.length ? { ...representative, tokens } : representative);
     });
-
-    const paletteNormalizedColors = new Set(perceptuallyDeduped.map((c) => c.normalized));
-    const cssVarsByColor = new Map();
-    Object.entries(cssVariables).forEach(([prop, value]) => {
-      const normalized = normalizeColor(value);
-      if (paletteNormalizedColors.has(normalized)) return;
-      let isDuplicate = false;
-      for (const paletteColor of perceptuallyDeduped) {
-        if (deltaE(normalized, paletteColor.normalized) < 15) { isDuplicate = true; break; }
-      }
-      if (isDuplicate) return;
-      if (!cssVarsByColor.has(normalized)) cssVarsByColor.set(normalized, { value, vars: [] });
-      cssVarsByColor.get(normalized).vars.push(prop);
-    });
-
-    const filteredCssVariables = {};
-    cssVarsByColor.forEach(({ value, vars }) => { filteredCssVariables[vars[0]] = value; });
 
     // Fallback: pick most chromatic non-gray palette color as primary
     if (!semanticColors.primary && perceptuallyDeduped.length > 0) {
@@ -692,7 +680,7 @@ export async function extractColors(page) {
       }))
       .sort((a, b) => b.count - a.count);
 
-    return { semantic: semanticColors, palette: perceptuallyDeduped, cssVariables: filteredCssVariables, detected, _raw: rawColors };
+    return { semantic: semanticColors, palette: perceptuallyDeduped, cssVariables, detected, _raw: rawColors };
   });
 
   if (result && result.palette) {
@@ -732,16 +720,15 @@ export async function extractColors(page) {
   }
 
   if (result && result.cssVariables) {
-    const enhancedCssVariables = {};
-    for (const [name, value] of Object.entries(result.cssVariables)) {
+    const enhancedCssVariables: Record<string, CssVariable> = {};
+    const declared = result.cssVariables as Record<string, { value: string; scope: 'root' | 'body' }>;
+    for (const [name, { value, scope }] of Object.entries(declared)) {
       const converted = convertColor(value);
-      if (converted) {
-        // value stays the author's declared token verbatim (provenance);
-        // hex gives consumers a parseable identity for modern notations.
-        enhancedCssVariables[name] = { value, hex: converted.hex, lch: converted.lch, oklch: converted.oklch };
-      } else {
-        enhancedCssVariables[name] = { value };
-      }
+      // value stays the author's declared token verbatim (provenance);
+      // hex gives consumers a parseable identity for modern notations.
+      enhancedCssVariables[name] = converted
+        ? { value, hex: converted.hex, lch: converted.lch, oklch: converted.oklch, scope }
+        : { value, scope };
     }
     result.cssVariables = enhancedCssVariables;
   }
