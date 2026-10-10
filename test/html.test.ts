@@ -219,3 +219,20 @@ test('a pair predating the size fields keeps the AA-Large middle tier', () => {
   assert.match(html, /b-warn">AA Large/);
   assert.match(html, /· 1 AA Large/);
 });
+
+test('role labels resolve when the semantic map is in rgb() and the palette in hex', () => {
+  const html = generateHtmlReport(fixture({ colors: { palette: [{ color: '#133174', normalized: '#133174', count: 40, confidence: 'high' }], semantic: { primary: 'rgb(19, 49, 116)' } } }));
+  assert.match(html, /<div class="role">primary<\/div>/);
+});
+
+test('the contrast gauge counts size-aware passes, not the fixed 4.5 flag', () => {
+  const large = { fg: '#767676', bg: '#ffffff', ratio: 3.6, aa: false, aaLarge: true, aaa: false, passAA: true, large: true };
+  const html = generateHtmlReport(fixture({ wcag: [large] }));
+  assert.match(html, /1\/1 pairs AA/);
+});
+
+test('input previews read the default state the extractor emits', () => {
+  const html = generateHtmlReport(fixture({ components: { inputs: [{ specificType: 'email', states: { default: { backgroundColor: '#ffffff', color: '#111111', border: '2px solid #ff0000', borderRadius: '6px', padding: '4px 8px' } } }] } }));
+  assert.match(html, /border:2px solid #ff0000/);
+  assert.match(html, /placeholder="email"/);
+});

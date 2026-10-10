@@ -9,7 +9,7 @@ import type { BrandingResult } from '../types.js';
 import chalk from 'chalk';
 import { color } from './theme.js';
 import { formatPageList } from '../run-summary.js';
-import { convertColor, formatColor, gradeWcagPair } from '../colors.js';
+import { convertColor, formatColor, gradeWcagPair, passesAA } from '../colors.js';
 import type { ColorFormat } from '../colors.js';
 
 /**
@@ -1093,8 +1093,8 @@ function displayWcag(wcag) {
   const staticPairs = wcag.filter(p => !p.source);
   const statePairs = wcag.filter(p => p.source === 'state');
 
-  const passing = staticPairs.filter(p => p.aa);
-  const failing = staticPairs.filter(p => !p.aa);
+  const passing = staticPairs.filter(p => passesAA(p));
+  const failing = staticPairs.filter(p => !passesAA(p));
   const all = [...passing.slice(0, 5), ...failing.slice(0, 3)];
 
   function renderPair(pair, branch) {
