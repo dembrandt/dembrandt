@@ -26,7 +26,7 @@ import type {
 } from "../types.js";
 import type { DriftReport, DriftChange } from "../drift.js";
 import { computeFindings } from "../findings.js";
-import { gradeWcagPair } from "../colors.js";
+import { gradeWcagPair, passesAA, toHexColor } from "../colors.js";
 import type { FindingsReport, Finding } from "../findings.js";
 
 export interface HtmlReportOptions {
@@ -274,7 +274,7 @@ function summaryGauges(result: BrandingResult, fr: FindingsReport, drift?: Drift
   // self-computed contrast findings.
   const wcag = result.wcag ?? [];
   if (wcag.length) {
-    const passed = wcag.filter((p) => p.aa).length;
+    const passed = wcag.filter((p) => passesAA(p)).length;
     g.push(gauge((100 * passed) / wcag.length, "Contrast", `${passed}/${wcag.length} pairs AA`, false, "#wcag"));
   } else {
     const xIssues = fr.findings.filter((f) => f.category === "contrast").length;
@@ -340,8 +340,9 @@ function paletteSection(result: BrandingResult): string {
   if (!palette.length) return "";
   // role lookup: hex -> role from semantic map
   const roleByHex = new Map<string, string>();
-  for (const [role, hex] of Object.entries(result.colors?.semantic ?? {})) {
-    if (hex) roleByHex.set(String(hex).toLowerCase(), role);
+  for (const [role, value] of Object.entries(result.colors?.semantic ?? {})) {
+    const hex = toHexColor(value);
+    if (hex) roleByHex.set(hex, role);
   }
   const cards = palette
     .map((c: PaletteColor) => {
@@ -577,16 +578,16 @@ function inputsSection(result: BrandingResult): string {
       const style = [
         st.backgroundColor ? `background:${safeCss(st.backgroundColor)}` : "",
         st.color ? `color:${safeCss(st.color)}` : "",
-        i.borderRadius ? `border-radius:${safeCss(i.borderRadius)}` : "",
-        i.padding ? `padding:${safeCss(i.padding)}` : "padding:8px 12px",
-        i.border ? `border:${safeCss(i.border)}` : "border:1px solid var(--line)",
+        st.borderRadius ? `border-radius:${safeCss(st.borderRadius)}` : "",
+        st.padding ? `padding:${safeCss(st.padding)}` : "padding:8px 12px",
+        st.border ? `border:${safeCss(st.border)}` : "border:1px solid var(--line)",
       ]
         .filter(Boolean)
         .join(";");
-      return `<input class="previewbtn" style="${esc(style)}" placeholder="${esc(i.type || "text")}" readonly>`;
+      return `<input class="previewbtn" style="${esc(style)}" placeholder="${esc(i.specificType || i.type || "text")}" readonly>`;
     })
     .join(" ");
-  const all = list.map((i) => [i.type, i.border, i.borderRadius].filter(Boolean).join(" / ")).join("\n");
+  const all = list.map((i) => [i.specificType || i.type, i.states?.default?.border, i.states?.default?.borderRadius].filter(Boolean).join(" / ")).join("\n");
   return section("Inputs", `<div class="row">${previews}</div>`, undefined, all);
 }
 
@@ -729,8 +730,9 @@ function driftSection(drift: DriftReport, result: BrandingResult, baselineLabel?
       ? `<span class="badge b-bad">DRIFT</span>`
       : `<span class="badge b-good">STABLE</span>`;
   const roleByHex = new Map<string, string>();
-  for (const [role, hex] of Object.entries(result.colors?.semantic ?? {})) {
-    if (hex) roleByHex.set(String(hex).toLowerCase(), role);
+  for (const [role, value] of Object.entries(result.colors?.semantic ?? {})) {
+    const hex = toHexColor(value);
+    if (hex) roleByHex.set(hex, role);
   }
   // Per-category blocks in scoring order; each header carries the sub-counts
   // so the old separate category table is redundant.

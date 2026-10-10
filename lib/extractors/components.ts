@@ -25,7 +25,7 @@ export async function extractButtonStyles(page) {
 
         // Must have a visible background or border — not just inherited
         const bg = computed.backgroundColor;
-        const borderWidth = parseFloat(computed.borderWidth);
+        const borderWidth = Math.max(...[computed.borderTopWidth, computed.borderRightWidth, computed.borderBottomWidth, computed.borderLeftWidth].map((w) => parseFloat(w) || 0));
         const hasBackground = !isTransparent(bg);
         const hasBorder = borderWidth > 0 && !isTransparent(computed.borderColor);
 
