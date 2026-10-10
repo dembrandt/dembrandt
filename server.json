@@ -1,0 +1,24 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.dembrandt/dembrandt",
+  "title": "Dembrandt",
+  "description": "Design tokens from any live site: colours, type, spacing, components, drift against a baseline.",
+  "repository": {
+    "url": "https://github.com/dembrandt/dembrandt",
+    "source": "github"
+  },
+  "websiteUrl": "https://dembrandt.com",
+  "version": "0.38.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "dembrandt",
+      "version": "0.38.0",
+      "runtimeHint": "npx",
+      "runtimeArguments": [{ "type": "positional", "value": "-y" }],
+      "packageArguments": [{ "type": "positional", "value": "mcp" }],
+      "transport": { "type": "stdio" }
+    }
+  ]
+}
