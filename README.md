@@ -97,6 +97,7 @@ reference is **[docs/usage.md](docs/usage.md)**.
 |---|---|
 | `--cookie <string>` | Reach pages behind a session |
 | `--header <string>` | Any extra request header |
+| `--no-headed-fallback` | Never open a visible browser on a failed navigation; for batch runs |
 | `--user-agent <string>` | Custom user agent |
 | `--locale <string>` | Locale for the fingerprint |
 | `--timezone <string>` | Timezone for the fingerprint |

@@ -57,6 +57,7 @@ const CLI_ONLY: Record<string, string> = {
   '--help': 'Protocol handshake carries the tool list.',
   '--ai': 'Experimental ML primary prediction; not a promised surface.',
   '--wcag': 'A parameter on get_design_tokens; check_contrast grades pairs an agent names.',
+  '--no-headed-fallback': 'MCP never opens a visible browser, so the switch has nothing to turn off there.',
 };
 
 interface ToolDefinition {
