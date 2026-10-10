@@ -81,6 +81,7 @@ program
   .option("--compare <baseline>", "Drift-compare against a baseline JSON file. Exits 1 on drift, 2 if the baseline cannot be read.")
   .option("--approve", "With --compare <file>: accept the current extraction as the new baseline by overwriting that local file, and pass instead of failing.")
   .option("--no-sandbox", "Disable browser sandbox (needed for Docker/CI)")
+  .option("--no-headed-fallback", "Fail instead of retrying a failed navigation in a visible browser (also DEMBRANDT_NO_HEADED_FALLBACK=1); for batch and unattended runs")
   .option("--raw-colors", "Include pre-filter raw colors in JSON output")
   .option(
     "--color-format <format>",
@@ -445,6 +446,7 @@ program
           browser = null;
 
           if (useHeaded || process.env.BROWSER_CDP_ENDPOINT) throw err;
+          if (opts.headedFallback === false || process.env.DEMBRANDT_NO_HEADED_FALLBACK === "1") throw err;
 
           if (
             err.message.includes("Timeout") ||
@@ -850,7 +852,7 @@ const OPTION_GROUPS = [
   ["Output & export", ["--json-only", "--save-output", "--dtcg", "--brand-guide", "--design-md", "--tailwind", "--shadcn", "--html", "--screenshot", "--raw-colors"]],
   ["Analysis", ["--wcag", "--compare", "--approve"]],
   ["Network & auth", ["--cookie", "--header", "--user-agent", "--locale", "--timezone", "--accept-language", "--screen-size"]],
-  ["Anti-detection", ["--stealth", "--no-sandbox"]],
+  ["Anti-detection", ["--stealth", "--no-sandbox", "--no-headed-fallback"]],
 ];
 
 program.configureHelp({
