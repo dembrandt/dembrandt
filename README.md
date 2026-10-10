@@ -130,6 +130,8 @@ Use Dembrandt as a tool in Claude Code, Cursor, Windsurf, or any MCP-compatible 
 claude mcp add --transport stdio dembrandt -- npx -y --package dembrandt dembrandt-mcp
 ```
 
+The server is listed in the MCP Registry as `io.github.dembrandt/dembrandt`, so a client that reads the registry can install it by name. `npx -y dembrandt mcp` starts it directly.
+
 Or add to your project's `.mcp.json`:
 
 ```json

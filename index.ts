@@ -905,8 +905,11 @@ program.configureHelp({
 // Handled before parse(): the root command takes a required <url> argument, so
 // a real Commander subcommand would collide with it. Intercepting the bare verb
 // keeps `dembrandt install-browser` working without restructuring the CLI.
-if (process.argv[2] === "install-browser") {
-  process.exit(installBrowsers(process.argv.slice(3)));
+if (process.argv[2] === "mcp") {
+  await import("./mcp-server.js");
+} else {
+  if (process.argv[2] === "install-browser") {
+    process.exit(installBrowsers(process.argv.slice(3)));
+  }
+  program.parse();
 }
-
-program.parse();
