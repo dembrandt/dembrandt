@@ -48,9 +48,12 @@
  *          userAgent) and drift warns when two snapshots differ in a dial.
  *          A crawl tags every merged value with pageCount and scope (site,
  *          section, page) and carries `coverage`: a 0-100 agreement score,
- *          per-family means and the page-local outliers. No semantic value
- *          moves: 163 of 175 corpus sites identical against a same-evening
- *          0.38.0 control, the remaining 12 moved on the control too.
+ *          per-family means and the page-local outliers. Palette `role` is
+ *          read after the usage cap, so a colour seen under three times is
+ *          `supporting`, not `accent`. Measured against a same-day 0.38.0
+ *          control over 175 corpus sites: 158 identical, three primaries
+ *          moved, two of them bot walls and one a site that moves between
+ *          control days as well.
  *  1.18.0 — frameworks entries gain `category`, `version` and `coverage` (the
  *          share of the page under that framework's mount points), iconSystem
  *          entries gain `version`. Additive: 1.17.x consumers ignore them.

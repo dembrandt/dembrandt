@@ -330,7 +330,7 @@ export async function extractColors(page) {
       const borderColor = hasBorder ? toLegacy(computed.borderColor) : "";
 
       const context = (
-        el.className + " " + el.id + " " +
+        (el.getAttribute('class') || '') + " " + el.id + " " +
         (el.getAttribute('data-tracking-linkid') || '') + " " +
         (el.getAttribute('data-cta') || '') + " " +
         (el.getAttribute('data-component') || '') + " " +
@@ -751,7 +751,8 @@ export async function extractColors(page) {
 
     result.palette = result.palette.map((colorItem) => {
       const hex = colorItem.normalized || colorItem.color;
-      const role = colorRole(hex, colorItem);
+      const confidence = capConfidenceByUsage(colorItem.confidence, colorItem.count);
+      const role = colorRole(hex, { ...colorItem, confidence });
       const onColor = bestOnColor(hex);
       const hover = hoverVariant(hex);
       // Mark alpha/lightness variants of primary
@@ -764,7 +765,7 @@ export async function extractColors(page) {
       }
       return {
         ...colorItem,
-        confidence: capConfidenceByUsage(colorItem.confidence, colorItem.count),
+        confidence,
         role,
         onColor,
         hover,

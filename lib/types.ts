@@ -269,6 +269,8 @@ export interface LinkStyle {
 }
 
 export interface InputStyle {
+  /** The input's type attribute, or its tag when it has none. */
+  specificType?: string;
   type?: string;
   border?: string;
   borderRadius?: string;
@@ -464,8 +466,8 @@ export interface ExtractionMeta {
    */
   viewport?: { width: number; height: number };
   /**
-   * The browser context the run was measured under. Two extractions whose
-   * contexts differ are two measurements, not one design and its drift.
+   * The browser context the main pass was measured under. The --dark-mode and
+   * --mobile passes are extra passes recorded in flags, not here.
    */
   context?: ContextDescription;
   /**

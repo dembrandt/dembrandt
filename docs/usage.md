@@ -25,6 +25,7 @@ dembrandt dembrandt.com --stealth       # Opt-in anti-detection: navigator spoof
 dembrandt dembrandt.com --locale fi-FI --timezone Europe/Helsinki # Browser fingerprint: locale and timezone
 dembrandt dembrandt.com --user-agent "Mozilla/5.0 ..."           # Custom user agent string
 dembrandt dembrandt.com --accept-language "fi,en;q=0.9"          # Custom Accept-Language header
+dembrandt dembrandt.com --header "X-A: 1" --header "X-B: 2"       # Extra request headers, repeatable
 dembrandt dembrandt.com --screen-size 2560x1440                  # Physical screen resolution to report
 ```
 

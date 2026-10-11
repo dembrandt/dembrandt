@@ -884,7 +884,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       motion,
     ] = await Promise.all([
       guardExtractor('logo', extractLogo(page, url), { logo: null, instances: [], favicons: [], manifest: null }, extractorErrors),
-      guardExtractor('colors', extractColors(page), { semantic: {}, palette: [], cssVariables: [], _raw: [] }, extractorErrors),
+      guardExtractor('colors', extractColors(page), { semantic: {}, palette: [], cssVariables: {}, detected: [], occurrences: [], _raw: [] }, extractorErrors),
       guardExtractor('typography', extractTypography(page), { styles: [], sources: {} }, extractorErrors),
       guardExtractor('spacing', extractSpacing(page), { scaleType: 'unknown', commonValues: [] }, extractorErrors),
       guardExtractor('borderRadius', extractBorderRadius(page), { values: [] }, extractorErrors),
@@ -1262,7 +1262,9 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       });
       colors.palette = mergedPalette;
       Object.assign(colors.semantic, darkModeColors.semantic);
-      Object.assign(colors.semanticEvidence ?? (colors.semanticEvidence = {}), darkModeColors.semanticEvidence);
+      for (const [role, ev] of Object.entries(darkModeColors.semanticEvidence ?? {})) {
+        if (darkModeColors.semantic[role]) (colors.semanticEvidence ??= {})[role] = ev;
+      }
       buttons.push(...darkModeButtons.map((btn) => ({ ...btn, source: "dark-mode" })));
       links.push(...darkModeLinks.map((link) => ({ ...link, source: "dark-mode" })));
 

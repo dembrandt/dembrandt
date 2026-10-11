@@ -580,3 +580,54 @@ test('every merged family carries pageCount and scope', () => {
   assert.equal(merged.borderRadius.values[0].scope, 'page');
   assert.equal(merged.coverage.byFamily.typography.meanCoverage, 1);
 });
+
+test('semantic evidence follows the page that supplied the role; occurrences sum across pages', () => {
+  const refused = { decision: 'refused', rule: null, reason: 'no candidate', tokens: [], alternates: [] };
+  const elected = { decision: 'elected', rule: 'cta', reason: 'painted on buttons', tokens: [], alternates: [] };
+  const merged = mergeResults([
+    page('https://a.test/', {
+      colors: {
+        palette: [], semantic: {}, cssVariables: {},
+        semanticEvidence: { primary: refused },
+        occurrences: [{ hex: '#111111', paints: 'fill', slot: null, count: 2, area: 100, cssVar: null, state: null }],
+      },
+    }),
+    page('https://a.test/pricing', {
+      colors: {
+        palette: [], semantic: { primary: '#0066cc' }, cssVariables: {},
+        semanticEvidence: { primary: elected },
+        occurrences: [
+          { hex: '#111111', paints: 'fill', slot: null, count: 3, area: 50, cssVar: '--ink', state: null },
+          { hex: '#0066cc', paints: 'text', slot: null, count: 1, area: 0, cssVar: null, state: null },
+        ],
+      },
+    }),
+  ]);
+  assert.equal(merged.colors.semantic.primary, '#0066cc');
+  assert.equal(merged.colors.semanticEvidence.primary, elected);
+  assert.deepEqual(
+    merged.colors.occurrences.map((o) => [o.hex, o.paints, o.count, o.area, o.cssVar]),
+    [['#111111', 'fill', 5, 150, null], ['#0066cc', 'text', 1, 0, null]],
+  );
+});
+
+test('homepage evidence is kept when a later page would overwrite it', () => {
+  const home = { decision: 'elected', rule: 'class', reason: 'home', tokens: [], alternates: [] };
+  const merged = mergeResults([
+    page('https://a.test/', { colors: { palette: [], semantic: { primary: '#0066cc' }, cssVariables: {}, semanticEvidence: { primary: home } } }),
+    page('https://a.test/x', { colors: { palette: [], semantic: { primary: '#cc0000' }, cssVariables: {}, semanticEvidence: { primary: { ...home, reason: 'other' } } } }),
+  ]);
+  assert.equal(merged.colors.semanticEvidence.primary, home);
+});
+
+test('a style seen in several contexts on one page counts that page once', () => {
+  const style = (context) => ({ family: 'Inter', size: '16px', weight: 400, context });
+  const merged = mergeResults([
+    page('https://a.test/', { typography: { styles: [style('body'), style('ui'), style('caption')], sources: {} } }),
+    page('https://a.test/x', { typography: { styles: [style('body')], sources: {} } }),
+  ]);
+  const s = merged.typography.styles.find((x) => x.size === '16px');
+  assert.equal(s.pageCount, 2);
+  assert.equal(s.count, 4);
+  assert.equal(s.scope, 'site');
+});

@@ -172,3 +172,19 @@ test('generateDesignMd ends with a dembrandt attribution comment', () => {
   const unversioned = generateDesignMd({ url: 'https://attribution.example' });
   assert.match(unversioned, /\n<!-- dembrandt -->\n$/);
 });
+
+test('typography tokens are named from the contexts the extractor emits', () => {
+  const output = generateDesignMd({
+    url: 'https://example.com',
+    typography: { styles: [
+      { context: 'heading-2', family: 'Inter', size: '32px', weight: 700, spacing: '-0.01em' },
+      { context: 'ui', family: 'Inter', size: '14px', weight: 500 },
+      { context: 'link', family: 'Inter', size: '16px', weight: 400 },
+      { context: 'caption', family: 'Inter', size: '12px', weight: 400 },
+      { context: 'text', family: 'Inter', size: '18px', weight: 400 },
+    ] },
+  } as never);
+  for (const name of ['headline-lg', 'label-lg', 'label-md', 'body-sm', 'body-md']) assert.match(output, new RegExp(`\\n {2}${name}:`), name);
+  assert.doesNotMatch(output, /\n {2}text-\d:/);
+  assert.match(output, /letterSpacing: "-0.01em"/);
+});
