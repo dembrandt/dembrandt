@@ -114,6 +114,16 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           jq --arg v "$VERSION" '.version = $v | .packages[0].version = $v' server.json > server.tmp && mv server.tmp server.json
 
+      - name: Wait until npm serves the version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          for i in $(seq 1 20); do
+            npm view "dembrandt@$VERSION" version >/dev/null 2>&1 && exit 0
+            sleep 15
+          done
+          echo "dembrandt@$VERSION not visible on npm after five minutes" >&2
+          exit 1
+
       - name: Publish to the MCP Registry
         run: |
           ./mcp-publisher login github-oidc
