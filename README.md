@@ -96,10 +96,10 @@ reference is **[docs/usage.md](docs/usage.md)**.
 | Flag | What you get |
 |---|---|
 | `--cookie <string>` | Reach pages behind a session |
-| `--cookie-file <path>` | JSON cookies, Playwright storageState (incl. localStorage), or Netscape cookies.txt |
+| `--cookie-file <path>` | JSON cookies, Playwright storageState (incl. localStorage and the sessionStorage block `--save-storage-state` adds), or Netscape cookies.txt |
 | `--basic-auth <user:pass>` | HTTP Basic for the browser context |
 | `--login` | Open a visible browser to sign in; press Enter when ready, then extract (interactive terminal only) |
-| `--save-storage-state <path>` | With `--login`, save the signed-in session to a file; reuse it later with `--cookie-file` |
+| `--save-storage-state <path>` | With `--login`, save the signed-in session (cookies, localStorage, sessionStorage) to a file; reuse it later with `--cookie-file`, also in CI |
 | `--header <string>` | Any extra request header |
 | `--user-agent <string>` | Custom user agent |
 | `--locale <string>` | Locale for the fingerprint |

@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import { randomUUID } from 'node:crypto';
+import { writeFileSync } from 'node:fs';
 import { color } from '../formatters/theme.js';
 import { discoverLinks } from '../discovery.js';
 import { extractLogo, extractSiteName } from './logo.js';
@@ -20,6 +21,13 @@ import {
   parseBasicAuth,
   waitForEnter,
   emptyAuthSession,
+  isOffTarget,
+  expiredSessionWarning,
+  sessionRedirectWarning,
+  readSessionStorage,
+  serializeStorageState,
+  sessionStorageInitScript,
+  type AuthSession,
 } from './auth-session.js';
 import { guardExtractor } from './guard.js';
 import { dismissConsent } from './consent.js';
@@ -305,13 +313,18 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
   const locale = options.locale || DEFAULT_LOCALE;
   const { width: screenW, height: screenH } = parseScreenSize(options.screenSize);
 
-  const fileSession = options.cookieFile
+  const fileSession: AuthSession = options.cookieFile
     ? loadAuthSession(options.cookieFile, url)
     : (options.storageState
-      ? { cookies: [] as import('./auth-session.js').SessionCookie[], storageState: options.storageState }
+      ? { cookies: [], storageState: options.storageState, sessionStorage: [] }
       : emptyAuthSession());
   const httpCredentials = options.httpCredentials
     ?? parseBasicAuth(options.basicAuth);
+  const sessionWarnings: string[] = [];
+  const expired = expiredSessionWarning(fileSession);
+  if (expired) { sessionWarnings.push(expired); console.log(color.warning(`  ! Session: ${expired}`)); }
+  const hasSession = fileSession.cookies.length > 0 || fileSession.sessionStorage.length > 0
+    || !!options.cookie || (options.sessionCookies?.length ?? 0) > 0;
 
   const contextOptions = buildContextOptions(
     {
@@ -346,6 +359,9 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
   );
   if (cookiesToAdd.length > 0) {
     await closingOnError(context.addCookies(cookiesToAdd));
+  }
+  if (fileSession.sessionStorage.length > 0) {
+    await closingOnError(context.addInitScript(sessionStorageInitScript(fileSession.sessionStorage)));
   }
 
   if (options.stealth) {
@@ -498,6 +514,8 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
             console.log(color.warning(`  ! Page redirected to different domain:`));
             console.log(chalk.dim(`    From: ${initialUrl}`));
             console.log(chalk.dim(`    To:   ${finalUrl}`));
+            const rejected = sessionRedirectWarning(finalUrl, url, hasSession && !options.login);
+            if (rejected) { sessionWarnings.push(rejected); console.log(color.warning(`  ! Session: ${rejected}`)); }
           } else {
             console.log(color.info(`  i Page redirected within same domain:`));
             console.log(chalk.dim(`    From: ${initialUrl}`));
@@ -511,8 +529,17 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
 
         if (options.login && attempts === 1) {
           await waitForEnter();
+          if (isOffTarget(page.url(), url)) {
+            await waitForEnter(undefined, undefined,
+              `The browser is on ${new URL(page.url()).host}, not ${new URL(url).host}. Finish signing in, or press Enter again to extract this page as is…\n`);
+          }
           if (options.saveStorageState) {
-            await context.storageState({ path: options.saveStorageState });
+            const state = await context.storageState();
+            const perTab = await Promise.all(context.pages().map(async (p) => ({
+              origin: new URL(p.url()).origin,
+              sessionStorage: await p.evaluate(readSessionStorage).catch(() => []),
+            })));
+            writeFileSync(options.saveStorageState, serializeStorageState(state, perTab));
             log(color.success(`  ✓ Storage state saved to ${options.saveStorageState}`));
           }
         }
@@ -1468,6 +1495,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         requestedUrl: url,
         contentLength: lastContentLength,
         ...(timeouts.length ? { timeouts } : {}),
+        ...(sessionWarnings.length ? { sessionWarnings } : {}),
         flags: {
           ...(options.stealth && { stealth: true }),
           ...(options.darkMode && { darkMode: true }),

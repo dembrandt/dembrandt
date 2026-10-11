@@ -445,6 +445,8 @@ export interface ExtractionMeta {
    * so this is the only record of what it flagged.
    */
   robotsWarnings?: string[];
+  /** A saved session that had lapsed or was sent back to sign in. */
+  sessionWarnings?: string[];
 }
 
 /** A single fault-isolated extractor failure. */

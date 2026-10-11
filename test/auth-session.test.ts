@@ -16,7 +16,13 @@ import {
   normalizeSessionCookie,
   waitForEnter,
   emptyAuthSession,
+  serializeStorageState,
+  sessionStorageInitScript,
+  isOffTarget,
+  expiredSessionWarning,
+  sessionRedirectWarning,
 } from '../lib/extractors/auth-session.js';
+import vm from 'node:vm';
 
 const URL = 'https://app.example.com/dashboard';
 
@@ -200,4 +206,85 @@ test('waitForEnter rejects when stdin ends before Enter', async () => {
   const pending = waitForEnter(stdin as never, { write() { return true; } } as never);
   stdin.emit('end');
   await assert.rejects(() => pending, /stdin closed/);
+});
+
+const SAVED = {
+  cookies: [{ name: 'sid', value: '1', domain: 'app.example.com', path: '/' }],
+  origins: [{ origin: 'https://app.example.com', localStorage: [{ name: 'theme', value: 'dark' }] }],
+  sessionStorage: [
+    { origin: 'https://app.example.com', sessionStorage: [{ name: 'idp.token', value: 'abc' }, { name: 'nonce', value: 'n1' }] },
+    { origin: 'https://login.example.net', sessionStorage: [] },
+  ],
+};
+
+test('parseCookieFileJson reads the sessionStorage block and keeps storageState Playwright-shaped', () => {
+  const session = parseCookieFileJson(JSON.stringify(SAVED), URL);
+  assert.deepEqual(Object.keys(session.storageState!), ['cookies', 'origins']);
+  assert.deepEqual(session.sessionStorage, [
+    { origin: 'https://app.example.com', sessionStorage: [{ name: 'idp.token', value: 'abc' }, { name: 'nonce', value: 'n1' }] },
+    { origin: 'https://login.example.net', sessionStorage: [] },
+  ]);
+  assert.deepEqual(parseCookieFileJson('{"cookies":[]}', URL).sessionStorage, []);
+  assert.deepEqual(parseCookieFileJson('[]', URL).sessionStorage, []);
+});
+
+test('serializeStorageState writes sessionStorage only for origins that have entries, and parses back', () => {
+  const text = serializeStorageState({ cookies: SAVED.cookies, origins: SAVED.origins }, SAVED.sessionStorage);
+  const parsed = JSON.parse(text);
+  assert.equal(parsed.sessionStorage.length, 1);
+  assert.equal(parsed.sessionStorage[0].origin, 'https://app.example.com');
+  assert.deepEqual(parseCookieFileJson(text, URL).sessionStorage, [SAVED.sessionStorage[0]]);
+  assert.equal(JSON.parse(serializeStorageState({ cookies: [], origins: [] }, [])).sessionStorage, undefined);
+});
+
+function runInitScript(origin: string, existing: Record<string, string>) {
+  const store = new Map(Object.entries(existing));
+  const sandbox = {
+    location: { origin },
+    sessionStorage: {
+      getItem: (k: string) => (store.has(k) ? store.get(k) : null),
+      setItem: (k: string, v: string) => { store.set(k, v); },
+    },
+  };
+  vm.runInNewContext(sessionStorageInitScript(SAVED.sessionStorage), sandbox);
+  return Object.fromEntries(store);
+}
+
+test('sessionStorageInitScript seeds the matching origin and leaves other origins and existing keys alone', () => {
+  assert.deepEqual(runInitScript('https://app.example.com', {}), { 'idp.token': 'abc', nonce: 'n1' });
+  assert.deepEqual(runInitScript('https://app.example.com', { 'idp.token': 'fresh' }), { 'idp.token': 'fresh', nonce: 'n1' });
+  assert.deepEqual(runInitScript('https://other.example.com', {}), {});
+  assert.deepEqual(runInitScript('https://login.example.net', {}), {});
+});
+
+test('sessionStorageInitScript escapes values that would otherwise break out of the script', () => {
+  const script = sessionStorageInitScript([{ origin: 'https://a.test', sessionStorage: [{ name: 'k', value: '</script>"; alert(1); //' }] }]);
+  const store = new Map<string, string>();
+  vm.runInNewContext(script, { location: { origin: 'https://a.test' }, sessionStorage: { getItem: () => null, setItem: (k, v) => store.set(k, v) } });
+  assert.equal(store.get('k'), '</script>"; alert(1); //');
+});
+
+test('isOffTarget compares hosts, so a sign-in redirect is off target and a path change is not', () => {
+  assert.equal(isOffTarget('https://login.example.net/authorize?x=1', 'https://app.example.com/dashboard'), true);
+  assert.equal(isOffTarget('https://app.example.com/home', 'https://app.example.com/dashboard'), false);
+  assert.equal(isOffTarget('https://app.example.com:8443/', 'https://app.example.com/'), true);
+  assert.equal(isOffTarget('about:blank', 'https://app.example.com/'), true);
+  assert.equal(isOffTarget('not a url', 'https://app.example.com/'), false);
+});
+
+test('expiredSessionWarning fires only when every dated cookie has lapsed', () => {
+  const now = Date.UTC(2026, 0, 1);
+  const past = now / 1000 - 3600;
+  const future = now / 1000 + 3600;
+  const session = (cookies) => ({ cookies, storageState: null, sessionStorage: [] });
+  assert.equal(expiredSessionWarning(session([]), now), null);
+  assert.equal(expiredSessionWarning(session([{ name: 'a', value: '1' }]), now), null);
+  assert.equal(expiredSessionWarning(session([{ name: 'a', value: '1', expires: past }, { name: 'b', value: '1', expires: future }]), now), null);
+  assert.match(expiredSessionWarning(session([{ name: 'a', value: '1', expires: past }, { name: 's', value: '1', expires: -1 }]), now)!, /expired.*2025-12-31T23:00:00/);
+});
+
+test('sessionRedirectWarning names both hosts and stays quiet without a session or on the same host', () => {
+  assert.match(sessionRedirectWarning('https://login.example.net/x', 'https://app.example.com/', true)!, /app\.example\.com redirected to login\.example\.net/);
+  assert.equal(sessionRedirectWarning('https://login.example.net/x', 'https://app.example.com/', false), null);
+  assert.equal(sessionRedirectWarning('https://app.example.com/signin', 'https://app.example.com/', true), null);
 });

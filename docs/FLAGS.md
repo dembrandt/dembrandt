@@ -28,6 +28,8 @@ The tables below list the only exceptions: combinations that change each other's
 | `--no-sandbox` + `--browser firefox` | Ignored. Sandbox flags are Chromium-only. |
 | `BROWSER_CDP_ENDPOINT` (env) + `--browser firefox` | Error. CDP connect is Chromium-only. CDP mode also disables the visible-browser retry on navigation failure. |
 | `--save-storage-state` without `--login` | No effect. A warning is printed. |
+| `--login`, Enter pressed while the browser is still on the sign-in host | A second prompt names both hosts; Enter again extracts the page as it stands. |
+| `--save-storage-state` with a single-page app that keeps its tokens in sessionStorage | Saved per origin under a `sessionStorage` key next to Playwright's state; `--cookie-file` seeds it before the first script runs, existing keys win. |
 | `--login` + `--crawl` / `--sitemap` / extra paths | Login pause runs on the first page only. A warning names the reuse path (`--save-storage-state` then `--cookie-file`). |
 
 ## Multi-page runs: which flags reach every page

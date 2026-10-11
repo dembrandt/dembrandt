@@ -33,10 +33,17 @@ export interface StorageState {
   origins: StorageOrigin[];
 }
 
+export interface SessionStorageOrigin {
+  origin: string;
+  sessionStorage: LocalStorageEntry[];
+}
+
 export interface AuthSession {
   cookies: SessionCookie[];
   /** Set when the file was Playwright storageState; null for cookies-only. */
   storageState: StorageState | null;
+  /** Our extension of storageState: sign-in tokens many single-page apps keep per tab. */
+  sessionStorage: SessionStorageOrigin[];
 }
 
 export interface HttpCredentials {
@@ -49,6 +56,7 @@ export type FileReader = (path: string) => string;
 const EMPTY_SESSION: AuthSession = Object.freeze({
   cookies: Object.freeze([]) as SessionCookie[],
   storageState: null,
+  sessionStorage: Object.freeze([]) as SessionStorageOrigin[],
 });
 
 /** Netscape cookies.txt. `#HttpOnly_<domain>` is a real cookie, not a comment. */
@@ -111,24 +119,34 @@ function normalizeCookieList(list: unknown[], targetUrl: string): SessionCookie[
   return out;
 }
 
-function normalizeOrigins(list: unknown[]): StorageOrigin[] {
-  const out: StorageOrigin[] = [];
+function normalizeEntries(list: unknown): LocalStorageEntry[] {
+  if (!Array.isArray(list)) return [];
+  const entries: LocalStorageEntry[] = [];
+  for (const e of list) {
+    if (!e || typeof e !== 'object') continue;
+    const row = e as Record<string, unknown>;
+    if (typeof row.name !== 'string' || typeof row.value !== 'string') continue;
+    entries.push({ name: row.name, value: row.value });
+  }
+  return entries;
+}
+
+function normalizeOriginList<K extends 'localStorage' | 'sessionStorage'>(
+  list: unknown[],
+  key: K,
+): Array<{ origin: string } & Record<K, LocalStorageEntry[]>> {
+  const out: Array<{ origin: string } & Record<K, LocalStorageEntry[]>> = [];
   for (const item of list) {
     if (!item || typeof item !== 'object') continue;
     const o = item as Record<string, unknown>;
     if (typeof o.origin !== 'string' || !o.origin) continue;
-    const entries: LocalStorageEntry[] = [];
-    if (Array.isArray(o.localStorage)) {
-      for (const e of o.localStorage) {
-        if (!e || typeof e !== 'object') continue;
-        const row = e as Record<string, unknown>;
-        if (typeof row.name !== 'string' || typeof row.value !== 'string') continue;
-        entries.push({ name: row.name, value: row.value });
-      }
-    }
-    out.push({ origin: o.origin, localStorage: entries });
+    out.push({ origin: o.origin, [key]: normalizeEntries(o[key]) } as { origin: string } & Record<K, LocalStorageEntry[]>);
   }
   return out;
+}
+
+function normalizeOrigins(list: unknown[]): StorageOrigin[] {
+  return normalizeOriginList(list, 'localStorage');
 }
 
 /** Cookie array or `{ cookies, origins }` storageState. */
@@ -141,16 +159,18 @@ export function parseCookieFileJson(text: string, targetUrl: string): AuthSessio
   }
 
   if (Array.isArray(parsed)) {
-    return { cookies: normalizeCookieList(parsed, targetUrl), storageState: null };
+    return { cookies: normalizeCookieList(parsed, targetUrl), storageState: null, sessionStorage: [] };
   }
 
   if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { cookies?: unknown }).cookies)) {
-    const obj = parsed as { cookies: unknown[]; origins?: unknown[] };
+    const obj = parsed as { cookies: unknown[]; origins?: unknown[]; sessionStorage?: unknown[] };
     const cookies = normalizeCookieList(obj.cookies, targetUrl);
     const origins = Array.isArray(obj.origins) ? normalizeOrigins(obj.origins) : [];
+    const sessionStorage = Array.isArray(obj.sessionStorage) ? normalizeOriginList(obj.sessionStorage, 'sessionStorage') : [];
     return {
       cookies,
       storageState: { cookies, origins },
+      sessionStorage,
     };
   }
 
@@ -162,7 +182,66 @@ export function parseCookieFileText(text: string, targetUrl: string): AuthSessio
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     return parseCookieFileJson(text, targetUrl);
   }
-  return { cookies: parseNetscapeCookies(text, targetUrl), storageState: null };
+  return { cookies: parseNetscapeCookies(text, targetUrl), storageState: null, sessionStorage: [] };
+}
+
+/** Playwright's storageState plus our sessionStorage block, as the file --save-storage-state writes. */
+export function serializeStorageState(state: StorageState, sessionStorage: SessionStorageOrigin[]): string {
+  const kept = sessionStorage.filter((o) => o.sessionStorage.length > 0);
+  return JSON.stringify(kept.length ? { ...state, sessionStorage: kept } : state, null, 2) + '\n';
+}
+
+/** Runs in the page: the tab's sessionStorage as name/value rows. */
+export function readSessionStorage(): LocalStorageEntry[] {
+  const out: LocalStorageEntry[] = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const name = sessionStorage.key(i);
+    if (name === null) continue;
+    out.push({ name, value: sessionStorage.getItem(name) ?? '' });
+  }
+  return out;
+}
+
+/**
+ * Init script that seeds a tab's sessionStorage for its origin before any
+ * page script runs. Existing keys win, so an app that has already refreshed
+ * its tokens is never rolled back to the saved ones.
+ */
+export function sessionStorageInitScript(origins: readonly SessionStorageOrigin[]): string {
+  const byOrigin: Record<string, LocalStorageEntry[]> = {};
+  for (const o of origins) {
+    if (o.sessionStorage.length) byOrigin[o.origin] = o.sessionStorage;
+  }
+  return `(() => {
+  const saved = ${JSON.stringify(byOrigin)}[location.origin];
+  if (!saved) return;
+  for (const { name, value } of saved) {
+    if (sessionStorage.getItem(name) === null) sessionStorage.setItem(name, value);
+  }
+})();`;
+}
+
+/** A saved session whose dated cookies have all lapsed will only reach the sign-in page again. */
+export function expiredSessionWarning(session: AuthSession, now = Date.now()): string | null {
+  const dated = session.cookies.filter((c) => typeof c.expires === 'number' && c.expires > 0);
+  if (dated.length === 0 || dated.some((c) => c.expires! * 1000 > now)) return null;
+  const last = new Date(Math.max(...dated.map((c) => c.expires! * 1000)));
+  return `every dated cookie in the saved session expired, the last on ${last.toISOString()}; run --login again`;
+}
+
+/** A run that carried a session but landed on another host was sent back to sign in. */
+export function sessionRedirectWarning(finalUrl: string, targetUrl: string, hasSession: boolean): string | null {
+  if (!hasSession || !isOffTarget(finalUrl, targetUrl)) return null;
+  return `the saved session was not accepted: ${new URL(targetUrl).host} redirected to ${new URL(finalUrl).host}; sign in again with --login`;
+}
+
+/** True when the browser has left the host the run was asked for, as it does mid sign-in. */
+export function isOffTarget(currentUrl: string, targetUrl: string): boolean {
+  try {
+    return new URL(currentUrl).host !== new URL(targetUrl).host;
+  } catch {
+    return false;
+  }
 }
 
 export function loadAuthSession(
@@ -170,7 +249,7 @@ export function loadAuthSession(
   targetUrl: string,
   read: FileReader = (p) => readFileSync(p, 'utf8'),
 ): AuthSession {
-  if (!filePath || !filePath.trim()) return { cookies: [], storageState: null };
+  if (!filePath || !filePath.trim()) return emptyAuthSession();
   const absolute = resolve(filePath);
   let text: string;
   try {
@@ -243,7 +322,7 @@ export function waitForEnter(
 }
 
 export function emptyAuthSession(): AuthSession {
-  return { cookies: [], storageState: null };
+  return { cookies: [], storageState: null, sessionStorage: [] };
 }
 
 export { EMPTY_SESSION };
