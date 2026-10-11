@@ -1,6 +1,6 @@
 name: "Dembrandt Drift Gate"
 author: "Dembrandt"
-description: "Extract a site's design system and fail the build on design drift against a baseline — colors, typography, spacing, radii, shadows from the real rendered DOM."
+description: "Extract a site's design tokens and fail the build on drift against a baseline: colors, type, spacing, radii, shadows."
 branding:
   icon: "eye"
   color: "purple"
