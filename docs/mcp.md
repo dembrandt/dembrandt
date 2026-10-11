@@ -26,13 +26,12 @@ Claude Desktop, Cursor, Windsurf and any client that reads a JSON config:
 }
 ```
 
-Claude Desktop: Settings, Developer, Edit Config, paste the block inside `mcpServers`, restart. Cursor and Windsurf: `.mcp.json` at the repo root. VS Code and Copilot: `.vscode/mcp.json` with the same server under `servers`. Zed: the same under `context_servers` in settings. JetBrains: Settings, Tools, AI Assistant, MCP, add the command.
+Claude Desktop: Settings, Developer, Edit Config, paste the block inside `mcpServers`, restart. Cursor and Windsurf: `.mcp.json` at the repo root. VS Code and Copilot: `.vscode/mcp.json` with the same server under `servers`.
 
-Codex and Gemini CLI:
+Codex:
 
 ```bash
 codex mcp add dembrandt -- npx -y dembrandt mcp
-gemini mcp add dembrandt npx -y dembrandt mcp
 ```
 
 The server runs on the machine that runs the agent. Web agents without a local process (ChatGPT, Perplexity, Claude.ai, Lovable, Figma Make) cannot connect to it. Claude Code can also take the skills repo as a plugin, which registers this server alongside 45 UX skills: `/plugin marketplace add dembrandt/dembrandt-skills`.
