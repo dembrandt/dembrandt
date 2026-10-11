@@ -2,8 +2,8 @@ name: "Dembrandt Drift Gate"
 author: "Dembrandt"
 description: "Extract a site's design tokens and fail the build on drift against a baseline: colors, type, spacing, radii, shadows."
 branding:
-  icon: "eye"
-  color: "purple"
+  icon: "shield"
+  color: "blue"
 
 inputs:
   url:
