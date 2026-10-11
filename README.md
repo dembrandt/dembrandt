@@ -135,7 +135,10 @@ Copy a command, paste a prompt, get a result. Competitor benchmarking, WCAG audi
 
 Use Dembrandt as a tool in Claude Code, Cursor, Windsurf, or any MCP-compatible client. Ask your agent to "extract the color palette from dembrandt.com" and it calls Dembrandt automatically.
 
-Setup for Claude Desktop, Claude Code, Cursor and Windsurf, the full tool list and how the job model works: **[dembrandt.com/mcp](https://www.dembrandt.com/mcp)**.
+[![Add to Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](cursor://anysphere.cursor-deeplink/mcp/install?name=dembrandt&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImRlbWJyYW5kdCIsIm1jcCJdfQ==)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=dembrandt&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22dembrandt%22%2C%22mcp%22%5D%7D)
+
+Per-client setup, environment variables and the full tool list: **[docs/mcp.md](docs/mcp.md)** and **[dembrandt.com/mcp](https://www.dembrandt.com/mcp)**.
 
 ```bash
 claude mcp add --transport stdio dembrandt -- npx -y dembrandt mcp
@@ -218,6 +221,7 @@ The CLI is MIT-licensed and free. Sponsorship funds the enforcement layer: a com
 
 - [docs/usage.md](docs/usage.md): every flag, multi-page extraction, browser selection, CDP, DTCG, DESIGN.md, Tailwind theme, WCAG, motion, brand guide PDF
 - [docs/ci.md](docs/ci.md): GitHub Action, drift gate, exit codes
+- [docs/mcp.md](docs/mcp.md): MCP server install per client, environment, tools
 - [docs/recipes.md](docs/recipes.md): copy-paste workflows
 - [docs/FLAGS.md](docs/FLAGS.md): flag interactions, ignored combinations, multi-page propagation
 
