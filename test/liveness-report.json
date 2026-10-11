@@ -8,7 +8,7 @@
     {
       "site": "stripe.com",
       "code": 0,
-      "colors": 31,
+      "colors": 30,
       "styles": 51,
       "degraded": 0,
       "ok": true,
@@ -18,7 +18,7 @@
       "site": "linear.app",
       "code": 0,
       "colors": 12,
-      "styles": 46,
+      "styles": 47,
       "degraded": 0,
       "ok": true,
       "skipped": false
@@ -45,7 +45,7 @@
       "site": "wikipedia.org",
       "code": 0,
       "colors": 10,
-      "styles": 13,
+      "styles": 17,
       "degraded": 0,
       "ok": true,
       "skipped": false

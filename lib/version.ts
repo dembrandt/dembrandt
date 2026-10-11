@@ -36,16 +36,34 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
- *  1.19.0 — colors.cssVariables entries gain `scope` (`root` or `body`).
- *          Additive: 1.18.x consumers ignore it. BEHAVIOR: cssVariables is
- *          now the complete declared colour-token map. It used to drop every
- *          variable within deltaE 15 of a palette entry and keep one name
- *          per value, so a dark-mode run or an alias token (--a and --b with
- *          one value) lost names. palette.tokens now carries the names of
- *          every colour merged into an entry, not only the representative's.
- *          Palette and semantic values are unmoved; drift ignores both fields:
- *          dembrandt.com scores 0 against a 0.38.0 baseline. The --ai token
- *          features stay constant 0, their trained meaning, until a retrain.
+ *  1.19.0 — four additions in one unreleased step. colors.semanticEvidence
+ *          .primary records how the primary was decided: `elected` with the
+ *          rule, reason, declaring tokens and runners-up, or `refused` with the
+ *          candidates that lost. colors.occurrences counts every colour per
+ *          paint (fill, text, border) with summed fill area and the declaring
+ *          custom property; slot and state are null until classification
+ *          lands. meta.context records the browser context the run was
+ *          measured under (viewport, deviceScaleFactor, isMobile, hasTouch,
+ *          colorScheme, reducedMotion, forcedColors, locale, timezoneId,
+ *          userAgent) and drift warns when two snapshots differ in a dial.
+ *          A crawl tags every merged value with pageCount and scope (site,
+ *          section, page) and carries `coverage`: a 0-100 agreement score,
+ *          per-family means and the page-local outliers. Palette `role` is
+ *          read after the usage cap, so a colour seen under three times is
+ *          `supporting`, not `accent`. Measured against a same-day 0.38.0
+ *          control over 175 corpus sites: 158 identical, three primaries
+ *          moved, two of them bot walls and one a site that moves between
+ *          control days as well. meta.flags gains `session`, `basicAuth` and
+ *          `login` as booleans only, never the credential; meta.sessionWarnings
+ *          lists a saved session that had lapsed or was redirected to sign in.
+ *          `tokenConformance` appears when a run is
+ *          checked against a token file (--tokens): the off-token values with
+ *          their nearest token and distance, counts per category, the commit.
+ *          colors.cssVariables entries gain `scope` (`root` or `body`) and
+ *          the map is complete: it no longer drops a variable within deltaE 15
+ *          of a palette entry or keeps one name per value, so alias tokens and
+ *          dark-mode values keep their names; palette.tokens carries every
+ *          name merged into an entry. Palette and semantic values unmoved.
  *  1.18.0 — frameworks entries gain `category`, `version` and `coverage` (the
  *          share of the page under that framework's mount points), iconSystem
  *          entries gain `version`. Additive: 1.17.x consumers ignore them.

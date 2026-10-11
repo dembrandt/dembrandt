@@ -11,6 +11,9 @@ The tables below list the only exceptions: combinations that change each other's
 | `--compare` + `--approve` | The current extraction overwrites the baseline file and the run passes regardless of drift. |
 | `--compare` + `--html` | The drift report is embedded in the HTML report. |
 | `--compare` + `--json-only` | A `drift` object is attached to the stdout JSON. Saved files (`--save-output`, baselines) stay pure extractions. |
+| `--tokens` + `--json-only` / `--save-output` | A `tokenConformance` object is attached to the result: date, url, commit, counts per category and the off-token list, one object per run so a pipeline can append and trend. |
+| `--tokens` + `--compare` | Independent checks. Either one failing exits 1; a token check that cannot read its file exits 2 like an unreadable baseline. |
+| `--tokens` + `--login` or `--cookie-file` + extra paths | The signed-in context is shared by every path, so one run checks several routes behind a sign-in. |
 | `--crawl` + `--sitemap` | Sitemap discovery is used, `--crawl N` sets the page limit (N pages total). `--sitemap` alone discovers up to 20 additional pages. |
 | `--dtcg` + `--save-output` | Two files: the raw extraction (`.json`, from `--save-output`) and the DTCG tokens (`.tokens.json`, from `--dtcg`), same timestamp. Each flag alone writes only its own file. |
 | `--json-only` + `--dtcg` | stdout is the DTCG document. `--wcag`, `--raw-colors`, and `pages` data exist only in the raw extraction: drop `--dtcg` or add `--save-output` to get them. |
@@ -23,10 +26,16 @@ The tables below list the only exceptions: combinations that change each other's
 | Combination | Behavior |
 |---|---|
 | `--approve` without `--compare` | No effect. A warning is printed. |
+| `--max-off-token` or `--tokens-report` without `--tokens` | No effect. |
+| `--annotations` + `--json-only` | No annotations: stdout is the JSON document. Drop `--json-only` on the runner or read `tokenConformance` and `drift` from the saved file. |
 | Explicit `[paths...]` arguments + `--crawl` or `--sitemap` | Explicit paths win; link and sitemap discovery are skipped entirely. |
 | `--color-format` + `--json-only` / `--save-output` / `--dtcg` / `--design-md` / `--html` / `--brand-guide` | Ignored by those paths. The flag is presentational and covers terminal output only; the payload carries hex, rgb, lch and oklch for every color. A warning names the paths it misses. |
 | `--no-sandbox` + `--browser firefox` | Ignored. Sandbox flags are Chromium-only. |
 | `BROWSER_CDP_ENDPOINT` (env) + `--browser firefox` | Error. CDP connect is Chromium-only. CDP mode also disables the visible-browser retry on navigation failure. |
+| `--save-storage-state` without `--login` | No effect. A warning is printed. |
+| `--login`, Enter pressed while the browser is still on the sign-in host | A second prompt names both hosts; Enter again extracts the page as it stands. |
+| `--save-storage-state` with a single-page app that keeps its tokens in sessionStorage | Saved per origin under a `sessionStorage` key next to Playwright's state; `--cookie-file` seeds it before the first script runs, existing keys win. |
+| `--login` + `--crawl` / `--sitemap` / extra paths | Login pause runs on the first page only. A warning names the reuse path (`--save-storage-state` then `--cookie-file`). |
 
 ## Multi-page runs: which flags reach every page
 
@@ -39,6 +48,8 @@ In a multi-page run (`--crawl`, `--sitemap`, or extra `[paths...]`), some flags 
 | `--slow` | |
 | `--stealth` | |
 | `--cookie` | |
+| `--cookie-file` | |
+| `--basic-auth` | |
 | `--header` | |
 | `--user-agent` | |
 | `--locale` | |

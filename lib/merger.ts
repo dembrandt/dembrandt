@@ -8,7 +8,9 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { coverageEntry, scopeOf, summarizeCoverage, type TokenScope } from './coverage.js';
 import { deltaE } from './colors.js';
+import type { ColorOccurrence } from './types.js';
 import { applyBudget, computeMetrics, totalWords, WORD_FLOOR } from './voice/metrics.js';
 
 /**
@@ -95,14 +97,30 @@ function mergeColors(results) {
     merged.push({ ...clean, count: totalCount, confidence, pageCount });
   }
 
-  // Semantic: homepage wins, fill missing from other pages
+  // Semantic: homepage wins, fill missing from other pages; evidence follows the page that supplied the value
   const semantic = { ...base.semantic };
+  const semanticEvidence = { ...base.semanticEvidence };
   for (let i = 1; i < results.length; i++) {
     const s = results[i].colors?.semantic || {};
     for (const [k, v] of Object.entries(s)) {
-      if (!semantic[k] && v) semantic[k] = v;
+      if (semantic[k] || !v) continue;
+      semantic[k] = v;
+      const ev = results[i].colors?.semanticEvidence?.[k];
+      if (ev) semanticEvidence[k] = ev;
     }
   }
+
+  const occurrenceMap = new Map<string, ColorOccurrence>();
+  results.forEach((r) => {
+    (r.colors?.occurrences || []).forEach((o) => {
+      const key = `${o.hex}|${o.paints}`;
+      const row = occurrenceMap.get(key);
+      if (row) { row.count += o.count; row.area += o.area; }
+      else occurrenceMap.set(key, { ...o });
+    });
+  });
+  const occurrences = Array.from(occurrenceMap.values())
+    .sort((a, b) => b.count - a.count || a.hex.localeCompare(b.hex) || a.paints.localeCompare(b.paints));
 
   // CSS variables: union, first occurrence wins
   const cssVariables: Record<string, any> = {};
@@ -113,7 +131,14 @@ function mergeColors(results) {
     }
   });
 
-  return { ...base, semantic, palette: merged, cssVariables };
+  return {
+    ...base,
+    semantic,
+    ...(Object.keys(semanticEvidence).length ? { semanticEvidence } : {}),
+    ...(occurrences.length ? { occurrences } : {}),
+    palette: merged,
+    cssVariables,
+  };
 }
 
 function mergeTypography(results) {
@@ -121,13 +146,17 @@ function mergeTypography(results) {
 
   // Dedup styles by (family, size, weight) tuple, sum counts
   const styleMap = new Map();
-  results.forEach(r => {
+  const stylePages = new Map<string, Set<number>>();
+  results.forEach((r, pageIdx) => {
     (r.typography?.styles || []).forEach(s => {
       const key = `${s.family}|${s.size}|${s.weight}`;
       if (!styleMap.has(key)) {
-        styleMap.set(key, { ...s, count: 1 });
+        styleMap.set(key, { ...s, count: 1, pageCount: 1 });
+        stylePages.set(key, new Set([pageIdx]));
       } else {
         styleMap.get(key).count++;
+        stylePages.get(key).add(pageIdx);
+        styleMap.get(key).pageCount = stylePages.get(key).size;
       }
     });
   });
@@ -253,11 +282,12 @@ function mergeValueArrays(results, getter, valueKey = 'value') {
     (getter(r) || []).forEach(item => {
       const key = item[valueKey];
       if (!map.has(key)) {
-        map.set(key, { ...item });
+        map.set(key, { ...item, pageCount: 1 });
       } else {
         const e = map.get(key);
         e.count = (e.count || 0) + (item.count || 1);
         e.frequency = (e.frequency || 0) + (item.frequency || 0);
+        e.pageCount++;
       }
     });
   });
@@ -287,10 +317,11 @@ function mergeBorders(results) {
     (r.borders?.combinations || []).forEach(item => {
       const key = `${item.width}|${item.style}|${item.color}`;
       if (!map.has(key)) {
-        map.set(key, { ...item, elements: [...(item.elements || [])] });
+        map.set(key, { ...item, elements: [...(item.elements || [])], pageCount: 1 });
       } else {
         const e = map.get(key);
         e.count += (item.count || 1);
+        e.pageCount++;
         const elementSet = new Set([...(e.elements || []), ...(item.elements || [])]);
         e.elements = [...elementSet].slice(0, 5);
         if (e.count > 10) e.confidence = 'high';
@@ -309,9 +340,10 @@ function mergeShadows(results) {
     (r.shadows || []).forEach(s => {
       const key = s.shadow || s.value || JSON.stringify(s);
       if (!map.has(key)) {
-        map.set(key, { ...s, count: s.count || 1 });
+        map.set(key, { ...s, count: s.count || 1, pageCount: 1 });
       } else {
         map.get(key).count += (s.count || 1);
+        map.get(key).pageCount++;
       }
     });
   });
@@ -483,11 +515,43 @@ function mergeVoice(results) {
  * @param {Object[]} results - Array of extractBranding() result objects
  * @returns {Object} Merged result with same shape as single-page result
  */
+const COVERAGE_FAMILIES: [string, (m) => { pageCount?: number; scope?: TokenScope }[] | undefined, (v) => string][] = [
+  ['color', (m) => m.colors?.palette, (v) => v.normalized || v.color],
+  ['typography', (m) => m.typography?.styles, (v) => `${v.family} ${v.size}/${v.weight}`],
+  ['spacing', (m) => m.spacing?.commonValues, (v) => String(v.px)],
+  ['radius', (m) => m.borderRadius?.values, (v) => String(v.value)],
+  ['border', (m) => m.borders?.combinations, (v) => `${v.width} ${v.style} ${v.color}`],
+  ['shadow', (m) => m.shadows, (v) => v.shadow || v.value],
+];
+
+/** Tags every merged value with its scope and sums the crawl's agreement. */
+function attachCoverage(merged, totalPages: number) {
+  const entries = [];
+  for (const [family, getter, nameOf] of COVERAGE_FAMILIES) {
+    for (const value of getter(merged) || []) {
+      if (!value.pageCount) continue;
+      value.scope = scopeOf(value.pageCount, totalPages);
+      entries.push(coverageEntry(family, nameOf(value), value.pageCount, totalPages));
+    }
+  }
+  const coverage = summarizeCoverage(entries, totalPages);
+  return coverage ? { coverage } : {};
+}
+
 export function mergeResults(results) {
   if (results.length === 0) throw new Error('No results to merge');
   if (results.length === 1) return results[0];
 
   const home = results[0];
+
+  const merged = {
+    colors: mergeColors(results),
+    typography: mergeTypography(results),
+    spacing: mergeSpacing(results),
+    borderRadius: mergeBorderRadius(results),
+    borders: mergeBorders(results),
+    shadows: mergeShadows(results),
+  };
 
   return {
     url: home.url,
@@ -496,12 +560,8 @@ export function mergeResults(results) {
     siteName: home.siteName,
     logo: home.logo,
     favicons: home.favicons,
-    colors: mergeColors(results),
-    typography: mergeTypography(results),
-    spacing: mergeSpacing(results),
-    borderRadius: mergeBorderRadius(results),
-    borders: mergeBorders(results),
-    shadows: mergeShadows(results),
+    ...merged,
+    ...attachCoverage(merged, results.length),
     gradients: mergeGradients(results),
     motion: mergeMotion(results),
     components: mergeComponents(results),

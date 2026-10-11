@@ -32,6 +32,8 @@ const PARAM_FOR_FLAG: Record<string, string> = {
   '--crawl': 'pages',
   '--sitemap': 'sitemap',
   '--cookie': 'cookie',
+  '--cookie-file': 'cookieFile',
+  '--basic-auth': 'basicAuth',
   '--header': 'header',
   '--user-agent': 'userAgent',
   '--no-sandbox': 'noSandbox',
@@ -39,6 +41,10 @@ const PARAM_FOR_FLAG: Record<string, string> = {
 
 /** Deliberately CLI-only. */
 const CLI_ONLY: Record<string, string> = {
+  '--tokens': 'Reads token files from the caller\'s disk; an agent passes the DTCG document to a pure tool instead.',
+  '--max-off-token': 'An exit-code gate for pipelines; an agent reads the counts in the report.',
+  '--tokens-report': 'Writes a Markdown page to disk for a wiki; an agent writes the file itself.',
+  '--annotations': 'CI log commands, read only by a CI runner.',
   '--json-only': 'Output shaping for a terminal. MCP returns structured content already.',
   '--save-output': 'Writes to the caller\'s disk. An agent writes the file itself.',
   '--raw-colors': 'Pre-filter debugging aid, not a product surface.',
@@ -48,6 +54,8 @@ const CLI_ONLY: Record<string, string> = {
   '--approve': 'Rewrites a baseline file on disk, which belongs to the CI job, not the agent.',
   '--browser': 'Engine selection is a local install concern.',
   '--stealth': 'Opt-in anti-detection. Deliberately not offered to an autonomous caller.',
+  '--login': 'Interactive TTY pause in a headed window. An agent cannot press Enter.',
+  '--save-storage-state': 'Writes a session file after --login; belongs to the operator, not the agent.',
   '--key': 'Account sync. An agent is not the account holder.',
   '--locale': 'Fingerprint detail with no agent-facing use yet.',
   '--timezone': 'Fingerprint detail with no agent-facing use yet.',
@@ -57,6 +65,7 @@ const CLI_ONLY: Record<string, string> = {
   '--help': 'Protocol handshake carries the tool list.',
   '--ai': 'Experimental ML primary prediction; not a promised surface.',
   '--wcag': 'A parameter on get_design_tokens; check_contrast grades pairs an agent names.',
+  '--no-headed-fallback': 'MCP never opens a visible browser, so the switch has nothing to turn off there.',
 };
 
 interface ToolDefinition {
@@ -111,7 +120,7 @@ test('every CLI flag is answered over MCP or declared CLI-only', () => {
 });
 
 test('every extraction tool takes the whole navigation surface, not just one of them', () => {
-  const shared = ['slow', 'mobile', 'darkMode', 'cookie', 'header', 'userAgent', 'noSandbox', 'pages', 'paths', 'sitemap'];
+  const shared = ['slow', 'mobile', 'darkMode', 'cookie', 'cookieFile', 'basicAuth', 'header', 'userAgent', 'noSandbox', 'pages', 'paths', 'sitemap'];
   // An extraction tool opens a browser: url plus sync. check_robots does not.
   const extraction = tools.filter((t) => {
     const props = Object.keys(t.inputSchema.properties ?? {});
