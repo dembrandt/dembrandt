@@ -101,6 +101,7 @@ reference is **[docs/usage.md](docs/usage.md)**.
 | `--login` | Open a visible browser to sign in; press Enter when ready, then extract (interactive terminal only) |
 | `--save-storage-state <path>` | With `--login`, save the signed-in session (cookies, localStorage, sessionStorage) to a file; reuse it later with `--cookie-file`, also in CI |
 | `--header <string>` | Any extra request header, repeat for several |
+| `--no-headed-fallback` | Never open a visible browser on a failed navigation; for batch runs |
 | `--user-agent <string>` | Custom user agent |
 | `--locale <string>` | Locale for the fingerprint |
 | `--timezone <string>` | Timezone for the fingerprint |
