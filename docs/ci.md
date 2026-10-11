@@ -96,6 +96,35 @@ dembrandt "$PREVIEW/checkout" --compare base.json --json-only > drift.json
 
 A ready-to-use **GitHub Actions** workflow (preview vs production, per-page PR comment with the exact tokens that changed, run summary, report artifact, host-auth bypass) is in [`examples/drift-gate.yml`](../examples/drift-gate.yml) as one full reference. The result-surfacing step (annotations, PR comment) is the only platform-specific part; the extract → compare → branch-on-exit-code core is identical on GitLab CI, Jenkins, and Azure DevOps.
 
+## Rendered values against a token file
+
+A drift gate compares a site with its own past. A token check asks a different question: which rendered colours, radii and font sizes are not tokens at all. Inherited library styles, inline chart colours and runtime-computed values never appear in a source scan; the browser is the only place they show.
+
+```bash
+dembrandt https://test.example.com /search /orders \
+  --cookie-file session.json \
+  --tokens tokens/light.json --tokens tokens/dark.json \
+  --max-off-token 10 --tokens-report docs/drift/rendered.md --no-sandbox
+```
+
+Every rendered colour is matched to the nearest token by ΔE2000 (2.3 or less counts as the token); radii and font sizes match on the pixel value. The report lists each off-token value with its count, the nearest token and the distance. More off-token values than `--max-off-token` exits 1, an unreadable token file exits 2. The same `tokenConformance` object is attached to the JSON, one per run, so a pipeline can append runs and draw a trend.
+
+### Azure Pipelines
+
+The runner is detected from `TF_BUILD`; `--annotations azure` forces it. Off-token values print as `##vso[task.logissue]` lines, so they appear on the run summary, and the Markdown report commits to a code wiki as is (plain tables, no HTML).
+
+```yaml
+steps:
+  - script: |
+      npx -y dembrandt@latest install-browser
+      npx -y dembrandt@latest $(APP_URL) /search /orders --no-sandbox \
+        --cookie-file $(Agent.TempDirectory)/session.json \
+        --tokens tokens.json --max-off-token 10 --tokens-report $(Build.ArtifactStagingDirectory)/rendered.md
+    displayName: Rendered values against tokens
+```
+
+Produce `session.json` once on a workstation with `dembrandt <url> --login --save-storage-state session.json` and store it as a secure file; it carries cookies, localStorage and sessionStorage, so single-page apps that keep their sign-in in sessionStorage work too.
+
 ## Exit codes
 
 A pipeline can branch on the exit code; "design drifted" and "extraction broke" are distinct:

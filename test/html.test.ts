@@ -64,6 +64,17 @@ test('frameworks and icon sets are listed with the version the page stated', () 
   assert.ok(html.includes('Heroicons 2'), 'icon set version missing');
 });
 
+test('a framework is listed with the share of the page it renders', () => {
+  const html = generateHtmlReport(fixture({
+    frameworks: [
+      { name: 'React', confidence: 'high', version: '19.2.0', coverage: 0.4 },
+      { name: 'Next.js', confidence: 'high', version: '16.2.9' },
+      { name: 'Vue', confidence: 'high', coverage: 0 },
+    ],
+  }) as never);
+  assert.ok(html.includes('React 19.2.0 (40% of page), Next.js 16.2.9, Vue (0% of page)'), 'page share missing');
+});
+
 test('escapes untrusted extracted strings (no breakout into the document)', () => {
   const evil = '</style><img src=x onerror=alert(1)>';
   const html = generateHtmlReport(fixture({
@@ -181,7 +192,7 @@ test('component sections carry a Copy all payload built from every entry, not ju
   const html = generateHtmlReport(fixture({ components: { buttons: [], inputs: [], links, badges: [] } }));
   const chips = (html.match(/class="badgepv"/g) ?? []).length;
   assert.equal(chips, 12);
-  const copy = html.match(/data-copy="([^"]*)"/g) ?? [];
+  const copy: string[] = html.match(/data-copy="([^"]*)"/g) ?? [];
   assert.ok(copy.some((c) => c.includes('#000000') && c.includes('#000014')), 'copy payload must span past the 12 rendered chips');
 });
 
@@ -218,4 +229,30 @@ test('a pair predating the size fields keeps the AA-Large middle tier', () => {
   const html = generateHtmlReport(fixture({ wcag: [legacy] }));
   assert.match(html, /b-warn">AA Large/);
   assert.match(html, /· 1 AA Large/);
+});
+
+test('role labels resolve when the semantic map is in rgb() and the palette in hex', () => {
+  const html = generateHtmlReport(fixture({ colors: { palette: [{ color: '#133174', normalized: '#133174', count: 40, confidence: 'high' }], semantic: { primary: 'rgb(19, 49, 116)' } } }));
+  assert.match(html, /<div class="role">primary<\/div>/);
+});
+
+test('the contrast gauge counts size-aware passes, not the fixed 4.5 flag', () => {
+  const large = { fg: '#767676', bg: '#ffffff', ratio: 3.6, aa: false, aaLarge: true, aaa: false, passAA: true, large: true };
+  const html = generateHtmlReport(fixture({ wcag: [large] }));
+  assert.match(html, /1\/1 pairs AA/);
+});
+
+test('input previews read the default state the extractor emits', () => {
+  const html = generateHtmlReport(fixture({ components: { inputs: [{ specificType: 'email', states: { default: { backgroundColor: '#ffffff', color: '#111111', border: '2px solid #ff0000', borderRadius: '6px', padding: '4px 8px' } } }] } }));
+  assert.match(html, /border:2px solid #ff0000/);
+  assert.match(html, /placeholder="email"/);
+});
+
+test('crawl agreement score and page-local outliers appear in the report', () => {
+  const html = generateHtmlReport(fixture({
+    coverage: { totalPages: 4, score: 72, byFamily: {}, outliers: [{ family: 'colors', token: '#ff0000', pages: 1, scope: 'page' }] },
+  }));
+  assert.match(html, /72\/100 consistent across 4 pages/);
+  assert.match(html, /page-local: colors #ff0000/);
+  assert.doesNotMatch(generateHtmlReport(fixture()), /consistent across/);
 });

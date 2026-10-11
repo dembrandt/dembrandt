@@ -22,7 +22,9 @@ import { generateTailwindTheme } from "./lib/formatters/tailwind.js";
 import { generateShadcnTheme } from "./lib/formatters/shadcn.js";
 import { generateHtmlReport } from "./lib/formatters/html.js";
 import { resolveCompare } from "./lib/compare.js";
-import { emitDriftAnnotations } from "./lib/ci-annotations.js";
+import { emitDriftAnnotations, conformanceAnnotations, detectCiSystem } from "./lib/ci-annotations.js";
+import { checkConformance, commitFromEnv, parseTokenFile } from "./lib/token-conformance.js";
+import { generateConformanceMd } from "./lib/formatters/conformance-md.js";
 import { parseSitemap, computePagesRequested } from "./lib/discovery.js";
 import { mergeResults } from "./lib/merger.js";
 import { writeFileSync, mkdirSync, readFileSync } from "fs";
@@ -79,8 +81,13 @@ program
   .option("--shadcn [path]", "Write a shadcn/ui theme block, observed slots only (default: output/<domain>/shadcn.css)")
   .option("--html [path]", "Write a self-contained HTML report (default: output/<domain>/<timestamp>.html)")
   .option("--compare <baseline>", "Drift-compare against a baseline JSON file. Exits 1 on drift, 2 if the baseline cannot be read.")
+  .option("--tokens <path>", "Check every rendered colour, radius and font size against a W3C Design Tokens file; repeat for several files (light and dark sets, several packages)", (v: string, all: string[] = []) => [...all, v])
+  .option("--max-off-token <n>", "With --tokens: exit 1 when more than N rendered values match no token", (v: string) => { const n = Number(v); if (!Number.isInteger(n) || n < 0) throw new InvalidArgumentError("--max-off-token takes a whole number"); return n; })
+  .option("--tokens-report <path>", "With --tokens: write the off-token summary as a Markdown page (plain tables, wiki-ready)")
+  .option("--annotations <system>", "Print CI annotations for off-token values and drift: github or azure (default: detected from the runner)", (v: string) => { if (v !== "github" && v !== "azure") throw new InvalidArgumentError("--annotations takes github or azure"); return v; })
   .option("--approve", "With --compare <file>: accept the current extraction as the new baseline by overwriting that local file, and pass instead of failing.")
   .option("--no-sandbox", "Disable browser sandbox (needed for Docker/CI)")
+  .option("--no-headed-fallback", "Fail instead of retrying a failed navigation in a visible browser (also DEMBRANDT_NO_HEADED_FALLBACK=1); for batch and unattended runs")
   .option("--raw-colors", "Include pre-filter raw colors in JSON output")
   .option(
     "--color-format <format>",
@@ -110,7 +117,11 @@ program
   })
   .option("--sitemap", "Discover pages from sitemap.xml instead of DOM links; use alone or combine with --crawl to set page limit")
   .option("--cookie <string>", "Cookie string for authenticated pages, e.g. \"session=abc; token=xyz\"")
-  .option("--header <string>", "Extra HTTP header, e.g. \"Authorization: Bearer eyJ...\"")
+  .option("--cookie-file <path>", "Cookie export for authenticated pages: JSON array, Playwright storageState (cookies + localStorage), or Netscape cookies.txt")
+  .option("--basic-auth <user:password>", "HTTP Basic credentials for the browser context, e.g. \"staging:secret\"")
+  .option("--login", "Open a visible browser to sign in; press Enter when ready, then continue extraction (interactive terminal only)")
+  .option("--save-storage-state <path>", "With --login, save the signed-in session to a file for later runs via --cookie-file")
+  .option("--header <string>", "Extra HTTP header, e.g. \"Authorization: Bearer eyJ...\"; repeat the flag for several", (v: string, all: string[] = []) => [...all, v])
   .option("--stealth", "Enable anti-detection: navigator spoofing, human mouse simulation, randomized fingerprint (use only when authorized)")
   .option("--user-agent <string>", "Custom user agent string")
   .option("--locale <string>", "Browser locale for fingerprint, e.g. en-GB, fi-FI; affects content only if the site reacts to Accept-Language (default: en-US)")
@@ -187,7 +198,7 @@ program
     let browser = null;
 
     try {
-      let useHeaded = false;
+      let useHeaded = !!opts.login;
       let result;
       // The browser is installed at most once per run. Without this a install
       // that succeeds but still cannot launch would loop on the same download.
@@ -269,6 +280,10 @@ program
             includeRawColors: opts.rawColors,
             stealth: opts.stealth,
             cookie: opts.cookie,
+            cookieFile: opts.cookieFile,
+            basicAuth: opts.basicAuth,
+            login: opts.login,
+            saveStorageState: opts.saveStorageState,
             header: opts.header,
             userAgent: opts.userAgent,
             locale: opts.locale,
@@ -402,6 +417,8 @@ program
                   slow: opts.slow,
                   stealth: opts.stealth,
                   cookie: opts.cookie,
+                  cookieFile: opts.cookieFile,
+                  basicAuth: opts.basicAuth,
                   header: opts.header,
                   screenSize: opts.screenSize,
                   wcag: opts.wcag,
@@ -445,6 +462,7 @@ program
           browser = null;
 
           if (useHeaded || process.env.BROWSER_CDP_ENDPOINT) throw err;
+          if (opts.headedFallback === false || process.env.DEMBRANDT_NO_HEADED_FALLBACK === "1") throw err;
 
           if (
             err.message.includes("Timeout") ||
@@ -682,13 +700,41 @@ program
           // via workflow-command annotations (DEM-83). No-op locally. Gated on
           // the gate actually failing, so an --approve'd local baseline (which
           // passes despite a drift report) emits nothing.
-          if (process.exitCode === EXIT.DRIFT) emitDriftAnnotations(report);
+          if (process.exitCode === EXIT.DRIFT && !opts.jsonOnly) emitDriftAnnotations(report, undefined, undefined, opts.annotations);
         } catch (err) {
           // A gate that cannot evaluate its baseline must not pass: exit RUNTIME
           // ("check broke, investigate") so CI distinguishes this from stable (0)
           // and from real drift (1). See lib/exit-codes.ts.
           console.log(color.warning(`! Could not compare against baseline: ${err.message}`));
           process.exitCode = EXIT.RUNTIME;
+        }
+      }
+
+      if (opts.tokens?.length) {
+        try {
+          const tokens = opts.tokens.flatMap((p: string) => parseTokenFile(readFileSync(resolve(process.cwd(), p), "utf-8"), p));
+          const report = checkConformance(result, tokens, { commit: commitFromEnv() });
+          result.tokenConformance = report;
+          const over = opts.maxOffToken !== undefined && report.offToken.length > opts.maxOffToken;
+          const verdict = over
+            ? color.warning(`${report.offToken.length} off-token values, limit ${opts.maxOffToken}`)
+            : color.accent(`${report.offToken.length} off-token values`);
+          savedNotices.push(chalk.dim(`⟂ Tokens: ${verdict} across ${report.categories.color.checked} colours, ${report.categories.radius.checked} radii, ${report.categories.fontSize.checked} font sizes`));
+          for (const row of report.offToken.slice(0, 5)) {
+            savedNotices.push(chalk.dim(`  ${row.category} ${row.value} ×${row.count}${row.nearest ? ` nearest ${row.nearest.name} (${row.nearest.value})` : ""}`));
+          }
+          if (opts.tokensReport) {
+            const mdPath = resolve(process.cwd(), opts.tokensReport);
+            mkdirSync(dirname(mdPath), { recursive: true });
+            writeFileSync(mdPath, generateConformanceMd(report, { version, maxOffToken: opts.maxOffToken }));
+            savedNotices.push(chalk.dim(`💾 Token report saved (--tokens-report): ${color.info(opts.tokensReport)}`));
+          }
+          if (over && Number(process.exitCode ?? 0) < EXIT.DRIFT) process.exitCode = EXIT.DRIFT;
+          const system = opts.annotations ?? detectCiSystem();
+          if (system && !opts.jsonOnly) for (const line of conformanceAnnotations(report, system, opts.maxOffToken)) process.stdout.write(`${line}\n`);
+        } catch (err) {
+          console.log(color.warning(`! Could not check tokens: ${err.message}`));
+          if (Number(process.exitCode ?? 0) < EXIT.RUNTIME) process.exitCode = EXIT.RUNTIME;
         }
       }
 
@@ -848,9 +894,9 @@ program
 const OPTION_GROUPS = [
   ["Extraction", ["--dark-mode", "--mobile", "--slow", "--crawl", "--sitemap", "--browser"]],
   ["Output & export", ["--json-only", "--save-output", "--dtcg", "--brand-guide", "--design-md", "--tailwind", "--shadcn", "--html", "--screenshot", "--raw-colors"]],
-  ["Analysis", ["--wcag", "--compare", "--approve"]],
-  ["Network & auth", ["--cookie", "--header", "--user-agent", "--locale", "--timezone", "--accept-language", "--screen-size"]],
-  ["Anti-detection", ["--stealth", "--no-sandbox"]],
+  ["Analysis", ["--wcag", "--compare", "--approve", "--tokens", "--max-off-token", "--tokens-report", "--annotations"]],
+  ["Network & auth", ["--cookie", "--cookie-file", "--basic-auth", "--login", "--save-storage-state", "--header", "--user-agent", "--locale", "--timezone", "--accept-language", "--screen-size"]],
+  ["Anti-detection", ["--stealth", "--no-sandbox", "--no-headed-fallback"]],
 ];
 
 program.configureHelp({
@@ -905,8 +951,11 @@ program.configureHelp({
 // Handled before parse(): the root command takes a required <url> argument, so
 // a real Commander subcommand would collide with it. Intercepting the bare verb
 // keeps `dembrandt install-browser` working without restructuring the CLI.
-if (process.argv[2] === "install-browser") {
-  process.exit(installBrowsers(process.argv.slice(3)));
+if (process.argv[2] === "mcp") {
+  await import("./mcp-server.js");
+} else {
+  if (process.argv[2] === "install-browser") {
+    process.exit(installBrowsers(process.argv.slice(3)));
+  }
+  program.parse();
 }
-
-program.parse();

@@ -36,15 +36,34 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
- *  (unversioned) — BEHAVIOR, contract unchanged: the drift engine compares
- *          `frameworks` and `iconSystem` as a `tech` category. A technology
- *          added or removed, or a major version, raises the score; a minor or
- *          patch version is listed and scores nothing. The category can only
- *          raise a score, never dilute one. It is skipped unless both
- *          snapshots are 1.18.0 or later and come from the same CLI version:
- *          a baseline taken before the fields existed is unmoved, and a
- *          detection rule changed between releases does not read as a
- *          technology the site dropped.
+ *  1.19.0 — four additions in one unreleased step. colors.semanticEvidence
+ *          .primary records how the primary was decided: `elected` with the
+ *          rule, reason, declaring tokens and runners-up, or `refused` with the
+ *          candidates that lost. colors.occurrences counts every colour per
+ *          paint (fill, text, border) with summed fill area and the declaring
+ *          custom property; slot and state are null until classification
+ *          lands. meta.context records the browser context the run was
+ *          measured under (viewport, deviceScaleFactor, isMobile, hasTouch,
+ *          colorScheme, reducedMotion, forcedColors, locale, timezoneId,
+ *          userAgent) and drift warns when two snapshots differ in a dial.
+ *          A crawl tags every merged value with pageCount and scope (site,
+ *          section, page) and carries `coverage`: a 0-100 agreement score,
+ *          per-family means and the page-local outliers. Palette `role` is
+ *          read after the usage cap, so a colour seen under three times is
+ *          `supporting`, not `accent`. Measured against a same-day 0.38.0
+ *          control over 175 corpus sites: 158 identical, three primaries
+ *          moved, two of them bot walls and one a site that moves between
+ *          control days as well. meta.flags gains `session`, `basicAuth` and
+ *          `login` as booleans only, never the credential; meta.sessionWarnings
+ *          lists a saved session that had lapsed or was redirected to sign in.
+ *          `tokenConformance` appears when a run is
+ *          checked against a token file (--tokens): the off-token values with
+ *          their nearest token and distance, counts per category, the commit.
+ *          BEHAVIOR, contract unchanged: drift compares `frameworks` and
+ *          `iconSystem` as a `tech` category. A technology added or removed,
+ *          or a major version, raises the score; a minor or patch version is
+ *          listed and scores nothing. Skipped unless both snapshots are
+ *          1.18.0 or later and from the same CLI version.
  *  1.18.0 — frameworks entries gain `category`, `version` and `coverage` (the
  *          share of the page under that framework's mount points), iconSystem
  *          entries gain `version`. Additive: 1.17.x consumers ignore them.
@@ -284,7 +303,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.18.0';
+export const SCHEMA_VERSION = '1.19.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';

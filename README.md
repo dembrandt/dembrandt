@@ -31,7 +31,7 @@ Requires Node.js 18+
 
 ## What you get
 
-- Colors (semantic, palette, CSS variables, gradients)
+- Colors (semantic roles with the evidence behind each pick, curated palette, every detected colour, CSS variables, gradients)
 - Typography (fonts, sizes, weights, sources, font file URLs)
 - Spacing (margin/padding scales)
 - Borders (radius, widths, styles, colors)
@@ -76,6 +76,10 @@ reference is **[docs/usage.md](docs/usage.md)**.
 |---|---|
 | `--wcag` | Contrast grades on real DOM pairs |
 | `--compare <baseline>` | Drift gate; exits 1 when tokens moved |
+| `--tokens <file>` | Check rendered colours, radii and font sizes against a W3C Design Tokens file; repeat for several |
+| `--max-off-token <n>` | With `--tokens`: exit 1 when more than N rendered values match no token |
+| `--tokens-report <path>` | With `--tokens`: Markdown summary with the nearest token per off-token value, wiki-ready |
+| `--annotations <github\|azure>` | CI annotations for drift and off-token values; detected from the runner by default |
 | `--approve` | Accept the current run as the new baseline |
 | `--ai` | ML brand-primary prediction (experimental) |
 
@@ -96,7 +100,12 @@ reference is **[docs/usage.md](docs/usage.md)**.
 | Flag | What you get |
 |---|---|
 | `--cookie <string>` | Reach pages behind a session |
-| `--header <string>` | Any extra request header |
+| `--cookie-file <path>` | JSON cookies, Playwright storageState (incl. localStorage and the sessionStorage block `--save-storage-state` adds), or Netscape cookies.txt |
+| `--basic-auth <user:pass>` | HTTP Basic for the browser context |
+| `--login` | Open a visible browser to sign in; press Enter when ready, then extract (interactive terminal only) |
+| `--save-storage-state <path>` | With `--login`, save the signed-in session (cookies, localStorage, sessionStorage) to a file; reuse it later with `--cookie-file`, also in CI |
+| `--header <string>` | Any extra request header, repeat for several |
+| `--no-headed-fallback` | Never open a visible browser on a failed navigation; for batch runs |
 | `--user-agent <string>` | Custom user agent |
 | `--locale <string>` | Locale for the fingerprint |
 | `--timezone <string>` | Timezone for the fingerprint |
@@ -130,6 +139,8 @@ Use Dembrandt as a tool in Claude Code, Cursor, Windsurf, or any MCP-compatible 
 claude mcp add --transport stdio dembrandt -- npx -y --package dembrandt dembrandt-mcp
 ```
 
+The server is listed in the MCP Registry as `io.github.dembrandt/dembrandt`, so a client that reads the registry can install it by name. `npx -y dembrandt mcp` starts it directly.
+
 Or add to your project's `.mcp.json`:
 
 ```json
@@ -145,7 +156,7 @@ Or add to your project's `.mcp.json`:
 
 Available tools include `get_design_tokens`, `get_color_palette`, `get_typography`, `get_component_styles`, `get_surfaces`, `get_spacing`, and `get_brand_identity`, plus pure analysis tools (`compute_drift`, `get_findings`, `export_dtcg`, `generate_design_md`, `render_report`) and job-control tools.
 
-Extraction tools accept `slow`, `mobile`, `darkMode`, `wcag`, `cookie` and `header` (for authenticated pages), `userAgent`, and `noSandbox` (Docker and most CI containers). Set `pages` above 1 to crawl and merge several pages, which produces a markedly stronger token set than one page; `paths` names them explicitly and `sitemap` discovers them from sitemap.xml.
+Extraction tools accept `slow`, `mobile`, `darkMode`, `wcag`, `cookie`, `cookieFile`, `basicAuth` and `header` (for authenticated pages), `userAgent`, and `noSandbox` (Docker and most CI containers). Interactive `--login` stays CLI-only. Set `pages` above 1 to crawl and merge several pages, which produces a markedly stronger token set than one page; `paths` names them explicitly and `sitemap` discovers them from sitemap.xml.
 
 Extraction returns a `job_id`. Poll it with `get_job_status`, then hand that same id to the pure tools instead of passing the extraction back as an argument:
 
@@ -177,7 +188,7 @@ Load extractions, track token drift, and compare snapshots. **[dembrandt.com/app
 ## Limitations
 
 - Dark mode requires `--dark-mode` flag (not automatically detected)
-- Hover/focus states extracted from CSS (not fully interactive)
+- Hover and focus states come from real interaction on a sample of elements; states that need a pointer path or a timer are missed
 - Canvas/WebGL-rendered sites cannot be analyzed (no DOM to read)
 - JavaScript-heavy sites require hydration time (8s initial + 4s stabilization)
 - Some dynamically-loaded content may be missed

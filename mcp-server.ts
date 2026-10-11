@@ -259,16 +259,17 @@ async function main() {
   const mobile = z.boolean().optional().default(false).describe("Extract from a mobile viewport instead of desktop");
   const darkMode = z.boolean().optional().default(false).describe("Extract the dark theme: the page is rendered with prefers-color-scheme: dark");
   const cookie = z.string().optional().describe('Cookie string for authenticated pages, e.g. "session=abc; token=xyz"');
-  const header = z.string().optional().describe('Extra HTTP header, e.g. "Authorization: Bearer eyJ..."');
+  const cookieFile = z.string().optional().describe("Path to a cookie export: JSON array, Playwright storageState (cookies + localStorage), or Netscape cookies.txt");
+  const basicAuth = z.string().optional().describe('HTTP Basic credentials as "user:password"');
+  const header = z.union([z.string(), z.array(z.string())]).optional().describe('Extra HTTP header, e.g. "Authorization: Bearer eyJ...", or a list of them');
   const userAgent = z.string().optional().describe("Custom user agent string");
   const noSandbox = z.boolean().optional().default(false).describe("Disable the browser sandbox, required inside Docker and most CI containers");
   const pages = z.number().int().min(1).max(20).optional().default(1).describe("Extract up to N pages and merge them into one token set. Pages are discovered from DOM links, or from sitemap.xml when sitemap is true. Merged tokens are markedly stronger than a single page.");
   const paths = z.array(z.string()).max(20).optional().describe('Explicit extra paths on the same domain to extract and merge, e.g. ["/pricing", "/docs"]. Overrides page discovery.');
   const sitemap = z.boolean().optional().default(false).describe("Discover the extra pages from sitemap.xml instead of DOM links. Alone it takes up to 20 pages; set pages to cap it");
 
-  // Every extraction tool takes the same navigation, auth and crawl surface.
   const crawlParams = { pages, paths, sitemap };
-  const browserParams = { slow, mobile, darkMode, cookie, header, userAgent, noSandbox };
+  const browserParams = { slow, mobile, darkMode, cookie, cookieFile, basicAuth, header, userAgent, noSandbox };
 
   // ── Extraction tools ───────────────────────────────────────────────────
 

@@ -127,8 +127,8 @@ export function computeFindings(result: BrandingResult): FindingsReport {
   const base = spacingBase(scaleType);
   if (base) {
     const off = (result.spacing?.commonValues ?? [])
-      .map((v) => v.px)
-      .filter((px): px is number => typeof px === "number" && px >= base && px % base !== 0);
+      .map((v) => (typeof v.px === "number" ? v.px : parseFloat(String(v.px))))
+      .filter((px): px is number => Number.isFinite(px) && px >= base && px % base !== 0);
     if (off.length) {
       findings.push({
         category: "consistency",
