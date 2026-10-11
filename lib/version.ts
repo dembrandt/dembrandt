@@ -53,7 +53,9 @@
  *          `supporting`, not `accent`. Measured against a same-day 0.38.0
  *          control over 175 corpus sites: 158 identical, three primaries
  *          moved, two of them bot walls and one a site that moves between
- *          control days as well.
+ *          control days as well. meta.flags gains `session`, `basicAuth` and
+ *          `login` as booleans only, never the credential; meta.sessionWarnings
+ *          lists a saved session that had lapsed or was redirected to sign in.
  *  1.18.0 — frameworks entries gain `category`, `version` and `coverage` (the
  *          share of the page under that framework's mount points), iconSystem
  *          entries gain `version`. Additive: 1.17.x consumers ignore them.
