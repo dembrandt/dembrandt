@@ -8,7 +8,7 @@
  * strict ratchet, even though the global tsconfig is strict:false.
  */
 import type { ExtractOptions } from '../types.js';
-import type { StorageState } from './auth-session.js';
+import type { StorageState, HttpCredentials } from './auth-session.js';
 
 export interface ParsedCookie {
   readonly name: string;
@@ -37,11 +37,6 @@ export interface ContextDescription {
   readonly locale: string;
   readonly timezoneId: string;
   readonly userAgent: string;
-}
-
-export interface HttpCredentials {
-  username: string;
-  password: string;
 }
 
 /**

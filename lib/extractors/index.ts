@@ -324,8 +324,8 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
   const sessionWarnings: string[] = [];
   const expired = expiredSessionWarning(fileSession);
   if (expired) { sessionWarnings.push(expired); console.log(color.warning(`  ! Session: ${expired}`)); }
-  const hasSession = fileSession.cookies.length > 0 || fileSession.sessionStorage.length > 0
-    || !!options.cookie || (options.sessionCookies?.length ?? 0) > 0;
+  const hasSession = fileSession.cookies.length > 0 || fileSession.storageState !== null
+    || fileSession.sessionStorage.length > 0 || !!options.cookie || (options.sessionCookies?.length ?? 0) > 0;
 
   const contextOptions = buildContextOptions(
     {

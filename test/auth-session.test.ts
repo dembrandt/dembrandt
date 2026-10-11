@@ -288,3 +288,9 @@ test('sessionRedirectWarning names both hosts and stays quiet without a session 
   assert.equal(sessionRedirectWarning('https://login.example.net/x', 'https://app.example.com/', false), null);
   assert.equal(sessionRedirectWarning('https://app.example.com/signin', 'https://app.example.com/', true), null);
 });
+
+test('parseNetscapeCookies tolerates leading whitespace on a cookie line', () => {
+  const [c] = parseNetscapeCookies('  #HttpOnly_app.example.com\tTRUE\t/\tTRUE\t0\tsid\tv', URL);
+  assert.equal(c.domain, 'app.example.com');
+  assert.equal(c.httpOnly, true);
+});

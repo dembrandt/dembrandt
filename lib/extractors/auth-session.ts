@@ -53,12 +53,6 @@ export interface HttpCredentials {
 
 export type FileReader = (path: string) => string;
 
-const EMPTY_SESSION: AuthSession = Object.freeze({
-  cookies: Object.freeze([]) as SessionCookie[],
-  storageState: null,
-  sessionStorage: Object.freeze([]) as SessionStorageOrigin[],
-});
-
 /** Netscape cookies.txt. `#HttpOnly_<domain>` is a real cookie, not a comment. */
 export function parseNetscapeCookies(text: string, targetUrl: string): SessionCookie[] {
   const cookies: SessionCookie[] = [];
@@ -66,7 +60,7 @@ export function parseNetscapeCookies(text: string, targetUrl: string): SessionCo
     const line = raw.trim();
     if (!line) continue;
     if (line.startsWith('#') && !/^#HttpOnly_/i.test(line)) continue;
-    const parts = raw.split('\t');
+    const parts = line.split('\t');
     if (parts.length < 7) continue;
     const [domainRaw, , path, secure, expires, name, value] = parts;
     if (!name) continue;
@@ -325,4 +319,3 @@ export function emptyAuthSession(): AuthSession {
   return { cookies: [], storageState: null, sessionStorage: [] };
 }
 
-export { EMPTY_SESSION };
