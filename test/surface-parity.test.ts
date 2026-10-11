@@ -39,6 +39,10 @@ const PARAM_FOR_FLAG: Record<string, string> = {
 
 /** Deliberately CLI-only. */
 const CLI_ONLY: Record<string, string> = {
+  '--tokens': 'Reads token files from the caller\'s disk; an agent passes the DTCG document to a pure tool instead.',
+  '--max-off-token': 'An exit-code gate for pipelines; an agent reads the counts in the report.',
+  '--tokens-report': 'Writes a Markdown page to disk for a wiki; an agent writes the file itself.',
+  '--annotations': 'CI log commands, read only by a CI runner.',
   '--json-only': 'Output shaping for a terminal. MCP returns structured content already.',
   '--save-output': 'Writes to the caller\'s disk. An agent writes the file itself.',
   '--raw-colors': 'Pre-filter debugging aid, not a product surface.',

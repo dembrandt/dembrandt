@@ -1,4 +1,5 @@
 import type { CoverageSummary, TokenScope } from './coverage.js';
+import type { ConformanceReport } from './token-conformance.js';
 import type { ContextDescription } from './extractors/context-config.js';
 /**
  * Shared types for dembrandt extraction output and CLI options.
@@ -561,6 +562,8 @@ export interface BrandingResult {
    */
   /** Site-wide agreement across a crawl; absent for a single page. */
   coverage?: CoverageSummary;
+  /** Rendered values checked against a token file (--tokens); absent otherwise. */
+  tokenConformance?: ConformanceReport;
   pages?: {
     url: string;
     extractedAt?: string;

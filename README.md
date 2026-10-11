@@ -76,6 +76,10 @@ reference is **[docs/usage.md](docs/usage.md)**.
 |---|---|
 | `--wcag` | Contrast grades on real DOM pairs |
 | `--compare <baseline>` | Drift gate; exits 1 when tokens moved |
+| `--tokens <file>` | Check rendered colours, radii and font sizes against a W3C Design Tokens file; repeat for several |
+| `--max-off-token <n>` | With `--tokens`: exit 1 when more than N rendered values match no token |
+| `--tokens-report <path>` | With `--tokens`: Markdown summary with the nearest token per off-token value, wiki-ready |
+| `--annotations <github\|azure>` | CI annotations for drift and off-token values; detected from the runner by default |
 | `--approve` | Accept the current run as the new baseline |
 | `--ai` | ML brand-primary prediction (experimental) |
 

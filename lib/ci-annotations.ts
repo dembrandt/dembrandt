@@ -19,6 +19,7 @@
  */
 
 import type { DriftReport, DriftChange } from "./drift.js";
+import type { ConformanceReport } from "./token-conformance.js";
 
 /** GitHub Actions sets GITHUB_ACTIONS=true on every step. Only there do workflow
  * commands render; emitting them anywhere else is noise. */
@@ -93,4 +94,42 @@ export function emitDriftAnnotations(
 ): void {
   if (!isGitHubActions(env)) return;
   for (const line of driftAnnotations(report)) log(line);
+}
+
+export type CiSystem = "github" | "azure";
+
+/** GitHub Actions sets GITHUB_ACTIONS, Azure Pipelines sets TF_BUILD. */
+export function detectCiSystem(env: NodeJS.ProcessEnv = process.env): CiSystem | null {
+  if (isGitHubActions(env)) return "github";
+  if (env.TF_BUILD === "True" || env.TF_BUILD === "true") return "azure";
+  return null;
+}
+
+/** Azure Pipelines logging commands; `;` and `]` would end the property list early. */
+function vsoLine(severity: Severity, message: string): string {
+  const safe = message.replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+  return `##vso[task.logissue type=${severity}]${safe}`;
+}
+
+function annotationLine(system: CiSystem, severity: Severity, message: string, title?: string): string {
+  if (system === "azure") return vsoLine(severity, title ? `${title}: ${message}` : message);
+  return title ? `::${severity} title=${escapeProperty(title)}::${escapeData(message)}` : `::${severity}::${escapeData(message)}`;
+}
+
+/**
+ * One line per off-token value, plus a headline when the run is over its limit.
+ * Pure: the caller prints to stdout, which is where both runners read commands.
+ */
+export function conformanceAnnotations(report: ConformanceReport, system: CiSystem, maxOffToken?: number): string[] {
+  const lines: string[] = [];
+  const total = report.offToken.length;
+  if (maxOffToken !== undefined && total > maxOffToken) {
+    lines.push(annotationLine(system, "error", `${total} rendered value${total === 1 ? "" : "s"} match no token, limit ${maxOffToken}`, "Off-token values"));
+  }
+  for (const row of report.offToken) {
+    const near = row.nearest ? `, nearest ${row.nearest.name} ${row.nearest.value}` : "";
+    const distance = row.distance === null ? "" : row.category === "color" ? ` (ΔE ${row.distance})` : ` (${row.distance}px)`;
+    lines.push(annotationLine(system, "warning", `${row.category} ${row.value} seen ${row.count}×${near}${distance}`));
+  }
+  return lines;
 }

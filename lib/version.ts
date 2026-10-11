@@ -53,7 +53,9 @@
  *          `supporting`, not `accent`. Measured against a same-day 0.38.0
  *          control over 175 corpus sites: 158 identical, three primaries
  *          moved, two of them bot walls and one a site that moves between
- *          control days as well.
+ *          control days as well. `tokenConformance` appears when a run is
+ *          checked against a token file (--tokens): the off-token values with
+ *          their nearest token and distance, counts per category, the commit.
  *  1.18.0 — frameworks entries gain `category`, `version` and `coverage` (the
  *          share of the page under that framework's mount points), iconSystem
  *          entries gain `version`. Additive: 1.17.x consumers ignore them.
