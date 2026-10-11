@@ -59,6 +59,11 @@
  *          `tokenConformance` appears when a run is
  *          checked against a token file (--tokens): the off-token values with
  *          their nearest token and distance, counts per category, the commit.
+ *          BEHAVIOR, contract unchanged: drift compares `frameworks` and
+ *          `iconSystem` as a `tech` category. A technology added or removed,
+ *          or a major version, raises the score; a minor or patch version is
+ *          listed and scores nothing. Skipped unless both snapshots are
+ *          1.18.0 or later and from the same CLI version.
  *          colors.cssVariables entries gain `scope` (`root` or `body`) and
  *          the map is complete: it no longer drops a variable within deltaE 15
  *          of a palette entry or keeps one name per value, so alias tokens and
