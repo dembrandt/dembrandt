@@ -619,3 +619,15 @@ test('homepage evidence is kept when a later page would overwrite it', () => {
   ]);
   assert.equal(merged.colors.semanticEvidence.primary, home);
 });
+
+test('a style seen in several contexts on one page counts that page once', () => {
+  const style = (context) => ({ family: 'Inter', size: '16px', weight: 400, context });
+  const merged = mergeResults([
+    page('https://a.test/', { typography: { styles: [style('body'), style('ui'), style('caption')], sources: {} } }),
+    page('https://a.test/x', { typography: { styles: [style('body')], sources: {} } }),
+  ]);
+  const s = merged.typography.styles.find((x) => x.size === '16px');
+  assert.equal(s.pageCount, 2);
+  assert.equal(s.count, 4);
+  assert.equal(s.scope, 'site');
+});

@@ -146,14 +146,17 @@ function mergeTypography(results) {
 
   // Dedup styles by (family, size, weight) tuple, sum counts
   const styleMap = new Map();
-  results.forEach(r => {
+  const stylePages = new Map<string, Set<number>>();
+  results.forEach((r, pageIdx) => {
     (r.typography?.styles || []).forEach(s => {
       const key = `${s.family}|${s.size}|${s.weight}`;
       if (!styleMap.has(key)) {
         styleMap.set(key, { ...s, count: 1, pageCount: 1 });
+        stylePages.set(key, new Set([pageIdx]));
       } else {
         styleMap.get(key).count++;
-        styleMap.get(key).pageCount++;
+        stylePages.get(key).add(pageIdx);
+        styleMap.get(key).pageCount = stylePages.get(key).size;
       }
     });
   });
