@@ -135,6 +135,8 @@ Copy a command, paste a prompt, get a result. Competitor benchmarking, WCAG audi
 
 Use Dembrandt as a tool in Claude Code, Cursor, Windsurf, or any MCP-compatible client. Ask your agent to "extract the color palette from dembrandt.com" and it calls Dembrandt automatically.
 
+Setup for Claude Desktop, Claude Code, Cursor and Windsurf, the full tool list and how the job model works: **[dembrandt.com/mcp](https://www.dembrandt.com/mcp)**.
+
 ```bash
 claude mcp add --transport stdio dembrandt -- npx -y --package dembrandt dembrandt-mcp
 ```
