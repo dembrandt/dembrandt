@@ -16,6 +16,8 @@ export interface ExtractionRequest {
   mobile?: boolean;
   wcag?: boolean;
   cookie?: string;
+  cookieFile?: string;
+  basicAuth?: string;
   header?: string;
   userAgent?: string;
   noSandbox?: boolean;
@@ -48,6 +50,8 @@ export function extractOptions(req: ExtractionRequest, version: string) {
     wcag: req.wcag || false,
     _version: version,
     ...(req.cookie ? { cookie: req.cookie } : {}),
+    ...(req.cookieFile ? { cookieFile: req.cookieFile } : {}),
+    ...(req.basicAuth ? { basicAuth: req.basicAuth } : {}),
     ...(req.header ? { header: req.header } : {}),
     ...(req.userAgent ? { userAgent: req.userAgent } : {}),
   };

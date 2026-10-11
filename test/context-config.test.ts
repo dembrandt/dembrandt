@@ -144,6 +144,22 @@ test('buildContextOptions is deterministic for identical input', () => {
   assert.deepEqual(buildContextOptions(opts, 'chromium'), buildContextOptions(opts, 'chromium'));
 });
 
+test('buildContextOptions forwards httpCredentials and storageState when set', () => {
+  const storageState = { cookies: [], origins: [] };
+  const opts = buildContextOptions({
+    httpCredentials: { username: 'u', password: 'p' },
+    storageState,
+  }, 'chromium');
+  assert.deepEqual(opts.httpCredentials, { username: 'u', password: 'p' });
+  assert.equal(opts.storageState, storageState);
+});
+
+test('buildContextOptions omits httpCredentials and storageState when unset', () => {
+  const opts = buildContextOptions({}, 'chromium');
+  assert.ok(!('httpCredentials' in opts));
+  assert.ok(!('storageState' in opts));
+});
+
 test('parseHeader takes a repeated flag and keeps the last value of a repeated name', () => {
   assert.deepEqual(parseHeader(['Authorization: Bearer x', 'X-Flag: new-nav', 'X-Flag: old-nav']), {
     Authorization: 'Bearer x',

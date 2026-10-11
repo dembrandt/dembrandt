@@ -8,6 +8,7 @@
  * strict ratchet, even though the global tsconfig is strict:false.
  */
 import type { ExtractOptions } from '../types.js';
+import type { StorageState, HttpCredentials } from './auth-session.js';
 
 export interface ParsedCookie {
   readonly name: string;
@@ -58,6 +59,8 @@ export interface ContextOptions {
   reducedMotion: ReducedMotion;
   forcedColors: ForcedColors;
   permissions?: string[];
+  httpCredentials?: HttpCredentials;
+  storageState?: StorageState;
 }
 
 export const DEFAULT_SCREEN: ScreenSize = Object.freeze({ width: 1920, height: 1080 });
@@ -160,6 +163,17 @@ export function buildContextOptions(options: ExtractOptions, browserName: string
 
   if (browserName === 'chromium') {
     contextOptions.permissions = ['clipboard-read', 'clipboard-write'];
+  }
+
+  if (options.httpCredentials) {
+    contextOptions.httpCredentials = {
+      username: options.httpCredentials.username,
+      password: options.httpCredentials.password,
+    };
+  }
+
+  if (options.storageState) {
+    contextOptions.storageState = options.storageState;
   }
 
   return contextOptions;

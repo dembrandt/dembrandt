@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import { randomUUID } from 'node:crypto';
+import { writeFileSync } from 'node:fs';
 import { color } from '../formatters/theme.js';
 import { discoverLinks } from '../discovery.js';
 import { extractLogo, extractSiteName } from './logo.js';
@@ -15,6 +16,20 @@ import { extractWcagPairs, bindContrastToPalette } from './colors.js';
 import { SCHEMA_VERSION } from '../version.js';
 import { hslChroma } from '../colors.js';
 import { buildContextOptions, describeContext, parseCookies, parseScreenSize, DEFAULT_LOCALE } from './context-config.js';
+import {
+  loadAuthSession,
+  mergeSessionCookies,
+  parseBasicAuth,
+  waitForEnter,
+  emptyAuthSession,
+  isOffTarget,
+  expiredSessionWarning,
+  sessionRedirectWarning,
+  readSessionStorage,
+  serializeStorageState,
+  sessionStorageInitScript,
+  type AuthSession,
+} from './auth-session.js';
 import { guardExtractor } from './guard.js';
 import { dismissConsent } from './consent.js';
 import type { Browser, Page } from 'playwright';
@@ -299,9 +314,29 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
   const locale = options.locale || DEFAULT_LOCALE;
   const { width: screenW, height: screenH } = parseScreenSize(options.screenSize);
 
-  const contextOptions = buildContextOptions(options, browser.browserType().name());
+  const fileSession: AuthSession = options.cookieFile
+    ? loadAuthSession(options.cookieFile, url)
+    : (options.storageState
+      ? { cookies: [], storageState: options.storageState, sessionStorage: [] }
+      : emptyAuthSession());
+  const httpCredentials = options.httpCredentials
+    ?? parseBasicAuth(options.basicAuth);
+  const sessionWarnings: string[] = [];
+  const expired = expiredSessionWarning(fileSession);
+  if (expired) { sessionWarnings.push(expired); console.log(color.warning(`  ! Session: ${expired}`)); }
+  const hasSession = fileSession.cookies.length > 0 || fileSession.storageState !== null
+    || fileSession.sessionStorage.length > 0 || !!options.cookie || (options.sessionCookies?.length ?? 0) > 0;
 
-  const context = await browser.newContext(contextOptions);
+  const contextOptions = buildContextOptions(
+    {
+      ...options,
+      ...(httpCredentials ? { httpCredentials } : {}),
+      ...(fileSession.storageState ? { storageState: fileSession.storageState } : {}),
+    },
+    browser.browserType().name(),
+  );
+
+  const context = await browser.newContext(contextOptions as Parameters<Browser['newContext']>[0]);
 
   // Setup between context creation and the main try/finally below runs outside
   // the finally that closes the context; a throw here (malformed cookie, dead
@@ -315,9 +350,19 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
     }
   };
 
-  const parsedCookies = parseCookies(options.cookie, url);
-  if (parsedCookies.length > 0) {
-    await closingOnError(context.addCookies(parsedCookies));
+  // storageState already applied its cookies; file-only cookies merge over --cookie.
+  const cliCookies = parseCookies(options.cookie, url);
+  const fileCookies = fileSession.storageState ? [] : fileSession.cookies;
+  const extraCookies = options.sessionCookies ?? [];
+  const cookiesToAdd = mergeSessionCookies(
+    cliCookies,
+    mergeSessionCookies(extraCookies, fileCookies),
+  );
+  if (cookiesToAdd.length > 0) {
+    await closingOnError(context.addCookies(cookiesToAdd));
+  }
+  if (fileSession.sessionStorage.length > 0) {
+    await closingOnError(context.addInitScript(sessionStorageInitScript(fileSession.sessionStorage)));
   }
 
   if (options.stealth) {
@@ -470,6 +515,8 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
             console.log(color.warning(`  ! Page redirected to different domain:`));
             console.log(chalk.dim(`    From: ${initialUrl}`));
             console.log(chalk.dim(`    To:   ${finalUrl}`));
+            const rejected = sessionRedirectWarning(finalUrl, url, hasSession && !options.login);
+            if (rejected) { sessionWarnings.push(rejected); console.log(color.warning(`  ! Session: ${rejected}`)); }
           } else {
             console.log(color.info(`  i Page redirected within same domain:`));
             console.log(chalk.dim(`    From: ${initialUrl}`));
@@ -480,6 +527,23 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
 
         spinner.stop();
         log(color.success(`  ✓ Page loaded`));
+
+        if (options.login && attempts === 1) {
+          await waitForEnter();
+          if (isOffTarget(page.url(), url)) {
+            await waitForEnter(undefined, undefined,
+              `The browser is on ${new URL(page.url()).host}, not ${new URL(url).host}. Finish signing in, or press Enter again to extract this page as is…\n`);
+          }
+          if (options.saveStorageState) {
+            const state = await context.storageState();
+            const perTab = await Promise.all(context.pages().map(async (p) => ({
+              origin: new URL(p.url()).origin,
+              sessionStorage: await p.evaluate(readSessionStorage).catch(() => []),
+            })));
+            writeFileSync(options.saveStorageState, serializeStorageState(state, perTab));
+            log(color.success(`  ✓ Storage state saved to ${options.saveStorageState}`));
+          }
+        }
 
         spinner.start("Waiting for body content to render...");
         try {
@@ -1439,6 +1503,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         requestedUrl: url,
         contentLength: lastContentLength,
         ...(timeouts.length ? { timeouts } : {}),
+        ...(sessionWarnings.length ? { sessionWarnings } : {}),
         flags: {
           ...(options.stealth && { stealth: true }),
           ...(options.darkMode && { darkMode: true }),
@@ -1450,6 +1515,9 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
           ...(options.timezoneId && { timezone: options.timezoneId }),
           ...(options.acceptLanguage && { acceptLanguage: options.acceptLanguage }),
           ...(options.screenSize && { screenSize: options.screenSize }),
+          ...((options.cookieFile || options.storageState || options.cookie || (options.sessionCookies?.length ?? 0) > 0) && { session: true }),
+          ...((options.basicAuth || options.httpCredentials) && { basicAuth: true }),
+          ...(options.login && { login: true }),
         },
       },
       siteName,

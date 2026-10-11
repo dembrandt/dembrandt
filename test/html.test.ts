@@ -192,7 +192,7 @@ test('component sections carry a Copy all payload built from every entry, not ju
   const html = generateHtmlReport(fixture({ components: { buttons: [], inputs: [], links, badges: [] } }));
   const chips = (html.match(/class="badgepv"/g) ?? []).length;
   assert.equal(chips, 12);
-  const copy = html.match(/data-copy="([^"]*)"/g) ?? [];
+  const copy: string[] = html.match(/data-copy="([^"]*)"/g) ?? [];
   assert.ok(copy.some((c) => c.includes('#000000') && c.includes('#000014')), 'copy payload must span past the 12 rendered chips');
 });
 
