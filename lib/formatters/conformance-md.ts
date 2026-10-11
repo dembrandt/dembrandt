@@ -31,7 +31,7 @@ export function generateConformanceMd(report: ConformanceReport, options: { vers
     ``,
     `${report.url} · ${report.checkedAt}${report.commit ? ` · ${report.commit.slice(0, 12)}` : ''}${options.version ? ` · dembrandt ${options.version}` : ''}`,
     ``,
-    `**${verdict}.** Tokens read from ${report.tokenSources.join(', ')}: ${report.tokens.color} colours, ${report.tokens.radius} radii, ${report.tokens.fontSize} font sizes${report.tokens.dimension ? `, ${report.tokens.dimension} other dimensions not compared` : ''}.`,
+    `**${verdict}.** Tokens read from ${report.tokenSources.join(', ')}: ${report.tokens.color} colours, ${report.tokens.radius} radii, ${report.tokens.fontSize} font sizes${report.tokens.dimension ? `, ${report.tokens.dimension} unnamed dimensions standing in where a kind has none` : ''}.`,
     ``,
     `| Category | Tokens | Rendered values | Off token |`,
     `|---|---|---|---|`,

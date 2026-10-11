@@ -83,17 +83,26 @@ test('checkConformance with no colour tokens reports every colour as off token w
 });
 
 test('a font size is never matched against a radius token, and a file without font sizes says so', () => {
-  const doc = { radius: { $type: 'dimension', lg: { $value: '16px' } }, space: { $type: 'dimension', '4': { $value: '13px' } } };
+  const doc = { radius: { $type: 'dimension', lg: { $value: '16px' } } };
   const tokens = readTokenDocument(doc, 'r.json');
-  assert.deepEqual(tokens.map((t) => [t.name, t.kind]), [['radius.lg', 'radius'], ['space.4', 'dimension']]);
+  assert.deepEqual(tokens.map((t) => [t.name, t.kind]), [['radius.lg', 'radius']]);
   const report = checkConformance(result(), tokens);
   assert.equal(report.categories.fontSize.tokens, 0);
   assert.equal(report.categories.fontSize.offToken, 2);
   assert.ok(report.offToken.filter((r) => r.category === 'fontSize').every((r) => r.nearest === null));
-  assert.equal(report.tokens.dimension, 1);
   const md = generateConformanceMd(report);
   assert.match(md, /\| Font size \| none of this type \| 2 \| 2 \|/);
-  assert.match(md, /1 other dimensions not compared/);
+});
+
+test('a kind with no named tokens falls back to unnamed dimensions, so shape.* still answers for radii', () => {
+  const doc = { shape: { $type: 'dimension', sm: { $value: '4px' }, md: { $value: '6px' } } };
+  const report = checkConformance(result(), readTokenDocument(doc, 's.json'));
+  assert.equal(report.categories.radius.offToken, 0);
+  assert.equal(report.categories.radius.tokens, 2);
+  assert.equal(report.tokens.dimension, 2);
+  assert.match(generateConformanceMd(report), /2 unnamed dimensions standing in/);
+  const named = checkConformance(result(), readTokenDocument({ ...doc, radius: { $type: 'dimension', lg: { $value: '16px' } } }, 's.json'));
+  assert.equal(named.categories.radius.offToken, 2);
 });
 
 test('generateConformanceMd is plain tables with the verdict against the limit', () => {

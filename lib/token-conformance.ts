@@ -81,7 +81,8 @@ interface RawToken { path: string; type: string | null; value: Json }
 const RADIUS_NAME = /radius|rounded|corner/i;
 const FONT_SIZE_NAME = /font|text|type|heading|body|caption|display/i;
 
-/** A dimension token's kind comes from its name: a radius is never a font size, whatever its pixels. */
+/** A dimension token's kind comes from its name: a radius is never a font size, whatever its pixels.
+ * A kind with no named tokens falls back to the unnamed dimensions, so `shape.md` still answers for radii. */
 export function dimensionKind(path: string): TokenKind {
   if (RADIUS_NAME.test(path)) return 'radius';
   if (FONT_SIZE_NAME.test(path)) return 'fontSize';
@@ -218,7 +219,9 @@ export interface ConformanceOptions {
 export function checkConformance(result: BrandingResult, tokens: DesignToken[], options: ConformanceOptions = {}): ConformanceReport {
   const byKind = (kind: TokenKind) => tokens.filter((t) => t.kind === kind);
   const colorTokens = byKind('color');
-  const kindTokens: Record<'radius' | 'fontSize', DesignToken[]> = { radius: byKind('radius'), fontSize: byKind('fontSize') };
+  const generic = byKind('dimension');
+  const orGeneric = (own: DesignToken[]) => (own.length ? own : generic);
+  const kindTokens: Record<'radius' | 'fontSize', DesignToken[]> = { radius: orGeneric(byKind('radius')), fontSize: orGeneric(byKind('fontSize')) };
   const maxDeltaE = options.colorDeltaE ?? COLOR_MATCH_DELTA_E;
   const offToken: OffTokenValue[] = [];
   const categories: Record<ConformanceCategory, CategoryConformance> = {
