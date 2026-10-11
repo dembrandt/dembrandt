@@ -25,7 +25,7 @@ The run shows its evidence, and it reaches the pages behind a sign-in.
 - Playwright 1.63.0, eslint 10.10.0, typescript-eslint 8.70.0 (#266)
 
 ### Upgrading
-Output contract 1.18.0 to 1.19.0, additive. Measured against a same-day 0.38.0 control over 175 corpus sites: 158 identical, three primaries moved, two of them bot walls and one a site that moves between control days too. The palette `role` of a colour seen under three times reads `supporting` where it read `accent`; drift weights the two differently, so a baseline from 0.38.0 may score a small move on such colours once. Nothing else in the drift engine reads the new fields.
+Output contract 1.18.0 to 1.19.0, additive. Measured against a same-day 0.38.0 control over 175 corpus sites: 158 identical, three primaries moved, two of them bot walls and one a site that moves between control days too. The palette `role` of a colour seen under three times reads `supporting` where it read `accent`; drift weights the two differently, so a baseline from 0.38.0 may score a small move on such colours once. Nothing else in the drift engine reads the new fields. Primary accuracy on the 141-site labelled corpus: 106 correct on 0.39.0 against 105 on a same-day 0.38.0 control.
 
 ## [0.38.0] - 2026-10-03
 
