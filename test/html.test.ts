@@ -236,3 +236,12 @@ test('input previews read the default state the extractor emits', () => {
   assert.match(html, /border:2px solid #ff0000/);
   assert.match(html, /placeholder="email"/);
 });
+
+test('crawl agreement score and page-local outliers appear in the report', () => {
+  const html = generateHtmlReport(fixture({
+    coverage: { totalPages: 4, score: 72, byFamily: {}, outliers: [{ family: 'colors', token: '#ff0000', pages: 1, scope: 'page' }] },
+  }));
+  assert.match(html, /72\/100 consistent across 4 pages/);
+  assert.match(html, /page-local: colors #ff0000/);
+  assert.doesNotMatch(generateHtmlReport(fixture()), /consistent across/);
+});

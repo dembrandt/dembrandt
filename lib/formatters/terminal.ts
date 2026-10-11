@@ -1118,7 +1118,7 @@ function displayWcag(wcag) {
 
   if (statePairs.length > 0) {
     console.log(chalk.dim('│  ├─') + ' ' + chalk.bold('Interactive states'));
-    const stateFailingFirst = [...statePairs.filter(p => !p.aa), ...statePairs.filter(p => p.aa)].slice(0, 8);
+    const stateFailingFirst = [...statePairs.filter(p => !passesAA(p)), ...statePairs.filter(p => passesAA(p))].slice(0, 8);
     stateFailingFirst.forEach((pair, i) => {
       const isLast = i === stateFailingFirst.length - 1;
       renderPair(pair, isLast ? '└─' : '├─');

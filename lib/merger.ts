@@ -10,6 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import { coverageEntry, scopeOf, summarizeCoverage, type TokenScope } from './coverage.js';
 import { deltaE } from './colors.js';
+import type { ColorOccurrence } from './types.js';
 import { applyBudget, computeMetrics, totalWords, WORD_FLOOR } from './voice/metrics.js';
 
 /**
@@ -96,14 +97,30 @@ function mergeColors(results) {
     merged.push({ ...clean, count: totalCount, confidence, pageCount });
   }
 
-  // Semantic: homepage wins, fill missing from other pages
+  // Semantic: homepage wins, fill missing from other pages; evidence follows the page that supplied the value
   const semantic = { ...base.semantic };
+  const semanticEvidence = { ...base.semanticEvidence };
   for (let i = 1; i < results.length; i++) {
     const s = results[i].colors?.semantic || {};
     for (const [k, v] of Object.entries(s)) {
-      if (!semantic[k] && v) semantic[k] = v;
+      if (semantic[k] || !v) continue;
+      semantic[k] = v;
+      const ev = results[i].colors?.semanticEvidence?.[k];
+      if (ev) semanticEvidence[k] = ev;
     }
   }
+
+  const occurrenceMap = new Map<string, ColorOccurrence>();
+  results.forEach((r) => {
+    (r.colors?.occurrences || []).forEach((o) => {
+      const key = `${o.hex}|${o.paints}`;
+      const row = occurrenceMap.get(key);
+      if (row) { row.count += o.count; row.area += o.area; }
+      else occurrenceMap.set(key, { ...o });
+    });
+  });
+  const occurrences = Array.from(occurrenceMap.values())
+    .sort((a, b) => b.count - a.count || a.hex.localeCompare(b.hex) || a.paints.localeCompare(b.paints));
 
   // CSS variables: union, first occurrence wins
   const cssVariables: Record<string, any> = {};
@@ -114,7 +131,14 @@ function mergeColors(results) {
     }
   });
 
-  return { ...base, semantic, palette: merged, cssVariables };
+  return {
+    ...base,
+    semantic,
+    ...(Object.keys(semanticEvidence).length ? { semanticEvidence } : {}),
+    ...(occurrences.length ? { occurrences } : {}),
+    palette: merged,
+    cssVariables,
+  };
 }
 
 function mergeTypography(results) {

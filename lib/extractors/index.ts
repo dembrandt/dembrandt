@@ -1198,7 +1198,9 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       });
       colors.palette = mergedPalette;
       Object.assign(colors.semantic, darkModeColors.semantic);
-      Object.assign(colors.semanticEvidence ?? (colors.semanticEvidence = {}), darkModeColors.semanticEvidence);
+      for (const [role, ev] of Object.entries(darkModeColors.semanticEvidence ?? {})) {
+        if (darkModeColors.semantic[role]) (colors.semanticEvidence ??= {})[role] = ev;
+      }
       buttons.push(...darkModeButtons.map((btn) => ({ ...btn, source: "dark-mode" })));
       links.push(...darkModeLinks.map((link) => ({ ...link, source: "dark-mode" })));
 
