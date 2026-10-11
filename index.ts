@@ -700,7 +700,7 @@ program
           // via workflow-command annotations (DEM-83). No-op locally. Gated on
           // the gate actually failing, so an --approve'd local baseline (which
           // passes despite a drift report) emits nothing.
-          if (process.exitCode === EXIT.DRIFT) emitDriftAnnotations(report);
+          if (process.exitCode === EXIT.DRIFT && !opts.jsonOnly) emitDriftAnnotations(report, undefined, undefined, opts.annotations);
         } catch (err) {
           // A gate that cannot evaluate its baseline must not pass: exit RUNTIME
           // ("check broke, investigate") so CI distinguishes this from stable (0)
@@ -729,12 +729,12 @@ program
             writeFileSync(mdPath, generateConformanceMd(report, { version, maxOffToken: opts.maxOffToken }));
             savedNotices.push(chalk.dim(`💾 Token report saved (--tokens-report): ${color.info(opts.tokensReport)}`));
           }
-          if (over) process.exitCode = EXIT.DRIFT;
+          if (over && Number(process.exitCode ?? 0) < EXIT.DRIFT) process.exitCode = EXIT.DRIFT;
           const system = opts.annotations ?? detectCiSystem();
-          if (system) for (const line of conformanceAnnotations(report, system, opts.maxOffToken)) process.stdout.write(`${line}\n`);
+          if (system && !opts.jsonOnly) for (const line of conformanceAnnotations(report, system, opts.maxOffToken)) process.stdout.write(`${line}\n`);
         } catch (err) {
           console.log(color.warning(`! Could not check tokens: ${err.message}`));
-          process.exitCode = EXIT.RUNTIME;
+          if (Number(process.exitCode ?? 0) < EXIT.RUNTIME) process.exitCode = EXIT.RUNTIME;
         }
       }
 

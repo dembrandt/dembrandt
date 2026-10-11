@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readTokenDocument, parseTokenFile, checkConformance, commitFromEnv } from '../lib/token-conformance.js';
 import { generateConformanceMd } from '../lib/formatters/conformance-md.js';
-import { conformanceAnnotations, detectCiSystem } from '../lib/ci-annotations.js';
+import { conformanceAnnotations, detectCiSystem, driftAnnotations, emitDriftAnnotations } from '../lib/ci-annotations.js';
 
 const DOC = {
   color: {
@@ -108,4 +108,22 @@ test('detectCiSystem and commitFromEnv read the runner variables', () => {
   assert.equal(detectCiSystem({}), null);
   assert.equal(commitFromEnv({ BUILD_SOURCEVERSION: 'deadbeef' }), 'deadbeef');
   assert.equal(commitFromEnv({}), null);
+});
+
+test('drift annotations speak Azure Pipelines too, and emit only where a runner or --annotations says', () => {
+  const report = {
+    status: 'drift', score: 40, threshold: 10,
+    summary: { changed: 1, added: 0, removed: 0 }, warnings: ['fonts differ'],
+    changes: [{ kind: 'changed', category: 'color', label: 'primary', before: '#000', after: '#111', delta: 3 }],
+  } as never;
+  const azure = driftAnnotations(report, 'azure');
+  assert.equal(azure[0], '##vso[task.logissue type=error]Design drift 40 exceeds threshold 10: 1 changed, 0 added, 0 removed');
+  assert.equal(azure[1], '##vso[task.logissue type=warning]Drift comparison caveat: fonts differ');
+  assert.match(azure[2], /^##vso\[task\.logissue type=error\]primary #000 -> #111/);
+  assert.match(driftAnnotations(report)[0], /^::error title=Design drift 40 exceeds threshold 10::/);
+  const seen: string[] = [];
+  emitDriftAnnotations(report, (l) => seen.push(l), {});
+  assert.equal(seen.length, 0);
+  emitDriftAnnotations(report, (l) => seen.push(l), {}, 'azure');
+  assert.equal(seen.length, 3);
 });

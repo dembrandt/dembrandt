@@ -64,20 +64,20 @@ function changeMessage(c: DriftChange): string {
  * lines; the caller prints them to stdout (workflow commands are read from
  * stdout). Returns an empty array for a stable report.
  */
-export function driftAnnotations(report: DriftReport): string[] {
+export function driftAnnotations(report: DriftReport, system: CiSystem = "github"): string[] {
   if (report.status !== "drift") return [];
   const lines: string[] = [];
   const title = `Design drift ${report.score} exceeds threshold ${report.threshold}`;
   const summary = `${report.summary.changed} changed, ${report.summary.added} added, ${report.summary.removed} removed`;
-  lines.push(`::error title=${escapeProperty(title)}::${escapeData(summary)}`);
+  lines.push(annotationLine(system, "error", summary, title));
   // Comparison-validity caveats (viewport/flag/font mismatch, degraded
   // categories) must render next to the failures they qualify, or reviewers
   // act on drift that the engine itself has flagged as suspect.
   for (const w of report.warnings ?? []) {
-    lines.push(`::warning title=${escapeProperty("Drift comparison caveat")}::${escapeData(w)}`);
+    lines.push(annotationLine(system, "warning", w, "Drift comparison caveat"));
   }
   for (const c of report.changes) {
-    lines.push(`::${severityForKind(c.kind)}::${escapeData(changeMessage(c))}`);
+    lines.push(annotationLine(system, severityForKind(c.kind), changeMessage(c)));
   }
   return lines;
 }
@@ -91,9 +91,10 @@ export function emitDriftAnnotations(
   report: DriftReport,
   log: (line: string) => void = console.log,
   env: NodeJS.ProcessEnv = process.env,
+  system: CiSystem | null = detectCiSystem(env),
 ): void {
-  if (!isGitHubActions(env)) return;
-  for (const line of driftAnnotations(report)) log(line);
+  if (!system) return;
+  for (const line of driftAnnotations(report, system)) log(line);
 }
 
 export type CiSystem = "github" | "azure";
@@ -105,7 +106,7 @@ export function detectCiSystem(env: NodeJS.ProcessEnv = process.env): CiSystem |
   return null;
 }
 
-/** Azure Pipelines logging commands; `;` and `]` would end the property list early. */
+/** Azure Pipelines logging commands; the message is the data part, only line breaks need escaping. */
 function vsoLine(severity: Severity, message: string): string {
   const safe = message.replace(/\r/g, "%0D").replace(/\n/g, "%0A");
   return `##vso[task.logissue type=${severity}]${safe}`;

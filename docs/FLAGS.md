@@ -26,7 +26,8 @@ The tables below list the only exceptions: combinations that change each other's
 | Combination | Behavior |
 |---|---|
 | `--approve` without `--compare` | No effect. A warning is printed. |
-| `--max-off-token`, `--tokens-report` or `--annotations azure` without `--tokens` | No effect; `--annotations` still applies to `--compare` drift on GitHub. |
+| `--max-off-token` or `--tokens-report` without `--tokens` | No effect. |
+| `--annotations` + `--json-only` | No annotations: stdout is the JSON document. Drop `--json-only` on the runner or read `tokenConformance` and `drift` from the saved file. |
 | Explicit `[paths...]` arguments + `--crawl` or `--sitemap` | Explicit paths win; link and sitemap discovery are skipped entirely. |
 | `--color-format` + `--json-only` / `--save-output` / `--dtcg` / `--design-md` / `--html` / `--brand-guide` | Ignored by those paths. The flag is presentational and covers terminal output only; the payload carries hex, rgb, lch and oklch for every color. A warning names the paths it misses. |
 | `--no-sandbox` + `--browser firefox` | Ignored. Sandbox flags are Chromium-only. |
