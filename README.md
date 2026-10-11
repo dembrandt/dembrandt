@@ -3,6 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/dembrandt.svg)](https://www.npmjs.com/package/dembrandt)
 [![npm downloads](https://img.shields.io/npm/dm/dembrandt.svg)](https://www.npmjs.com/package/dembrandt)
 [![license](https://img.shields.io/npm/l/dembrandt.svg)](https://github.com/dembrandt/dembrandt/blob/main/LICENSE)
+[![GitHub Marketplace](https://img.shields.io/badge/GitHub%20Marketplace-Drift%20Gate-2088FF?logo=githubactions&logoColor=white)](https://github.com/marketplace/actions/dembrandt-drift-gate)
 [![GitHub Sponsors](https://img.shields.io/badge/Sponsor-me-pink?style=flat&logo=github-sponsors)](https://github.com/sponsors/dembrandt)
 
 Extract any website's design system in one command. Enforce it in CI.
@@ -130,7 +131,7 @@ Extract a preview deployment, compare against a committed baseline, fail the job
     baseline: .dembrandt/baseline.json
 ```
 
-The action annotates the PR with the drifted tokens. On any other runner the gate is just an exit code plus JSON: `dembrandt URL --compare baseline.json --json-only` exits 1 on drift and prints per-token `changes[]`. See **[docs/ci.md](docs/ci.md)** for the Action inputs, the platform-neutral gate, and the exit code table.
+The action is on the [GitHub Marketplace](https://github.com/marketplace/actions/dembrandt-drift-gate) and annotates the PR with the drifted tokens. On any other runner the gate is just an exit code plus JSON: `dembrandt URL --compare baseline.json --json-only` exits 1 on drift and prints per-token `changes[]`. See **[docs/ci.md](docs/ci.md)** for the Action inputs, the platform-neutral gate, and the exit code table.
 
 ## Recipes
 
