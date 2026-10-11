@@ -6,6 +6,7 @@ import {
   guardWarnings,
   ignoredDiscoveryWarning,
   loginMultiPageWarning,
+  loginNeedsTtyError,
   saveStorageStateWarning,
   voiceNeedsOutputFile,
 } from '../lib/cli-guards.js';
@@ -88,4 +89,10 @@ test('guardWarnings emits every applicable warning in emit order', () => {
   const warnings = guardWarnings({ approve: true, crawl: 3, colorFormat: 'oklch', dtcg: true }, ['/pricing']);
   assert.deepEqual(warnings.map((w) => w.slice(2, 11)), ['--approve', '--crawl i', '--color-f']);
   assert.deepEqual(guardWarnings({}, undefined), []);
+});
+
+test('--login without a terminal is an error that names the reuse path', () => {
+  assert.match(loginNeedsTtyError({ login: true }, false) ?? '', /not a TTY.*--cookie-file/);
+  assert.equal(loginNeedsTtyError({ login: true }, true), null);
+  assert.equal(loginNeedsTtyError({}, false), null);
 });

@@ -60,9 +60,9 @@ function result() {
 test('checkConformance passes near-identical colours and exact dimensions, and lists the rest worst first', () => {
   const report = checkConformance(result(), readTokenDocument(DOC, 'tokens.json'), { checkedAt: 't', commit: 'abc' });
   assert.deepEqual(report.categories, {
-    color: { checked: 3, offToken: 1 },
-    radius: { checked: 2, offToken: 1 },
-    fontSize: { checked: 2, offToken: 1 },
+    color: { checked: 3, offToken: 1, tokens: 5 },
+    radius: { checked: 2, offToken: 1, tokens: 2 },
+    fontSize: { checked: 2, offToken: 1, tokens: 2 },
   });
   assert.deepEqual(report.offToken.map((r) => [r.category, r.value, r.count, r.nearest?.name, r.distance]), [
     ['color', '#d6336c', 8, 'color.brand.primary', report.offToken[0].distance],
@@ -71,14 +71,29 @@ test('checkConformance passes near-identical colours and exact dimensions, and l
   ]);
   assert.ok((report.offToken[0].distance ?? 0) > 2.3);
   assert.equal(report.commit, 'abc');
-  assert.deepEqual(report.tokens, { color: 5, dimension: 4 });
+  assert.deepEqual(report.tokens, { color: 5, radius: 2, fontSize: 2, dimension: 0 });
   assert.deepEqual(report.tokenSources, ['tokens.json']);
 });
 
 test('checkConformance with no colour tokens reports every colour as off token with no nearest', () => {
   const report = checkConformance(result(), readTokenDocument({ radius: { $type: 'dimension', a: { $value: '4px' } } }, 'r.json'));
   assert.equal(report.categories.color.offToken, 3);
+  assert.equal(report.categories.color.tokens, 0);
   assert.equal(report.offToken.find((r) => r.category === 'color')?.nearest, null);
+});
+
+test('a font size is never matched against a radius token, and a file without font sizes says so', () => {
+  const doc = { radius: { $type: 'dimension', lg: { $value: '16px' } }, space: { $type: 'dimension', '4': { $value: '13px' } } };
+  const tokens = readTokenDocument(doc, 'r.json');
+  assert.deepEqual(tokens.map((t) => [t.name, t.kind]), [['radius.lg', 'radius'], ['space.4', 'dimension']]);
+  const report = checkConformance(result(), tokens);
+  assert.equal(report.categories.fontSize.tokens, 0);
+  assert.equal(report.categories.fontSize.offToken, 2);
+  assert.ok(report.offToken.filter((r) => r.category === 'fontSize').every((r) => r.nearest === null));
+  assert.equal(report.tokens.dimension, 1);
+  const md = generateConformanceMd(report);
+  assert.match(md, /\| Font size \| none of this type \| 2 \| 2 \|/);
+  assert.match(md, /1 other dimensions not compared/);
 });
 
 test('generateConformanceMd is plain tables with the verdict against the limit', () => {
@@ -86,7 +101,7 @@ test('generateConformanceMd is plain tables with the verdict against the limit',
   const md = generateConformanceMd(report, { version: '0.39.0', maxOffToken: 2 });
   assert.match(md, /^# Rendered values against tokens/);
   assert.match(md, /\*\*3 off-token values, above the limit of 2\.\*\*/);
-  assert.match(md, /\| Colour \| 3 \| 1 \|/);
+  assert.match(md, /\| Colour \| 5 \| 3 \| 1 \|/);
   assert.match(md, /\| Font size \| `13px` \| 6 \| `type\.caption` \(12px\) \| 1px \|/);
   assert.doesNotMatch(md, /<[a-z]/);
   assert.match(generateConformanceMd(report), /\*\*3 off-token values\.\*\*/);

@@ -71,6 +71,12 @@ export function loginMultiPageWarning(opts: GuardOptions, paths: string[] | unde
   return "! --login applies to the first page only; for a crawl, --save-storage-state then re-run with --cookie-file.";
 }
 
+/** --login waits for Enter on stdin; without a terminal it can only ever time out on the sign-in page. */
+export function loginNeedsTtyError(opts: GuardOptions, stdinIsTty: boolean): string | null {
+  if (!opts.login || stdinIsTty) return null;
+  return "--login needs an interactive terminal: stdin is not a TTY, so nobody can press Enter and no session would be saved. Run it in a terminal once with --save-storage-state, then reuse the file with --cookie-file.";
+}
+
 /** Every applicable warning, in emit order. */
 export function guardWarnings(opts: GuardOptions, paths: string[] | undefined): string[] {
   return [

@@ -27,6 +27,8 @@ The tables below list the only exceptions: combinations that change each other's
 |---|---|
 | `--approve` without `--compare` | No effect. A warning is printed. |
 | `--max-off-token` or `--tokens-report` without `--tokens` | No effect. |
+| `--login` without a terminal (piped stdin, CI, an agent's shell) | Exit 2 before the browser opens; nobody could press Enter. Sign in once in a terminal with `--save-storage-state`, reuse the file with `--cookie-file`. |
+| `--tokens` with a file that has no tokens of a kind | Font sizes match only font-size tokens (`$type` fontSize, a typography composite, or a name with font, text, type, heading, body, caption, display), radii only radius tokens (radius, rounded, corner); other dimensions are not compared. A kind with no tokens lists every rendered value as off token with no nearest, and the report says "none of this type". |
 | `--annotations` + `--json-only` | No annotations: stdout is the JSON document. Drop `--json-only` on the runner or read `tokenConformance` and `drift` from the saved file. |
 | Explicit `[paths...]` arguments + `--crawl` or `--sitemap` | Explicit paths win; link and sitemap discovery are skipped entirely. |
 | `--color-format` + `--json-only` / `--save-output` / `--dtcg` / `--design-md` / `--html` / `--brand-guide` | Ignored by those paths. The flag is presentational and covers terminal output only; the payload carries hex, rgb, lch and oklch for every color. A warning names the paths it misses. |

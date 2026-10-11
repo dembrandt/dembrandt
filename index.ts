@@ -35,7 +35,7 @@ import { EXIT, classifyError } from "./lib/exit-codes.js";
 import { activeFlags, pathSummary } from "./lib/run-summary.js";
 import { consumeCloudHint } from "./lib/cli-state.js";
 import { installBrowsers, bundledPlaywrightVersion } from "./lib/install-browser.js";
-import { guardWarnings, voiceNeedsOutputFile } from "./lib/cli-guards.js";
+import { guardWarnings, loginNeedsTtyError, voiceNeedsOutputFile } from "./lib/cli-guards.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"));
@@ -141,6 +141,11 @@ program
     const voiceWritesOutput: boolean = voiceNeedsOutputFile(opts, !!apiKey);
 
     for (const warning of guardWarnings(opts, paths)) console.error(color.warning(warning));
+    const loginError = loginNeedsTtyError(opts, Boolean(process.stdin.isTTY));
+    if (loginError) {
+      console.error(color.error(`✖ ${loginError}`));
+      process.exit(EXIT.RUNTIME);
+    }
 
     // In --json-only mode, redirect all status output to stderr so stdout is clean JSON
     const originalConsoleLog = console.log;

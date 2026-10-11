@@ -31,11 +31,11 @@ export function generateConformanceMd(report: ConformanceReport, options: { vers
     ``,
     `${report.url} · ${report.checkedAt}${report.commit ? ` · ${report.commit.slice(0, 12)}` : ''}${options.version ? ` · dembrandt ${options.version}` : ''}`,
     ``,
-    `**${verdict}.** Tokens read: ${report.tokens.color} colours, ${report.tokens.dimension} dimensions from ${report.tokenSources.join(', ')}.`,
+    `**${verdict}.** Tokens read from ${report.tokenSources.join(', ')}: ${report.tokens.color} colours, ${report.tokens.radius} radii, ${report.tokens.fontSize} font sizes${report.tokens.dimension ? `, ${report.tokens.dimension} other dimensions not compared` : ''}.`,
     ``,
-    `| Category | Rendered values | Off token |`,
-    `|---|---|---|`,
-    ...(['color', 'radius', 'fontSize'] as const).map((c) => `| ${CATEGORY_LABEL[c]} | ${report.categories[c].checked} | ${report.categories[c].offToken} |`),
+    `| Category | Tokens | Rendered values | Off token |`,
+    `|---|---|---|---|`,
+    ...(['color', 'radius', 'fontSize'] as const).map((c) => `| ${CATEGORY_LABEL[c]} | ${report.categories[c].tokens || 'none of this type'} | ${report.categories[c].checked} | ${report.categories[c].offToken} |`),
     ``,
   ];
 

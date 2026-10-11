@@ -1,12 +1,12 @@
 import { convertColor, deltaE2000 } from './colors.js';
 import type { BrandingResult } from './types.js';
 
-export type TokenKind = 'color' | 'dimension';
+export type TokenKind = 'color' | 'radius' | 'fontSize' | 'dimension';
 
 export interface DesignToken {
   name: string;
   kind: TokenKind;
-  /** Lowercase hex for a colour, pixels for a dimension. */
+  /** Lowercase hex for a colour, pixels for a dimension. A `dimension` is one whose name says neither radius nor font size. */
   value: string | number;
   source: string;
 }
@@ -25,6 +25,8 @@ export interface OffTokenValue {
 export interface CategoryConformance {
   checked: number;
   offToken: number;
+  /** Tokens of this kind in the file; 0 means nothing to match against. */
+  tokens: number;
 }
 
 export interface ConformanceReport {
@@ -76,6 +78,16 @@ function parseColorHex(value: Json | undefined): string | null {
 
 interface RawToken { path: string; type: string | null; value: Json }
 
+const RADIUS_NAME = /radius|rounded|corner/i;
+const FONT_SIZE_NAME = /font|text|type|heading|body|caption|display/i;
+
+/** A dimension token's kind comes from its name: a radius is never a font size, whatever its pixels. */
+export function dimensionKind(path: string): TokenKind {
+  if (RADIUS_NAME.test(path)) return 'radius';
+  if (FONT_SIZE_NAME.test(path)) return 'fontSize';
+  return 'dimension';
+}
+
 function collectTokens(node: JsonObject, path: string[], inheritedType: string | null, out: RawToken[]): void {
   const type = typeof node.$type === 'string' ? node.$type : inheritedType;
   if ('$value' in node) {
@@ -112,7 +124,7 @@ export function readTokenDocument(doc: Json, source: string): DesignToken[] {
     const type = t.type ?? resolved.type;
     if (type === 'typography' && isObject(resolved.value)) {
       const px = parseDimensionPx(resolveAlias(resolved.value.fontSize, byPath).value);
-      if (px !== null) tokens.push({ name: `${t.path}.fontSize`, kind: 'dimension', value: px, source });
+      if (px !== null) tokens.push({ name: `${t.path}.fontSize`, kind: 'fontSize', value: px, source });
       continue;
     }
     if (type === 'color') {
@@ -120,7 +132,7 @@ export function readTokenDocument(doc: Json, source: string): DesignToken[] {
       if (hex) tokens.push({ name: t.path, kind: 'color', value: hex, source });
     } else if (type === 'dimension' || type === 'fontSize') {
       const px = parseDimensionPx(resolved.value);
-      if (px !== null) tokens.push({ name: t.path, kind: 'dimension', value: px, source });
+      if (px !== null) tokens.push({ name: t.path, kind: type === 'fontSize' ? 'fontSize' : dimensionKind(t.path), value: px, source });
     }
   }
   return tokens;
@@ -204,14 +216,15 @@ export interface ConformanceOptions {
  * values carry the nearest token and how far it is, worst offenders first.
  */
 export function checkConformance(result: BrandingResult, tokens: DesignToken[], options: ConformanceOptions = {}): ConformanceReport {
-  const colorTokens = tokens.filter((t) => t.kind === 'color');
-  const dimensionTokens = tokens.filter((t) => t.kind === 'dimension');
+  const byKind = (kind: TokenKind) => tokens.filter((t) => t.kind === kind);
+  const colorTokens = byKind('color');
+  const kindTokens: Record<'radius' | 'fontSize', DesignToken[]> = { radius: byKind('radius'), fontSize: byKind('fontSize') };
   const maxDeltaE = options.colorDeltaE ?? COLOR_MATCH_DELTA_E;
   const offToken: OffTokenValue[] = [];
   const categories: Record<ConformanceCategory, CategoryConformance> = {
-    color: { checked: 0, offToken: 0 },
-    radius: { checked: 0, offToken: 0 },
-    fontSize: { checked: 0, offToken: 0 },
+    color: { checked: 0, offToken: 0, tokens: colorTokens.length },
+    radius: { checked: 0, offToken: 0, tokens: kindTokens.radius.length },
+    fontSize: { checked: 0, offToken: 0, tokens: kindTokens.fontSize.length },
   };
 
   for (const r of renderedColors(result)) {
@@ -226,14 +239,14 @@ export function checkConformance(result: BrandingResult, tokens: DesignToken[], 
     });
   }
 
-  const dimensionRows: Array<[ConformanceCategory, Rendered[]]> = [
+  const dimensionRows: Array<['radius' | 'fontSize', Rendered[]]> = [
     ['radius', renderedRadii(result)],
     ['fontSize', renderedFontSizes(result)],
   ];
   for (const [category, rows] of dimensionRows) {
     for (const r of rows) {
       categories[category].checked++;
-      const near = nearestDimension(Number.parseFloat(r.value), dimensionTokens);
+      const near = nearestDimension(Number.parseFloat(r.value), kindTokens[category]);
       if (near && near.distance === 0) continue;
       categories[category].offToken++;
       offToken.push({
@@ -250,7 +263,7 @@ export function checkConformance(result: BrandingResult, tokens: DesignToken[], 
     url: result.url,
     commit: options.commit ?? null,
     tokenSources: [...new Set(tokens.map((t) => t.source))],
-    tokens: { color: colorTokens.length, dimension: dimensionTokens.length },
+    tokens: { color: colorTokens.length, radius: kindTokens.radius.length, fontSize: kindTokens.fontSize.length, dimension: byKind('dimension').length },
     categories,
     offToken,
   };
