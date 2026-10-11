@@ -261,7 +261,7 @@ async function main() {
   const cookie = z.string().optional().describe('Cookie string for authenticated pages, e.g. "session=abc; token=xyz"');
   const cookieFile = z.string().optional().describe("Path to a cookie export: JSON array, Playwright storageState (cookies + localStorage), or Netscape cookies.txt");
   const basicAuth = z.string().optional().describe('HTTP Basic credentials as "user:password"');
-  const header = z.string().optional().describe('Extra HTTP header, e.g. "Authorization: Bearer eyJ..."');
+  const header = z.union([z.string(), z.array(z.string())]).optional().describe('Extra HTTP header, e.g. "Authorization: Bearer eyJ...", or a list of them');
   const userAgent = z.string().optional().describe("Custom user agent string");
   const noSandbox = z.boolean().optional().default(false).describe("Disable the browser sandbox, required inside Docker and most CI containers");
   const pages = z.number().int().min(1).max(20).optional().default(1).describe("Extract up to N pages and merge them into one token set. Pages are discovered from DOM links, or from sitemap.xml when sitemap is true. Merged tokens are markedly stronger than a single page.");

@@ -43,6 +43,7 @@ export function displayResults(data: BrandingResult, options: { colorFormat?: Co
     const paths = formatPageList(data.pages.map(p => p.url));
     console.log(chalk.dim('├─') + ' ' + chalk.dim(`${data.pages.length} pages: ${paths}`));
   }
+  displayCoverage(data.coverage);
   console.log(chalk.dim('│'));
 
   displayLogo(data.logo);
@@ -323,6 +324,14 @@ function displayColors(colors, colorFormat: ColorFormat = 'hex') {
     );
   });
 
+  const primaryEvidence = colors.semanticEvidence?.primary;
+  if (primaryEvidence) {
+    const tokens = primaryEvidence.tokens?.length ? ` (${primaryEvidence.tokens.slice(0, 2).join(', ')})` : '';
+    const alternates = primaryEvidence.decision === 'refused' && primaryEvidence.alternates?.length
+      ? ': ' + primaryEvidence.alternates.map((a) => a.color).join(' ') : '';
+    console.log(chalk.dim(`│  primary ${primaryEvidence.decision}, ${primaryEvidence.reason}${tokens}${alternates}`));
+  }
+
   const cssVarLimit = 15;
   const paletteLimit = 20;
   const remaining = (colors.cssVariables ? Math.max(0, Object.keys(colors.cssVariables).length - cssVarLimit) : 0) +
@@ -331,6 +340,16 @@ function displayColors(colors, colorFormat: ColorFormat = 'hex') {
     console.log(chalk.dim(`│  └─`) + ' ' + chalk.dim(`+${remaining} more in JSON`));
   }
   console.log(chalk.dim('│'));
+}
+
+function displayCoverage(coverage) {
+  if (!coverage) return;
+  const tint = coverage.score >= 80 ? color.success : coverage.score >= 55 ? color.warning : chalk.red;
+  console.log(chalk.dim('├─') + ' ' + tint(`${coverage.score}/100 consistent`) + chalk.dim(` across ${coverage.totalPages} pages`));
+  if (!coverage.outliers.length) return;
+  const shown = coverage.outliers.slice(0, 4).map((o) => `${o.family} ${o.token}`).join(', ');
+  const rest = coverage.outliers.length - 4;
+  console.log(chalk.dim('├─') + ' ' + chalk.dim(`page-local: ${shown}${rest > 0 ? `, +${rest} more` : ''}`));
 }
 
 function displayTypography(typography) {

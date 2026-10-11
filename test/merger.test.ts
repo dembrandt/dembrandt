@@ -537,3 +537,46 @@ test('the homepage primary stays the canonical of its cluster after a merge', ()
   assert.equal(merged.colors.semantic.primary, 'rgb(56, 89, 255)');
   assert.equal(merged.colors.palette.find((c) => c.normalized === '#3859ff').count, 12);
 });
+
+test('coverage tags a token by how many pages carry it, not by how often it is used', () => {
+  const everywhere = { px: '8px', count: 40 };
+  const oneOff = { px: '11px', count: 400 };
+
+  const merged = mergeResults([
+    page('https://a.com/', { spacing: { commonValues: [everywhere, oneOff] } }),
+    page('https://a.com/pricing', { spacing: { commonValues: [everywhere] } }),
+    page('https://a.com/docs', { spacing: { commonValues: [everywhere] } }),
+  ]);
+
+  const spacing = merged.spacing.commonValues;
+  assert.equal(spacing.find((v) => v.px === '8px').pageCount, 3);
+  assert.equal(spacing.find((v) => v.px === '11px').pageCount, 1);
+
+  assert.deepEqual(merged.coverage.outliers.map((o) => o.token), ['11px']);
+  assert.equal(merged.coverage.totalPages, 3);
+});
+
+test('coverage is absent for a single-page extraction', () => {
+  const merged = mergeResults([page('https://a.com/', { shadows: [{ shadow: '0 1px 2px', count: 3 }] })]);
+  assert.equal(merged.coverage, undefined);
+});
+
+test('every merged family carries pageCount and scope', () => {
+  const merged = mergeResults([
+    page('https://a.com/', {
+      typography: { styles: [{ context: 'body', family: 'Inter', size: '16px', weight: '400' }], sources: {} },
+      borders: { combinations: [{ width: '1px', style: 'solid', color: '#000000', count: 2 }] },
+      shadows: [{ shadow: '0 1px 2px', count: 3 }],
+      borderRadius: { values: [{ value: '4px', count: 2 }] },
+    }),
+    page('https://a.com/x', {
+      typography: { styles: [{ context: 'body', family: 'Inter', size: '16px', weight: '400' }], sources: {} },
+      shadows: [{ shadow: '0 1px 2px', count: 1 }],
+    }),
+  ]);
+  assert.equal(merged.typography.styles[0].scope, 'site');
+  assert.equal(merged.shadows[0].scope, 'site');
+  assert.equal(merged.borders.combinations[0].scope, 'page');
+  assert.equal(merged.borderRadius.values[0].scope, 'page');
+  assert.equal(merged.coverage.byFamily.typography.meanCoverage, 1);
+});

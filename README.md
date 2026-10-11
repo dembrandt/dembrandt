@@ -31,7 +31,7 @@ Requires Node.js 18+
 
 ## What you get
 
-- Colors (semantic, palette, CSS variables, gradients)
+- Colors (semantic roles with the evidence behind each pick, curated palette, every detected colour, CSS variables, gradients)
 - Typography (fonts, sizes, weights, sources, font file URLs)
 - Spacing (margin/padding scales)
 - Borders (radius, widths, styles, colors)
@@ -100,7 +100,7 @@ reference is **[docs/usage.md](docs/usage.md)**.
 | `--basic-auth <user:pass>` | HTTP Basic for the browser context |
 | `--login` | Open a visible browser to sign in; press Enter when ready, then extract (interactive terminal only) |
 | `--save-storage-state <path>` | With `--login`, save the signed-in session (cookies, localStorage, sessionStorage) to a file; reuse it later with `--cookie-file`, also in CI |
-| `--header <string>` | Any extra request header |
+| `--header <string>` | Any extra request header, repeat for several |
 | `--user-agent <string>` | Custom user agent |
 | `--locale <string>` | Locale for the fingerprint |
 | `--timezone <string>` | Timezone for the fingerprint |
@@ -181,7 +181,7 @@ Load extractions, track token drift, and compare snapshots. **[dembrandt.com/app
 ## Limitations
 
 - Dark mode requires `--dark-mode` flag (not automatically detected)
-- Hover/focus states extracted from CSS (not fully interactive)
+- Hover and focus states come from real interaction on a sample of elements; states that need a pointer path or a timer are missed
 - Canvas/WebGL-rendered sites cannot be analyzed (no DOM to read)
 - JavaScript-heavy sites require hydration time (8s initial + 4s stabilization)
 - Some dynamically-loaded content may be missed

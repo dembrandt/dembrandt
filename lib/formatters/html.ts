@@ -402,7 +402,11 @@ function semanticSection(result: BrandingResult): string {
     )
     .join("");
   const all = sem.map(([role, hex]) => `${role}: ${hex}`).join("\n");
-  return section("Semantic colors", `<div class="colors">${chips}</div>`, undefined, all);
+  const ev = result.colors?.semanticEvidence?.primary;
+  const note = ev
+    ? `<p class="muted">primary ${esc(ev.decision)}: ${esc(ev.reason)}${ev.tokens?.length ? ` (${esc(ev.tokens.slice(0, 2).join(", "))})` : ""}${ev.decision === "refused" && ev.alternates?.length ? `. Candidates: ${esc(ev.alternates.map((a) => a.color).join(" "))}` : ""}</p>`
+    : "";
+  return section("Semantic colors", `<div class="colors">${chips}</div>${note}`, undefined, all);
 }
 
 /**
@@ -661,7 +665,8 @@ function wcagSection(result: BrandingResult): string {
 
 function metaSection(result: BrandingResult): string {
   const named = (t: { name: string; version?: string }) => (t.version ? `${t.name} ${t.version}` : t.name);
-  const fw = (result.frameworks ?? []).map(named);
+  const fw = (result.frameworks ?? []).map((t) =>
+    typeof t.coverage === 'number' ? `${named(t)} (${Math.round(t.coverage * 100)}% of page)` : named(t));
   const icons = (result.iconSystem ?? []).map(named);
   const bps = (result.breakpoints ?? []).map((b) => {
     // b.px may be a bare number (360) or already a CSS length ("360px", "20rem").

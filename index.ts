@@ -114,7 +114,7 @@ program
   .option("--basic-auth <user:password>", "HTTP Basic credentials for the browser context, e.g. \"staging:secret\"")
   .option("--login", "Open a visible browser to sign in; press Enter when ready, then continue extraction (interactive terminal only)")
   .option("--save-storage-state <path>", "With --login, save the signed-in session to a file for later runs via --cookie-file")
-  .option("--header <string>", "Extra HTTP header, e.g. \"Authorization: Bearer eyJ...\"")
+  .option("--header <string>", "Extra HTTP header, e.g. \"Authorization: Bearer eyJ...\"; repeat the flag for several", (v: string, all: string[] = []) => [...all, v])
   .option("--stealth", "Enable anti-detection: navigator spoofing, human mouse simulation, randomized fingerprint (use only when authorized)")
   .option("--user-agent <string>", "Custom user agent string")
   .option("--locale <string>", "Browser locale for fingerprint, e.g. en-GB, fi-FI; affects content only if the site reacts to Accept-Language (default: en-US)")
