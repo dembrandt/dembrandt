@@ -80,3 +80,13 @@ describe('DTCG formatter output is spec-valid', () => {
     expect(validateTokensObject(tokens).valid).toBe(true);
   });
 });
+
+describe('typography letter spacing', () => {
+  it('reads the extractor field, not the DTCG name', () => {
+    const fixture = loadFixture(FIXTURE);
+    delete fixture.typography.styles[0].letterSpacing;
+    fixture.typography.styles[0].spacing = '0.05em';
+    const tokens = toDtcgTokens(fixture);
+    expect(JSON.stringify(tokens.typography)).toContain('"letterSpacing":{"value":0.05,"unit":"rem"}');
+  });
+});

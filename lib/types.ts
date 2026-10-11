@@ -1,3 +1,5 @@
+import type { CoverageSummary, TokenScope } from './coverage.js';
+import type { ContextDescription } from './extractors/context-config.js';
 /**
  * Shared types for dembrandt extraction output and CLI options.
  * These were JSDoc @typedefs; promoted to real exported interfaces so the rest
@@ -7,6 +9,9 @@
 export type Confidence = 'high' | 'medium' | 'low';
 
 export interface PaletteColor {
+  /** Pages of a crawl that carry this value, and what that share of the crawl makes it. */
+  pageCount?: number;
+  scope?: TokenScope;
   /** Original color string */
   color: string;
   /** Hex color (#rrggbb) */
@@ -53,10 +58,57 @@ export interface CssVariable {
   oklch?: string;
 }
 
+export interface SemanticEvidence {
+  decision: 'elected' | 'refused';
+  rule: string | null;
+  reason: string;
+  /** Custom properties that declare the elected colour. */
+  tokens: string[];
+  alternates: { color: string; count: number; sources: string[] }[];
+}
+
+export interface DetectedColor {
+  color: string;
+  normalized: string;
+  count: number;
+  usageFrac: number;
+  areaFrac: number;
+  confidence: 'high' | 'medium' | 'low';
+  sources: string[];
+  isToken: boolean;
+}
+
+/**
+ * One colour on one kind of paint, counted over the page. The measurement
+ * layer: palette and semantic are interpretations of it. `slot` and `state`
+ * are reserved for landmark and interaction classification and stay null
+ * until that lands.
+ */
+export interface ColorOccurrence {
+  hex: string;
+  paints: 'fill' | 'text' | 'border';
+  slot: string | null;
+  count: number;
+  /** Summed element box area for fills, 0 for text and borders. */
+  area: number;
+  /** The first declared custom property carrying this exact colour. */
+  cssVar: string | null;
+  state: string | null;
+}
+
 export interface Colors {
   palette: PaletteColor[];
   /** e.g. { primary: '#hex' } */
   semantic: Record<string, string>;
+  /** How each semantic role was decided; a refused role is recorded, not absent. */
+  semanticEvidence?: Record<string, SemanticEvidence>;
+  /**
+   * Every colour painted on a DOM element, no frequency threshold, no perceptual
+   * merge. Logo, manifest and gradient colours join `palette` after this scan
+   * and are not in it.
+   */
+  detected?: DetectedColor[];
+  occurrences?: ColorOccurrence[];
   /**
    * CSS custom properties. Older extractions carry a bare colour string; current
    * ones carry a CssVariable object, so consumers must handle both.
@@ -69,6 +121,9 @@ export interface Colors {
 }
 
 export interface TypographyStyle {
+  /** Pages of a crawl that carry this value, and what that share of the crawl makes it. */
+  pageCount?: number;
+  scope?: TokenScope;
   /** 'heading-1' | 'body' | 'button' | 'caption' | 'display' | 'link' */
   context: string;
   family: string;
@@ -113,6 +168,9 @@ export interface Typography {
 }
 
 export interface SpacingValue {
+  /** Pages of a crawl that carry this value, and what that share of the crawl makes it. */
+  pageCount?: number;
+  scope?: TokenScope;
   /**
    * Numeric pixels for math and diffing. Raw extraction emits the "16px" string;
    * normalizeExtraction() coerces it to a number. Read `display` for rendering.
@@ -133,6 +191,9 @@ export interface Spacing {
 }
 
 export interface TokenValue {
+  /** Pages of a crawl that carry this value, and what that share of the crawl makes it. */
+  pageCount?: number;
+  scope?: TokenScope;
   value: string;
   count: number;
   confidence: Confidence;
@@ -143,6 +204,9 @@ export interface BorderRadius {
 }
 
 export interface BorderCombination {
+  /** Pages of a crawl that carry this value, and what that share of the crawl makes it. */
+  pageCount?: number;
+  scope?: TokenScope;
   width: string;
   style: string;
   color: string;
@@ -158,6 +222,9 @@ export interface Borders {
 }
 
 export interface Shadow {
+  /** Pages of a crawl that carry this value, and what that share of the crawl makes it. */
+  pageCount?: number;
+  scope?: TokenScope;
   shadow: string;
   count: number;
   confidence: Confidence;
@@ -202,6 +269,8 @@ export interface LinkStyle {
 }
 
 export interface InputStyle {
+  /** The input's type attribute, or its tag when it has none. */
+  specificType?: string;
   type?: string;
   border?: string;
   borderRadius?: string;
@@ -397,6 +466,11 @@ export interface ExtractionMeta {
    */
   viewport?: { width: number; height: number };
   /**
+   * The browser context the main pass was measured under. The --dark-mode and
+   * --mobile passes are extra passes recorded in flags, not here.
+   */
+  context?: ContextDescription;
+  /**
    * False when web fonts had not finished loading when styles were read:
    * typography families may be OS fallbacks, and family drift against this
    * snapshot is suspect. Consumers must not have to infer this from generic
@@ -485,6 +559,8 @@ export interface BrandingResult {
    * Per-page results in a multi-page run. Voice sits here rather than being
    * merged: the variation between pages is the finding, not noise to average.
    */
+  /** Site-wide agreement across a crawl; absent for a single page. */
+  coverage?: CoverageSummary;
   pages?: {
     url: string;
     extractedAt?: string;
@@ -668,7 +744,8 @@ export interface ExtractOptions {
   acceptLanguage?: string;
   screenSize?: string;
   cookie?: string;
-  header?: string;
+  /** One "Name: value" header, or several when the flag is repeated. */
+  header?: string | string[];
   /** Internal: collect raw :root tokens + interactive-state styles to a sidecar. */
   teach?: boolean;
   /** Injected CLI version, surfaced as meta.dembrandtVersion. */

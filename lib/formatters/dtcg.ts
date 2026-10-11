@@ -293,7 +293,7 @@ function exportTypography(typography) {
         fontSize,
         fontWeight: typeof style.weight === 'number' ? style.weight : parseInt(style.weight) || 400,
         lineHeight: style.lineHeight ? (parseFloat(style.lineHeight) || 1.5) : 1.5,
-        letterSpacing: (style.letterSpacing && toDtcgDimension(style.letterSpacing)) || { value: 0, unit: 'px' }
+        letterSpacing: ((style.letterSpacing ?? style.spacing) && toDtcgDimension(style.letterSpacing ?? style.spacing)) || { value: 0, unit: 'px' }
       }
     };
   });

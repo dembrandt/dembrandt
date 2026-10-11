@@ -5,6 +5,7 @@
  * YAML design tokens in front matter plus ordered markdown rationale sections.
  */
 import { convertColor, deltaE } from '../colors.js';
+import type { SemanticEvidence } from '../types.js';
 
 /**
  * The @google/design.md release this emitter is known to satisfy.
@@ -48,7 +49,7 @@ export function generateDesignMd(result: any, options: { version?: string } = {}
   const sections = [
     '# Design System',
     buildOverviewSection(domain),
-    hasKeys(colorRoles) ? buildColorsSection(colorRoles) : null,
+    hasKeys(colorRoles) || result.colors?.semanticEvidence?.primary ? buildColorsSection(colorRoles, result.colors?.semanticEvidence) : null,
     hasKeys(typographyTokens) ? buildTypographySection(result, typographyTokens) : null,
     hasLayoutEvidence(result, spacingTokens) ? buildLayoutSection(result, spacingTokens) : null,
     hasElevationEvidence(result) ? buildElevationSection(result) : null,
@@ -175,7 +176,7 @@ function buildTypographyTokens(result) {
       fontSize: normalizeDimension(style.fontSize ?? style.size),
       fontWeight: normalizeFontWeight(style.fontWeight ?? style.weight),
       lineHeight: normalizeLineHeight(style.lineHeight),
-      letterSpacing: normalizeDimension(style.letterSpacing),
+      letterSpacing: normalizeDimension(style.letterSpacing ?? style.spacing),
       fontFeature: normalizeFontFeature(style.fontFeatures ?? style.fontFeature),
     });
 
@@ -266,10 +267,19 @@ function buildComponentTokens(result, colorRoles, roundedTokens) {
   return components;
 }
 
-function buildColorsSection(colorRoles) {
+function buildColorsSection(colorRoles, evidence?: Record<string, SemanticEvidence>) {
   const lines = ['## Colors'];
   for (const [role, hex] of (Object.entries(colorRoles) as any[])) {
-    lines.push(`- **${titleize(role)}** (${hex}): Observed color token extracted from the site's palette, semantic CSS, or component styles.`);
+    const ev = evidence?.[role];
+    const why = ev?.decision === 'elected'
+      ? `Elected: ${ev.reason}${ev.tokens.length ? ` (${ev.tokens.slice(0, 2).join(', ')})` : ''}.`
+      : "Observed color token extracted from the site's palette, semantic CSS, or component styles.";
+    lines.push(`- **${titleize(role)}** (${hex}): ${why}`);
+  }
+  const refused = evidence?.primary?.decision === 'refused' ? evidence.primary : null;
+  if (refused && !colorRoles.primary) {
+    const candidates = refused.alternates.length ? ` Candidates: ${refused.alternates.map((a) => a.color).join(', ')}.` : '';
+    lines.push(`- **Primary**: not elected, ${refused.reason}.${candidates}`);
   }
   return lines.join('\n');
 }
@@ -396,13 +406,14 @@ function typographyTokenName(style, index) {
   const contexts = style.contexts ?? (style.context ? [style.context] : []);
   const normalized = contexts.map(c => String(c).toLowerCase());
 
-  if (normalized.some(c => /^h1$/.test(c))) return 'headline-display';
-  if (normalized.some(c => /^h2$/.test(c))) return 'headline-lg';
-  if (normalized.some(c => /^h3$/.test(c))) return 'headline-md';
-  if (normalized.some(c => /^h[4-6]$/.test(c))) return 'headline-sm';
-  if (normalized.some(c => c === 'button')) return 'label-lg';
-  if (normalized.some(c => c === 'a')) return 'label-md';
-  if (normalized.some(c => c === 'p' || c === 'div')) return 'body-md';
+  if (normalized.some(c => c === 'display' || /^h1$/.test(c) || c === 'heading-1')) return 'headline-display';
+  if (normalized.some(c => /^h2$/.test(c) || c === 'heading-2')) return 'headline-lg';
+  if (normalized.some(c => /^h3$/.test(c) || c === 'heading-3')) return 'headline-md';
+  if (normalized.some(c => /^h[4-6]$/.test(c) || /^heading-[4-6]$/.test(c))) return 'headline-sm';
+  if (normalized.some(c => c === 'button' || c === 'ui')) return 'label-lg';
+  if (normalized.some(c => c === 'a' || c === 'link')) return 'label-md';
+  if (normalized.some(c => c === 'caption')) return 'body-sm';
+  if (normalized.some(c => c === 'p' || c === 'div' || c === 'body' || c === 'text')) return 'body-md';
 
   return `text-${index + 1}`;
 }

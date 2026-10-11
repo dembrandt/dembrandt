@@ -22,6 +22,21 @@ export interface ScreenSize {
 
 export type ColorScheme = 'light' | 'dark' | 'no-preference';
 export type ReducedMotion = 'reduce' | 'no-preference';
+export type ForcedColors = 'active' | 'none';
+
+/** The measurement conditions a run was taken under, echoed into meta.context. */
+export interface ContextDescription {
+  readonly viewport: ScreenSize;
+  readonly deviceScaleFactor: number;
+  readonly isMobile: boolean;
+  readonly hasTouch: boolean;
+  readonly colorScheme: ColorScheme;
+  readonly reducedMotion: ReducedMotion;
+  readonly forcedColors: ForcedColors;
+  readonly locale: string;
+  readonly timezoneId: string;
+  readonly userAgent: string;
+}
 
 /**
  * The subset of Playwright's BrowserContextOptions that we set. Declared
@@ -36,8 +51,12 @@ export interface ContextOptions {
   locale: string;
   timezoneId: string;
   extraHTTPHeaders: Record<string, string>;
+  deviceScaleFactor: number;
+  isMobile: boolean;
+  hasTouch: boolean;
   colorScheme: ColorScheme;
   reducedMotion: ReducedMotion;
+  forcedColors: ForcedColors;
   permissions?: string[];
 }
 
@@ -66,16 +85,20 @@ export function parseCookies(cookie: string | undefined, url: string): ParsedCoo
 }
 
 /**
- * Parse a single "Name: value" header. Returns {} when absent or when no colon
- * is present (an invalid header is ignored rather than guessed at).
+ * Parse one or more "Name: value" headers. A header without a colon or a name
+ * is ignored rather than guessed at; a repeated name keeps the last value.
  */
-export function parseHeader(header: string | undefined): Record<string, string> {
+export function parseHeader(header: string | readonly string[] | undefined): Record<string, string> {
   if (!header) return {};
-  const colon = header.indexOf(':');
-  if (colon < 1) return {};
-  const name = header.slice(0, colon).trim();
-  if (!name) return {};
-  return { [name]: header.slice(colon + 1).trim() };
+  const out: Record<string, string> = {};
+  for (const raw of typeof header === 'string' ? [header] : header) {
+    const colon = raw.indexOf(':');
+    if (colon < 1) continue;
+    const name = raw.slice(0, colon).trim();
+    if (!name) continue;
+    out[name] = raw.slice(colon + 1).trim();
+  }
+  return out;
 }
 
 /**
@@ -127,8 +150,12 @@ export function buildContextOptions(options: ExtractOptions, browserName: string
     locale,
     timezoneId: options.timezoneId || DEFAULT_TIMEZONE,
     extraHTTPHeaders,
+    deviceScaleFactor: 1,
+    isMobile: false,
+    hasTouch: false,
     colorScheme: 'light',
     reducedMotion: 'no-preference',
+    forcedColors: 'none',
   };
 
   if (browserName === 'chromium') {
@@ -136,4 +163,20 @@ export function buildContextOptions(options: ExtractOptions, browserName: string
   }
 
   return contextOptions;
+}
+
+/** The part of the context that decides what a page renders, for meta.context. */
+export function describeContext(options: ContextOptions): ContextDescription {
+  return {
+    viewport: { width: options.viewport.width, height: options.viewport.height },
+    deviceScaleFactor: options.deviceScaleFactor,
+    isMobile: options.isMobile,
+    hasTouch: options.hasTouch,
+    colorScheme: options.colorScheme,
+    reducedMotion: options.reducedMotion,
+    forcedColors: options.forcedColors,
+    locale: options.locale,
+    timezoneId: options.timezoneId,
+    userAgent: options.userAgent,
+  };
 }

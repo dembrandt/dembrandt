@@ -13,7 +13,8 @@ import { extractBreakpoints, extractGradients, extractMotion, extractMotionStati
 import { extractTeach } from './teach.js';
 import { extractWcagPairs, bindContrastToPalette } from './colors.js';
 import { SCHEMA_VERSION } from '../version.js';
-import { buildContextOptions, parseCookies, parseScreenSize, DEFAULT_LOCALE } from './context-config.js';
+import { hslChroma } from '../colors.js';
+import { buildContextOptions, describeContext, parseCookies, parseScreenSize, DEFAULT_LOCALE } from './context-config.js';
 import { guardExtractor } from './guard.js';
 import { dismissConsent } from './consent.js';
 import type { Browser, Page } from 'playwright';
@@ -819,7 +820,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       motion,
     ] = await Promise.all([
       guardExtractor('logo', extractLogo(page, url), { logo: null, instances: [], favicons: [], manifest: null }, extractorErrors),
-      guardExtractor('colors', extractColors(page), { semantic: {}, palette: [], cssVariables: [], _raw: [] }, extractorErrors),
+      guardExtractor('colors', extractColors(page), { semantic: {}, palette: [], cssVariables: {}, detected: [], occurrences: [], _raw: [] }, extractorErrors),
       guardExtractor('typography', extractTypography(page), { styles: [], sources: {} }, extractorErrors),
       guardExtractor('spacing', extractSpacing(page), { scaleType: 'unknown', commonValues: [] }, extractorErrors),
       guardExtractor('borderRadius', extractBorderRadius(page), { values: [] }, extractorErrors),
@@ -905,6 +906,16 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
             colors.palette.push(entry);
           }
         }
+        const primaryEvidence = colors.semanticEvidence?.primary;
+        if (primaryEvidence) {
+          const primaryHex = colors.semantic.primary ? convertColor(colors.semantic.primary)?.hex : null;
+          const logoChromatic = logoResult.logoColors.filter((hex) =>
+            hslChroma(hex) > 0.15 && hex !== primaryHex && !primaryEvidence.alternates.some((a) => a.color === hex));
+          primaryEvidence.alternates.push(...logoChromatic.map((hex) => ({ color: hex, count: 10, sources: ['logo'] })));
+          if (primaryEvidence.decision === 'refused' && logoChromatic.length > 0) {
+            primaryEvidence.reason = `${logoChromatic.length} chromatic logo colours of equal weight, none painted as a surface`;
+          }
+        }
         log(color.success(`  ✓ SVG logo colors: ${logoResult.logoColors.length} injected`));
       }
     } catch (e) { degraded.push('svg-logo-colors'); console.log(color.warning('  ! SVG logo color injection: failed (continuing)')); }
@@ -934,14 +945,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         }
 
         const { convertColor } = await import('../colors.js');
-        const chromaOf = (hex) => {
-          const m = /^#([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-          if (!m) return 0;
-          const r = parseInt(m[1], 16) / 255, g = parseInt(m[2], 16) / 255, b = parseInt(m[3], 16) / 255;
-          const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
-          if (max === min || l < 0.08 || l > 0.92) return 0;
-          return l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
-        };
+        const chromaOf = hslChroma;
 
         let injected = 0;
         for (const raw of stopColors) {
@@ -1194,6 +1198,9 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       });
       colors.palette = mergedPalette;
       Object.assign(colors.semantic, darkModeColors.semantic);
+      for (const [role, ev] of Object.entries(darkModeColors.semanticEvidence ?? {})) {
+        if (darkModeColors.semantic[role]) (colors.semanticEvidence ??= {})[role] = ev;
+      }
       buttons.push(...darkModeButtons.map((btn) => ({ ...btn, source: "dark-mode" })));
       links.push(...darkModeLinks.map((link) => ({ ...link, source: "dark-mode" })));
 
@@ -1425,6 +1432,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         dembrandtVersion: options._version || null,
         schemaVersion: SCHEMA_VERSION,
         viewport: { width: screenW, height: screenH },
+        context: describeContext(contextOptions),
         fontsReady,
         ...(pendingFonts.length ? { pendingFonts } : {}),
         // top-level `url` is post-redirect; this is what was passed in.

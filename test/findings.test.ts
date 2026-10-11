@@ -89,3 +89,10 @@ test('coverage counts only the token categories actually present', () => {
   const fr = computeFindings(base({ shadows: [], breakpoints: [] }));
   assert.equal(fr.coverage.present, 4);
 });
+
+test('off-grid spacing fires on the raw "16px" strings the extractor emits', () => {
+  const fr = computeFindings(base({ spacing: { scaleType: '8px', commonValues: [{ px: '16px' }, { px: '18px' }, { px: '22px' }] } }));
+  const off = fr.findings.find((f) => f.group === 'Spacing');
+  assert.ok(off, 'expected an off-grid finding');
+  assert.match(off!.message, /18px, 22px are off the 8px spacing grid/);
+});

@@ -60,6 +60,35 @@ test('baseline and candidate extracted at different viewport widths produce a wa
   assert.match(report.warnings![0], /390x844/);
 });
 
+const context = (over: Record<string, unknown> = {}) => ({
+  viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1, isMobile: false, hasTouch: false,
+  colorScheme: 'light', reducedMotion: 'no-preference', forcedColors: 'none',
+  locale: 'en-US', timezoneId: 'America/New_York', userAgent: 'ua', ...over,
+});
+
+test('snapshots measured under different rendering dials produce one context warning naming each dial', () => {
+  const base = fixture({ meta: { schemaVersion: '1', context: context() } });
+  const cand = fixture({ meta: { schemaVersion: '1', context: context({ colorScheme: 'dark', deviceScaleFactor: 2 }) } });
+
+  const report = computeDrift(base, cand);
+  assert.equal(report.warnings?.length, 1);
+  assert.match(report.warnings![0], /deviceScaleFactor 1 -> 2/);
+  assert.match(report.warnings![0], /colorScheme light -> dark/);
+  assert.doesNotMatch(report.warnings![0], /locale/);
+});
+
+test('a context that differs only in the user agent or timezone is the same measurement', () => {
+  const base = fixture({ meta: { schemaVersion: '1', context: context() } });
+  const cand = fixture({ meta: { schemaVersion: '1', context: context({ userAgent: 'other', timezoneId: 'Europe/Helsinki' }) } });
+  assert.equal(computeDrift(base, cand).warnings, undefined);
+});
+
+test('a snapshot without meta.context is not warned against', () => {
+  const base = fixture({ meta: { schemaVersion: '1' } });
+  const cand = fixture({ meta: { schemaVersion: '1', context: context({ colorScheme: 'dark' }) } });
+  assert.equal(computeDrift(base, cand).warnings, undefined);
+});
+
 test('same viewport width produces no warning', () => {
   const base = fixture({ meta: { schemaVersion: '1', viewport: { width: 1920, height: 1080 } } });
   const cand = fixture({ meta: { schemaVersion: '1', viewport: { width: 1920, height: 900 } } });
