@@ -29,6 +29,11 @@ Playwright cache, so either route only needs it once.
 
 Requires Node.js 18+
 
+Or install the MCP server straight into your editor and let the agent run it:
+
+[![Add to Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](cursor://anysphere.cursor-deeplink/mcp/install?name=dembrandt&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImRlbWJyYW5kdCIsIm1jcCJdfQ==)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=dembrandt&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22dembrandt%22%2C%22mcp%22%5D%7D)
+
 ## What you get
 
 - Colors (semantic roles with the evidence behind each pick, curated palette, every detected colour, CSS variables, gradients)
