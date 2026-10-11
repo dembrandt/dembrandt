@@ -138,10 +138,10 @@ Use Dembrandt as a tool in Claude Code, Cursor, Windsurf, or any MCP-compatible 
 Setup for Claude Desktop, Claude Code, Cursor and Windsurf, the full tool list and how the job model works: **[dembrandt.com/mcp](https://www.dembrandt.com/mcp)**.
 
 ```bash
-claude mcp add --transport stdio dembrandt -- npx -y --package dembrandt dembrandt-mcp
+claude mcp add --transport stdio dembrandt -- npx -y dembrandt mcp
 ```
 
-The server is listed in the [MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dembrandt/dembrandt) as `io.github.dembrandt/dembrandt`, so a client that reads the registry can install it by name. `npx -y dembrandt mcp` starts it directly.
+The server is listed in the [MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.dembrandt/dembrandt) as `io.github.dembrandt/dembrandt`, so a client that reads the registry can install it by name.
 
 Or add to your project's `.mcp.json`:
 
@@ -150,7 +150,7 @@ Or add to your project's `.mcp.json`:
   "mcpServers": {
     "dembrandt": {
       "command": "npx",
-      "args": ["-y", "--package", "dembrandt", "dembrandt-mcp"]
+      "args": ["-y", "dembrandt", "mcp"]
     }
   }
 }

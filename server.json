@@ -2,10 +2,27 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.dembrandt/dembrandt",
   "title": "Dembrandt",
-  "description": "Design tokens from any live site: colours, type, spacing, components, drift against a baseline.",
+  "description": "Design tokens from any live site: colors, type, spacing, DTCG, Tailwind, drift checks.",
+  "icons": [
+    {
+      "src": "https://www.dembrandt.com/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    },
+    {
+      "src": "https://www.dembrandt.com/icon-192.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "192x192"
+      ]
+    }
+  ],
   "repository": {
     "url": "https://github.com/dembrandt/dembrandt",
-    "source": "github"
+    "source": "github",
+    "id": "1101924225"
   },
   "websiteUrl": "https://dembrandt.com",
   "version": "0.39.2",
@@ -16,9 +33,35 @@
       "identifier": "dembrandt",
       "version": "0.39.2",
       "runtimeHint": "npx",
-      "runtimeArguments": [{ "type": "positional", "value": "-y" }],
-      "packageArguments": [{ "type": "positional", "value": "mcp" }],
-      "transport": { "type": "stdio" }
+      "runtimeArguments": [
+        {
+          "type": "positional",
+          "value": "-y"
+        }
+      ],
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        }
+      ],
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "DEMBRANDT_KEY",
+          "description": "API key from dembrandt.com/app/api-keys. Uploads each extraction as a snapshot and scores it against the previous one for that domain.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "BROWSER_CDP_ENDPOINT",
+          "description": "Connect to an already running Chromium over CDP instead of launching one, e.g. http://localhost:9222.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
     }
   ]
 }
