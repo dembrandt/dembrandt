@@ -234,7 +234,7 @@ function buildRoundedTokens(result) {
 function buildComponentTokens(result, colorRoles, roundedTokens) {
   const components: Record<string, any> = {};
   const button = (result.components?.buttons ?? [])
-    .map(btn => btn.states?.default ?? btn)
+    .map(btn => ({ ...(btn.states?.default ?? btn), height: btn.box?.height }))
     .find(btn => btn.backgroundColor && !isTransparentColor(btn.backgroundColor));
 
   if (button) {
@@ -260,6 +260,7 @@ function buildComponentTokens(result, colorRoles, roundedTokens) {
       textColor: tokenReferenceForColor(state.color ?? state.textColor, colorRoles) ?? toHex(state.color ?? state.textColor),
       rounded: tokenReferenceForRadius(state.borderRadius, roundedTokens) ?? normalizeRadius(state.borderRadius),
       padding: normalizePadding(state.padding),
+      height: normalizeDimension(input.box?.height),
     });
     if (token) components['input-observed'] = token;
   }
@@ -355,6 +356,7 @@ function buildComponentsSection(result) {
     }
     if (btn.color ?? btn.textColor) parts.push(`text ${toHex(btn.color ?? btn.textColor) ?? (btn.color ?? btn.textColor)}`);
     if (btn.padding) parts.push(`padding ${btn.padding}`);
+    if (button.box?.height) parts.push(`height ${button.box.height}px`);
     if (hasVisibleBorder(btn.border)) parts.push(`border ${btn.border}`);
     if (parts.length) {
       lines.push(`- **Buttons**: Observed sample with ${parts.join(', ')}`);
@@ -367,6 +369,7 @@ function buildComponentsSection(result) {
     const parts = [];
     if (hasVisibleBorder(inp.border)) parts.push(`${inp.border.split(' ').slice(0, 2).join(' ')} border`);
     if (inp.borderRadius) parts.push(`${inp.borderRadius} radius`);
+    if (input.box?.height) parts.push(`${input.box.height}px height`);
     if (parts.length) {
       lines.push(`- **Inputs**: Observed sample with ${parts.join(', ')}`);
     }
@@ -520,7 +523,7 @@ function hasComponentEvidence(result) {
 
 function firstButton(buttons) {
   if (!Array.isArray(buttons)) return null;
-  const normalized = buttons.map(button => button.states?.default ?? button);
+  const normalized = buttons.map(button => ({ ...(button.states?.default ?? button), box: button.box }));
   return normalized.find(button =>
     button.backgroundColor && !isTransparentColor(button.backgroundColor) ||
     positiveDimension(button.borderRadius) ||

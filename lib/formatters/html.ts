@@ -561,6 +561,7 @@ function buttonsSection(result: BrandingResult): string {
         st.border ? `border:${safeCss(st.border)}` : "",
         b.fontWeight ? `font-weight:${safeCss(b.fontWeight)}` : "",
         b.fontSize ? `font-size:${safeCss(b.fontSize)}` : "",
+        b.box?.height ? `box-sizing:border-box;height:${b.box.height}px` : "",
       ]
         .filter(Boolean)
         .join(";");
@@ -570,7 +571,7 @@ function buttonsSection(result: BrandingResult): string {
   const all = buttons
     .map((b: ButtonStyle) => {
       const st = b.states?.default ?? {};
-      return `${b.text || "Button"}: ${[st.backgroundColor, st.color, st.borderRadius].filter(Boolean).join(" / ")}`;
+      return `${b.text || "Button"}: ${[st.backgroundColor, st.color, st.borderRadius, b.box?.height && `${b.box.height}px`].filter(Boolean).join(" / ")}`;
     })
     .join("\n");
   return section("Buttons", `<div class="row">${previews}</div>`, undefined, all);
@@ -590,13 +591,14 @@ function inputsSection(result: BrandingResult): string {
         st.borderRadius ? `border-radius:${safeCss(st.borderRadius)}` : "",
         st.padding ? `padding:${safeCss(st.padding)}` : "padding:8px 12px",
         st.border ? `border:${safeCss(st.border)}` : "border:1px solid var(--line)",
+        i.box?.height ? `box-sizing:border-box;height:${i.box.height}px` : "",
       ]
         .filter(Boolean)
         .join(";");
       return `<input class="previewbtn" style="${esc(style)}" placeholder="${esc(i.specificType || i.type || "text")}" readonly>`;
     })
     .join(" ");
-  const all = list.map((i) => [i.specificType || i.type, i.states?.default?.border, i.states?.default?.borderRadius].filter(Boolean).join(" / ")).join("\n");
+  const all = list.map((i) => [i.specificType || i.type, i.states?.default?.border, i.states?.default?.borderRadius, i.box?.height && `${i.box.height}px`].filter(Boolean).join(" / ")).join("\n");
   return section("Inputs", `<div class="row">${previews}</div>`, undefined, all);
 }
 

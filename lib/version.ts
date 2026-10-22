@@ -69,6 +69,15 @@
  *          of a palette entry or keeps one name per value, so alias tokens and
  *          dark-mode values keep their names; palette.tokens carries every
  *          name merged into an entry. Palette and semantic values unmoved.
+ *          components.buttons[] and components.inputs.*[] gain `box`: the
+ *          rendered height in whole px with boxSizing, lineHeight, minHeight
+ *          and derivedHeight (line-height + vertical padding + border), so a
+ *          consumer can tell a set control height from a derived one and
+ *          compare buttons against inputs. Inputs also gain `fontSize`.
+ *          BEHAVIOR: a button or input that differs from another only in
+ *          height is now its own variant instead of collapsing into it, in
+ *          the page sample and in a crawl merge. Drift reads neither
+ *          components nor box: 0 on dembrandt.com.
  *  1.18.0 — frameworks entries gain `category`, `version` and `coverage` (the
  *          share of the page under that framework's mount points), iconSystem
  *          entries gain `version`. Additive: 1.17.x consumers ignore them.

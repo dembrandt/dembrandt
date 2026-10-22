@@ -1,5 +1,8 @@
+import { CONTROL_BOX_SOURCE } from './control-box.js';
+
 export async function extractButtonStyles(page) {
-  return await page.evaluate(() => {
+  return await page.evaluate(({ controlBoxSource }) => {
+    const controlBox = new Function(controlBoxSource + '\nreturn controlBox;')();
     // Only real interactive buttons — not tabs, menus, dropdowns
     const candidates = Array.from(document.querySelectorAll(
       'button, a[href], [role="button"]'
@@ -67,6 +70,7 @@ export async function extractButtonStyles(page) {
             fontSize: computed.fontSize,
             fontWeight: computed.fontWeight,
           },
+          box: controlBox(computed, rect.height),
           text: text.slice(0, 40),
         });
       } catch {}
@@ -79,13 +83,14 @@ export async function extractButtonStyles(page) {
     const unique = [];
     for (const r of results) {
       const s = r.state;
-      const key = `${s.backgroundColor}|${s.color}|${s.borderRadius}|${s.border}`;
+      const key = `${s.backgroundColor}|${s.color}|${s.borderRadius}|${s.border}|${r.box?.height}`;
       if (!seen.has(key)) {
         seen.add(key);
         unique.push({
           states: { default: s },
           fontWeight: s.fontWeight,
           fontSize: s.fontSize,
+          box: r.box,
           text: r.text,
           confidence: r.score >= 40 ? 'high' : 'medium',
         });
@@ -94,11 +99,12 @@ export async function extractButtonStyles(page) {
     }
 
     return unique;
-  });
+  }, { controlBoxSource: CONTROL_BOX_SOURCE });
 }
 
 export async function extractInputStyles(page) {
-  return await page.evaluate(() => {
+  return await page.evaluate(({ controlBoxSource }) => {
+    const controlBox = new Function(controlBoxSource + '\nreturn controlBox;')();
     const inputs = Array.from(
       document.querySelectorAll(`
         input[type="text"],
@@ -171,13 +177,18 @@ export async function extractInputStyles(page) {
         }
       } catch (e) {}
 
-      inputGroups[inputType].push({ specificType, states: { default: defaultState, focus: focusState } });
+      inputGroups[inputType].push({
+        specificType,
+        fontSize: computed.fontSize,
+        box: controlBox(computed, rect.height),
+        states: { default: defaultState, focus: focusState },
+      });
     });
 
     const deduplicateGroup = (group) => {
       const seen = new Map();
       for (const item of group) {
-        const key = `${item.states.default.border}|${item.states.default.borderRadius}|${item.states.default.backgroundColor}`;
+        const key = `${item.states.default.border}|${item.states.default.borderRadius}|${item.states.default.backgroundColor}|${item.box?.height}`;
         if (!seen.has(key)) seen.set(key, item);
       }
       return Array.from(seen.values());
@@ -189,7 +200,7 @@ export async function extractInputStyles(page) {
       radio: deduplicateGroup(inputGroups.radio).slice(0, 3),
       select: deduplicateGroup(inputGroups.select).slice(0, 3),
     };
-  });
+  }, { controlBoxSource: CONTROL_BOX_SOURCE });
 }
 
 export async function extractLinkStyles(page) {
