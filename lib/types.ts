@@ -259,11 +259,16 @@ export interface CssState {
   [key: string]: string | undefined;
 }
 
+import type { ControlBox } from './extractors/control-box.js';
+export type { ControlBox };
+
 export interface ButtonStyle {
   states: { default: CssState; hover?: CssState; active?: CssState; focus?: CssState; [key: string]: CssState | undefined };
   text?: string;
   fontWeight?: string;
   fontSize?: string;
+  /** Rendered geometry (1.19+): the fields the control-height rule reads. */
+  box?: ControlBox;
   classes?: string;
 }
 
@@ -279,6 +284,8 @@ export interface InputStyle {
   border?: string;
   borderRadius?: string;
   padding?: string;
+  fontSize?: string;
+  box?: ControlBox;
   states?: { default?: CssState; focus?: CssState };
 }
 

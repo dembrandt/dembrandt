@@ -210,7 +210,7 @@ function fingerprintComponent(c) {
   const base = c.states?.default || c;
   return [
     base.backgroundColor || '', base.color || '', base.borderRadius || '',
-    base.fontSize || '', base.fontWeight || '', base.border || ''
+    base.fontSize || '', base.fontWeight || '', base.border || '', c.box?.height ?? ''
   ].join('|');
 }
 

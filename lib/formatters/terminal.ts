@@ -619,6 +619,9 @@ function displayButtons(buttons, colorFormat: ColorFormat = 'hex') {
       }
 
       if (stateInfo.key === 'default') {
+        if (btn.box?.height) {
+          props.push({ key: 'height', value: `${btn.box.height}px` });
+        }
         if (state.padding && state.padding !== '0px') {
           props.push({ key: 'padding', value: state.padding });
         }
@@ -806,6 +809,10 @@ function displayInputs(inputs, colorFormat: ColorFormat = 'hex') {
 
       if (defaultState.border && defaultState.border !== 'none' && !defaultState.border.includes('0px')) {
         defaultProps.push({ key: 'border', value: defaultState.border });
+      }
+
+      if (input.box?.height) {
+        defaultProps.push({ key: 'height', value: `${input.box.height}px` });
       }
 
       if (defaultState.padding && defaultState.padding !== '0px') {

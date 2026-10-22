@@ -188,3 +188,18 @@ test('typography tokens are named from the contexts the extractor emits', () => 
   assert.doesNotMatch(output, /\n {2}text-\d:/);
   assert.match(output, /letterSpacing: "-0.01em"/);
 });
+
+test('the components section states the rendered height of the sampled button and input', () => {
+  const box = { height: 40, boxSizing: 'border-box', lineHeight: '20px', minHeight: 'auto', derivedHeight: 38 };
+  const output = generateDesignMd({
+    url: 'https://example.com',
+    components: {
+      buttons: [{ states: { default: { backgroundColor: 'rgb(26, 28, 30)', borderRadius: '8px' } }, box }],
+      inputs: { text: [{ specificType: 'text', box, states: { default: { border: '1px solid rgb(0, 0, 0)' } } }] },
+    },
+  } as never);
+  assert.match(output, /\*\*Buttons\*\*: .*height 40px/);
+  assert.match(output, /button-observed:(\n {4}.*)*\n {4}height: "40px"/);
+  assert.match(output, /input-observed:(\n {4}.*)*\n {4}height: "40px"/);
+  assert.match(output, /\*\*Inputs\*\*: .*40px height/);
+});
