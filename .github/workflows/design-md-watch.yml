@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -82,7 +82,7 @@ jobs:
       - name: Update the emitter
         id: agent
         if: (steps.check.outputs.code == '1' || steps.latest.outcome == 'failure') && env.HAS_AGENT == 'true'
-        uses: anthropics/claude-code-action@8ce9314fa9a404564fa7e954cd84f25bcba2b829 # v1.0.236
+        uses: anthropics/claude-code-action@d70510b174a1244958df0b03166a54912811f3e6 # v1.0.264
         continue-on-error: true
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
