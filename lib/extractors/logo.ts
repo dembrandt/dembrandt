@@ -504,6 +504,40 @@ export async function extractLogo(page, url) {
               }
             });
           });
+          // A sprite logo (<use href="#logo">) draws a shape from elsewhere on the
+          // page, which the saved markup can't reach, so copy that shape in. A
+          // target inside the logo already renders, and pages reuse those ids.
+          const ns = 'http://www.w3.org/2000/svg';
+          const ownIds = new Set(Array.from(clone.querySelectorAll('[id]'), (node: Element) => node.id));
+          clone.querySelectorAll('use').forEach((use: SVGUseElement) => {
+            const href = use.getAttribute('href') || use.getAttribute('xlink:href') || '';
+            const target = href.startsWith('#') && !ownIds.has(href.slice(1))
+              ? document.getElementById(href.slice(1))
+              : null;
+            if (!target) return;
+            // What <use> sets (fill, style, transform) applies to the shape; x/y move it.
+            const wrapper = document.createElementNS(ns, 'g');
+            for (const { name, value } of Array.from(use.attributes)) {
+              if (!['href', 'xlink:href', 'x', 'y', 'width', 'height'].includes(name)) wrapper.setAttribute(name, value);
+            }
+            const x = use.getAttribute('x');
+            const y = use.getAttribute('y');
+            if (x || y) wrapper.setAttribute('transform', `${wrapper.getAttribute('transform') || ''} translate(${x || 0} ${y || 0})`.trim());
+            // A <symbol> draws as a nested <svg> with the symbol's own attributes, sized by the <use>.
+            const isSymbol = target.tagName.toLowerCase() === 'symbol';
+            const shape = (isSymbol ? document.createElementNS(ns, 'svg') : target.cloneNode(true)) as Element;
+            if (isSymbol) {
+              for (const { name, value } of Array.from(target.attributes)) shape.setAttribute(name, value);
+              for (const name of ['width', 'height']) {
+                const value = use.getAttribute(name);
+                if (value) shape.setAttribute(name, value);
+              }
+              shape.append(...Array.from(target.childNodes, (node) => node.cloneNode(true)));
+            }
+            shape.removeAttribute('id');
+            wrapper.append(shape);
+            use.replaceWith(wrapper);
+          });
           const serialized = clone.outerHTML;
           // Skip pathological inline SVGs (sprite sheets, embedded rasters).
           if (serialized && serialized.length <= 50000) {
