@@ -36,7 +36,11 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
- *  1.19.0 — four additions in one unreleased step. colors.semanticEvidence
+ *  1.20.0 — an inline SVG logo drawn from a sprite (<use> pointing at a symbol
+ *          elsewhere on the page) carries that symbol in logo.markup and
+ *          logo.dataUri; both rendered empty before. Drift reports a changed
+ *          logo once for such sites. Values move for an unchanged site.
+ *  1.19.0 —four additions in one unreleased step. colors.semanticEvidence
  *          .primary records how the primary was decided: `elected` with the
  *          rule, reason, declaring tokens and runners-up, or `refused` with the
  *          candidates that lost. colors.occurrences counts every colour per
@@ -308,7 +312,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.19.0';
+export const SCHEMA_VERSION = '1.20.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
