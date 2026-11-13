@@ -19,7 +19,7 @@ const pages: Record<string, string> = {
     '<symbol id="brand" viewBox="0 0 200 40" fill="#00aa00"><rect width="200" height="40"/></symbol>',
     '<use href="#brand"></use>',
   ),
-  // Another svg on the page reuses the id the logo points at in its own defs.
+  // The logo uses its own defs, and another svg on the page reuses the id.
   '/own-defs': page(
     '<div style="position:absolute;top:-100px"><svg width="10" height="10"><defs><circle id="a" cx="5" cy="5" r="5"/></defs><use href="#a"/></svg></div>' +
     '<header><a href="/"><svg class="logo" viewBox="0 0 200 40" width="200" height="40"><defs><rect id="a" width="200" height="40"/></defs><use href="#a"></use></svg></a></header>',
@@ -52,7 +52,7 @@ async function logoFor(path: string) {
   }
 }
 
-/** The RGBA at the centre of the saved logo, drawn on its own as an image. */
+/** RGBA at the centre of the logo, drawn on its own as an image. */
 async function centerPixel(dataUri: string): Promise<number[]> {
   const tab = await browser!.newPage();
   try {
