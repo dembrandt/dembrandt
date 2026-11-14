@@ -267,7 +267,7 @@ export interface ButtonStyle {
   text?: string;
   fontWeight?: string;
   fontSize?: string;
-  /** Rendered geometry (1.19+): the fields the control-height rule reads. */
+  /** Rendered geometry (1.20+): the fields the control-height rule reads. */
   box?: ControlBox;
   classes?: string;
 }
@@ -284,8 +284,8 @@ export interface InputStyle {
   border?: string;
   borderRadius?: string;
   padding?: string;
-  fontSize?: string;
-  box?: ControlBox;
+  /** Null for a multi-line control (1.20+). */
+  box?: ControlBox | null;
   states?: { default?: CssState; focus?: CssState };
 }
 

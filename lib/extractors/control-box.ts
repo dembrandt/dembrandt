@@ -8,7 +8,7 @@ export interface ControlBox {
   boxSizing: string;
   lineHeight: string;
   minHeight: string;
-  /** line-height + vertical padding + vertical border: what the box is when nothing sets height. */
+  /** line-height + vertical padding + vertical border: the box when nothing sets height. Null for inline boxes. */
   derivedHeight: number | null;
 }
 
@@ -22,7 +22,7 @@ export function controlBox(computed: unknown, rectHeight: unknown): ControlBox |
   const lineHeight = str('lineHeight');
   // 'normal' has no px value; browsers resolve it near 1.2em
   const line = lineHeight === 'normal' ? fontSize * 1.2 : parseFloat(lineHeight);
-  const derived = isFinite(line) && line > 0
+  const derived = isFinite(line) && line > 0 && str('display') !== 'inline'
     ? Math.round(line + px('paddingTop') + px('paddingBottom') + px('borderTopWidth') + px('borderBottomWidth'))
     : null;
   return {

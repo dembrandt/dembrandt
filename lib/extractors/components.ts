@@ -83,7 +83,7 @@ export async function extractButtonStyles(page) {
     const unique = [];
     for (const r of results) {
       const s = r.state;
-      const key = `${s.backgroundColor}|${s.color}|${s.borderRadius}|${s.border}|${r.box?.height}`;
+      const key = `${s.backgroundColor}|${s.color}|${s.borderRadius}|${s.border}|${s.padding}|${s.fontSize}`;
       if (!seen.has(key)) {
         seen.add(key);
         unique.push({
@@ -177,10 +177,11 @@ export async function extractInputStyles(page) {
         }
       } catch (e) {}
 
+      const singleLine = ['INPUT', 'SELECT'].includes(input.tagName)
+        || (input.hasAttribute('role') && input.getAttribute('aria-multiline') !== 'true');
       inputGroups[inputType].push({
         specificType,
-        fontSize: computed.fontSize,
-        box: controlBox(computed, rect.height),
+        box: singleLine ? controlBox(computed, rect.height) : null,
         states: { default: defaultState, focus: focusState },
       });
     });

@@ -293,10 +293,10 @@ test('components dedup by fingerprint and sum counts', () => {
   assert.equal(merged.components.buttons[0].count, 2, 'the repeated variant leads');
 });
 
-test('buttons that differ only in rendered height stay separate size variants', () => {
-  const sized = (h) => ({ variant: 'primary', backgroundColor: '#1a73e8', color: '#fff', borderRadius: '8px', box: { height: h, boxSizing: 'border-box', lineHeight: '20px', minHeight: 'auto', derivedHeight: h } });
-  const a = page('https://a.com/', { components: { buttons: [sized(36)], inputs: {}, links: [], badges: {} } });
-  const b = page('https://a.com/x', { components: { buttons: [sized(48)], inputs: {}, links: [], badges: {} } });
+test('buttons that differ only in padding stay separate size variants', () => {
+  const sized = (padding, h) => ({ variant: 'primary', backgroundColor: '#1a73e8', color: '#fff', borderRadius: '8px', padding, box: { height: h, boxSizing: 'border-box', lineHeight: '20px', minHeight: 'auto', derivedHeight: h } });
+  const a = page('https://a.com/', { components: { buttons: [sized('8px 12px', 36)], inputs: {}, links: [], badges: {} } });
+  const b = page('https://a.com/x', { components: { buttons: [sized('14px 20px', 48)], inputs: {}, links: [], badges: {} } });
   const merged = mergeResults([a, b]);
   assert.deepEqual(merged.components.buttons.map((x) => x.box.height).sort(), [36, 48]);
 });

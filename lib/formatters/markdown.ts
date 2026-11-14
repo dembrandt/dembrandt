@@ -234,7 +234,7 @@ function buildRoundedTokens(result) {
 function buildComponentTokens(result, colorRoles, roundedTokens) {
   const components: Record<string, any> = {};
   const button = (result.components?.buttons ?? [])
-    .map(btn => ({ ...(btn.states?.default ?? btn), height: btn.box?.height }))
+    .map(btn => ({ ...(btn.states?.default ?? btn), ...(btn.box?.height ? { height: btn.box.height } : {}) }))
     .find(btn => btn.backgroundColor && !isTransparentColor(btn.backgroundColor));
 
   if (button) {
@@ -524,8 +524,8 @@ function hasComponentEvidence(result) {
 function firstButton(buttons) {
   if (!Array.isArray(buttons)) return null;
   const normalized = buttons.map(button => ({ ...(button.states?.default ?? button), box: button.box }));
-  return normalized.find(button =>
-    button.backgroundColor && !isTransparentColor(button.backgroundColor) ||
+  return normalized.find(button => button.backgroundColor && !isTransparentColor(button.backgroundColor))
+  ?? normalized.find(button =>
     positiveDimension(button.borderRadius) ||
     meaningfulPadding(button.padding) ||
     hasVisibleBorder(button.border)

@@ -24,6 +24,11 @@ test('line-height normal is approximated from the font size', () => {
   assert.equal(controlBox(computed({ lineHeight: 'normal', fontSize: '16px' }), 40)?.derivedHeight, Math.round(19.2 + 18));
 });
 
+test('an inline box has no derived height, since its vertical padding does not grow the line', () => {
+  assert.equal(controlBox(computed({ display: 'inline' }), 22)?.derivedHeight, null);
+  assert.equal(controlBox(computed({ display: 'inline-block' }), 38)?.derivedHeight, 38);
+});
+
 test('missing or malformed values never throw and fall back to defaults', () => {
   assert.equal(controlBox(null, 0), null);
   assert.equal(controlBox(computed(), NaN), null);

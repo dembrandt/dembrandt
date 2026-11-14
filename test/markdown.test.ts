@@ -203,3 +203,18 @@ test('the components section states the rendered height of the sampled button an
   assert.match(output, /input-observed:(\n {4}.*)*\n {4}height: "40px"/);
   assert.match(output, /\*\*Inputs\*\*: .*40px height/);
 });
+
+test('the components section and the button-observed token describe the same, filled button', () => {
+  const box = (height) => ({ height, boxSizing: 'border-box', lineHeight: '20px', minHeight: 'auto', derivedHeight: height });
+  const output = generateDesignMd({
+    url: 'https://example.com',
+    components: {
+      buttons: [
+        { states: { default: { backgroundColor: 'rgba(0, 0, 0, 0)', border: '1px solid rgb(0, 0, 0)' } }, box: box(32) },
+        { states: { default: { backgroundColor: 'rgb(26, 28, 30)' } }, box: box(44) },
+      ],
+    },
+  } as never);
+  assert.match(output, /\*\*Buttons\*\*: .*height 44px/);
+  assert.match(output, /button-observed:(\n {4}.*)*\n {4}height: "44px"/);
+});

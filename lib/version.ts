@@ -36,7 +36,17 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
- *  1.19.0 — four additions in one unreleased step. colors.semanticEvidence
+ *  1.20.0 — components.buttons[] and components.inputs.*[] gain `box`: the
+ *          rendered height in whole px with boxSizing, lineHeight, minHeight
+ *          and derivedHeight (line-height + vertical padding + border, null
+ *          for inline boxes), so a consumer can tell a set control height
+ *          from a derived one and compare buttons against inputs. Only
+ *          single-line controls carry it; a textarea or editor body does not.
+ *          Additive: 1.19.x consumers ignore it. BEHAVIOR: a button whose
+ *          padding or font size differs from another's is its own variant
+ *          instead of collapsing into it, in the page sample and in a crawl
+ *          merge. Drift reads neither components nor box: 0 on dembrandt.com.
+ *  1.19.0 — four additions in one step, shipped in 0.39. colors.semanticEvidence
  *          .primary records how the primary was decided: `elected` with the
  *          rule, reason, declaring tokens and runners-up, or `refused` with the
  *          candidates that lost. colors.occurrences counts every colour per
@@ -69,15 +79,6 @@
  *          of a palette entry or keeps one name per value, so alias tokens and
  *          dark-mode values keep their names; palette.tokens carries every
  *          name merged into an entry. Palette and semantic values unmoved.
- *          components.buttons[] and components.inputs.*[] gain `box`: the
- *          rendered height in whole px with boxSizing, lineHeight, minHeight
- *          and derivedHeight (line-height + vertical padding + border), so a
- *          consumer can tell a set control height from a derived one and
- *          compare buttons against inputs. Inputs also gain `fontSize`.
- *          BEHAVIOR: a button or input that differs from another only in
- *          height is now its own variant instead of collapsing into it, in
- *          the page sample and in a crawl merge. Drift reads neither
- *          components nor box: 0 on dembrandt.com.
  *  1.18.0 — frameworks entries gain `category`, `version` and `coverage` (the
  *          share of the page under that framework's mount points), iconSystem
  *          entries gain `version`. Additive: 1.17.x consumers ignore them.
@@ -317,7 +318,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.19.0';
+export const SCHEMA_VERSION = '1.20.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
