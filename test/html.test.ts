@@ -256,3 +256,13 @@ test('crawl agreement score and page-local outliers appear in the report', () =>
   assert.match(html, /page-local: colors #ff0000/);
   assert.doesNotMatch(generateHtmlReport(fixture()), /consistent across/);
 });
+
+test('a box height reaches the preview style only as a number of pixels', () => {
+  const box = (height: unknown) => ({ height, boxSizing: 'border-box', lineHeight: '20px', minHeight: 'auto', derivedHeight: null });
+  const html = generateHtmlReport(fixture({ components: {
+    buttons: [{ states: { default: { backgroundColor: '#133174' } }, text: 'Go', box: box(40) }, { states: { default: {} }, text: 'X', box: box('1px;background:url(evilhost)') }],
+    inputs: [], links: [], badges: [],
+  } } as never));
+  assert.match(html, /height:40px/);
+  assert.doesNotMatch(html, /evilhost/);
+});
