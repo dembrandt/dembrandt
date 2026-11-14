@@ -26,8 +26,8 @@
     {
       "site": "vercel.com",
       "code": 0,
-      "colors": 6,
-      "styles": 23,
+      "colors": 8,
+      "styles": 24,
       "degraded": 0,
       "ok": true,
       "skipped": false
@@ -36,7 +36,7 @@
       "site": "shopify.com",
       "code": 0,
       "colors": 9,
-      "styles": 39,
+      "styles": 38,
       "degraded": 0,
       "ok": true,
       "skipped": false
