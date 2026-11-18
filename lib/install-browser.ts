@@ -39,12 +39,12 @@ export function installBrowsers(argv: string[]): number {
   // pulling firefox as well doubles the download for a first-run recovery.
   const targets = argv.length ? argv : ["chromium"];
 
-  console.log(`Installing Playwright ${targets.join(" ")} for playwright-core ${version}...`);
+  console.error(`Installing Playwright ${targets.join(" ")} for playwright-core ${version}...`);
   try {
     // cli.js is not in playwright-core's exports map, so it cannot be
     // require.resolve'd directly — derive its path from package.json, which is.
     const cli = join(dirname(require.resolve("playwright-core/package.json")), "cli.js");
-    execFileSync(process.execPath, [cli, "install", ...targets], { stdio: "inherit" });
+    execFileSync(process.execPath, [cli, "install", ...targets], { stdio: ["ignore", process.stderr, process.stderr] });
     return 0;
   } catch {
     console.error(
