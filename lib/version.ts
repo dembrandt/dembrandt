@@ -46,6 +46,10 @@
  *          padding or font size differs from another's is its own variant
  *          instead of collapsing into it, in the page sample and in a crawl
  *          merge. Drift reads neither components nor box: 0 on dembrandt.com.
+ *          Values move for an unchanged site: an inline SVG logo drawn from a
+ *          sprite (<use> pointing at a symbol elsewhere on the page) carries
+ *          that symbol in logo.markup and logo.dataUri; both rendered empty
+ *          before. Drift reports a changed logo once for such sites.
  *  1.19.0 — four additions in one step, shipped in 0.39. colors.semanticEvidence
  *          .primary records how the primary was decided: `elected` with the
  *          rule, reason, declaring tokens and runners-up, or `refused` with the
