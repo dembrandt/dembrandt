@@ -25,13 +25,13 @@
     "id": "1101924225"
   },
   "websiteUrl": "https://dembrandt.com",
-  "version": "0.39.2",
+  "version": "0.40.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "dembrandt",
-      "version": "0.39.2",
+      "version": "0.40.0",
       "runtimeHint": "npx",
       "runtimeArguments": [
         {

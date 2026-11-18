@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.40.0] - 2026-11-18
+
+Controls carry their real size, and sprite logos render.
+
+### Added
+- Buttons and inputs carry `box`: rendered height with box-sizing, line-height, min-height and the height derived from line-height, padding and border, so a set control height is told apart from a derived one. Single-line controls only (#285)
+
+### Changed
+- A button whose padding or font size differs from another's is its own variant instead of collapsing into it, on a page and across a crawl (#285)
+
+### Fixed
+- An inline SVG logo drawn from a sprite (`<use>` pointing at a symbol elsewhere on the page) now carries that symbol in `logo.markup` and `logo.dataUri`; both rendered empty before. Thanks @gruessi (#290)
+
+### Upgrading
+Schema 1.20.0. `box` is additive. Button variant counts can rise, and a sprite-logo site reports a changed logo once in drift. Drift on dembrandt.com against 0.39.2: 0.
+
 ## [0.39.2] - 2026-10-11
 
 Radii named without the word radius match again.
