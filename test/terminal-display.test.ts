@@ -183,3 +183,16 @@ test('terminalLink degrades to plain text when the terminal cannot hyperlink', (
   const link = terminalLink('https://example.test', 'label');
   assert.ok(link.includes('example.test') || link.includes('label'), link);
 });
+
+test('a button and an input print their rendered height in the default state', () => {
+  const box = { height: 40, boxSizing: 'border-box', lineHeight: '20px', minHeight: 'auto', derivedHeight: 38 };
+  const out = render({
+    ...MINIMAL,
+    components: {
+      buttons: [{ confidence: 'high', states: { default: { backgroundColor: '#1a73e8', color: '#fff' } }, box }],
+      inputs: { text: [{ specificType: 'text', box, states: { default: { backgroundColor: '#fff' } } }] },
+      links: [], badges: {},
+    } as never,
+  }).join('\n');
+  assert.equal((out.match(/height: 40px/g) ?? []).length, 2);
+});

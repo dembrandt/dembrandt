@@ -36,11 +36,21 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
- *  1.20.0 — an inline SVG logo drawn from a sprite (<use> pointing at a symbol
- *          elsewhere on the page) carries that symbol in logo.markup and
- *          logo.dataUri; both rendered empty before. Drift reports a changed
- *          logo once for such sites. Values move for an unchanged site.
- *  1.19.0 —four additions in one unreleased step. colors.semanticEvidence
+ *  1.20.0 — components.buttons[] and components.inputs.*[] gain `box`: the
+ *          rendered height in whole px with boxSizing, lineHeight, minHeight
+ *          and derivedHeight (line-height + vertical padding + border, null
+ *          for inline boxes), so a consumer can tell a set control height
+ *          from a derived one and compare buttons against inputs. Only
+ *          single-line controls carry it; a textarea or editor body does not.
+ *          Additive: 1.19.x consumers ignore it. BEHAVIOR: a button whose
+ *          padding or font size differs from another's is its own variant
+ *          instead of collapsing into it, in the page sample and in a crawl
+ *          merge. Drift reads neither components nor box: 0 on dembrandt.com.
+ *          Values move for an unchanged site: an inline SVG logo drawn from a
+ *          sprite (<use> pointing at a symbol elsewhere on the page) carries
+ *          that symbol in logo.markup and logo.dataUri; both rendered empty
+ *          before. Drift reports a changed logo once for such sites.
+ *  1.19.0 — four additions in one step, shipped in 0.39. colors.semanticEvidence
  *          .primary records how the primary was decided: `elected` with the
  *          rule, reason, declaring tokens and runners-up, or `refused` with the
  *          candidates that lost. colors.occurrences counts every colour per
