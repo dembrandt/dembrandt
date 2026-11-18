@@ -34,4 +34,9 @@ export function controlBox(computed: unknown, rectHeight: unknown): ControlBox |
   };
 }
 
+export function renderableHeight(box: unknown): number | null {
+  const h = box && typeof box === 'object' ? (box as { height?: unknown }).height : undefined;
+  return typeof h === 'number' && Number.isFinite(h) && h > 0 ? h : null;
+}
+
 export const CONTROL_BOX_SOURCE: string = controlBox.toString();

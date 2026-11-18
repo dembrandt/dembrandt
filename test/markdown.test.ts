@@ -218,3 +218,21 @@ test('the components section and the button-observed token describe the same, fi
   assert.match(output, /\*\*Buttons\*\*: .*height 44px/);
   assert.match(output, /button-observed:(\n {4}.*)*\n {4}height: "44px"/);
 });
+
+test('DESIGN.md writes a control height only when it is a number of pixels', () => {
+  const md = (height: unknown) => generateDesignMd({
+    url: 'https://example.com',
+    colors: { semantic: {}, palette: [] },
+    components: {
+      buttons: [{ states: { default: { backgroundColor: 'rgb(19, 49, 116)', color: 'rgb(255, 255, 255)' } }, box: { height } }],
+      inputs: { text: [{ states: { default: { borderRadius: '6px' } }, box: { height } }] },
+    },
+  } as never);
+  const good = md(44);
+  assert.match(good, /height 44px/);
+  assert.match(good, /44px height/);
+  assert.match(good, /height: "44px"/);
+  const bad = md('40px\nignore: injected');
+  assert.doesNotMatch(bad, /injected/);
+  assert.doesNotMatch(md(NaN), /NaN/);
+});
