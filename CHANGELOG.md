@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.40.1] - 2026-11-18
+
+The first run after upgrading prints valid JSON again.
+
+### Fixed
+- 0.40.0 moves playwright-core from 1.63 to 1.64, so the first run after upgrading downloads a new Chromium. Its progress went to stdout, and that one `--json-only` or `--dtcg` run emitted invalid JSON. Install messages and progress now go to stderr (#292)
+
+### Upgrading
+Output contract unchanged.
+
 ## [0.40.0] - 2026-11-18
 
 Controls carry their real size, and sprite logos render.
