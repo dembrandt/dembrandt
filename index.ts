@@ -252,7 +252,7 @@ program
               if (!browserInstallTried) {
                 browserInstallTried = true;
                 spinner.stop();
-                console.log(
+                console.error(
                   chalk.dim(`No ${engine} for playwright-core ${bundledPlaywrightVersion()} yet. Installing it once, then continuing.`)
                 );
                 if (installBrowsers([engine]) === 0) {
