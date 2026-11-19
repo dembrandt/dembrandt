@@ -36,6 +36,12 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.21.0 — no field changes. BEHAVIOR: a link or role=button of button size
+ *          (28-80px tall, 64-480px wide, with text) counts as a call to action
+ *          without a button class, and when its own background is transparent
+ *          its ::before or ::after fill is read. semantic.primary moves on 9 of
+ *          175 corpus sites, none to a worse colour; one site that reported no
+ *          primary reports one. A baseline drifts on the primary role once.
  *  1.20.0 — components.buttons[] and components.inputs.*[] gain `box`: the
  *          rendered height in whole px with boxSizing, lineHeight, minHeight
  *          and derivedHeight (line-height + vertical padding + border, null
@@ -322,7 +328,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.20.0';
+export const SCHEMA_VERSION = '1.21.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';

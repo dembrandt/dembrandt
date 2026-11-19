@@ -376,21 +376,26 @@ export async function extractColors(page) {
 
       const isStatus = statusContext.test(context);
 
-      const ctaShaped = (context.includes('button') || context.includes('btn') || context.includes('cta')) &&
-        bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent' && colorAlpha(bgColor) >= 0.7;
+      const buttonBox = (el.tagName === 'A' || el.getAttribute('role') === 'button') && (el.textContent || '').trim() !== '' &&
+        rect.height >= 28 && rect.height <= 80 && rect.width >= 64 && rect.width <= 480;
+      const isOpaque = (c) => c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent' && colorAlpha(c) >= 0.7;
+      const ctaFill = isOpaque(bgColor) || !buttonBox ? bgColor
+        : [toLegacy(getComputedStyle(el, '::before').backgroundColor), toLegacy(getComputedStyle(el, '::after').backgroundColor)].find(isOpaque) ?? bgColor;
+      const ctaShaped = (context.includes('button') || context.includes('btn') || context.includes('cta') || buttonBox) &&
+        isOpaque(ctaFill);
       const isCta = ctaShaped &&
-        bgColor !== 'rgb(255, 255, 255)' && bgColor !== 'rgb(0, 0, 0)' && bgColor !== 'rgb(239, 239, 239)';
-      if (ctaShaped && (bgColor === 'rgb(0, 0, 0)' || bgColor === 'rgb(255, 255, 255)')) {
-        const n = normalizeColor(bgColor);
-        if (n) { const e = ctaNeutralMap.get(n) || { original: bgColor, count: 0 }; e.count++; ctaNeutralMap.set(n, e); }
+        ctaFill !== 'rgb(255, 255, 255)' && ctaFill !== 'rgb(0, 0, 0)' && ctaFill !== 'rgb(239, 239, 239)';
+      if (ctaShaped && (ctaFill === 'rgb(0, 0, 0)' || ctaFill === 'rgb(255, 255, 255)')) {
+        const n = normalizeColor(ctaFill);
+        if (n) { const e = ctaNeutralMap.get(n) || { original: ctaFill, count: 0 }; e.count++; ctaNeutralMap.set(n, e); }
       }
 
       if (isCta) {
         score = Math.max(score, 25);
         // CTA background is a strong primary signal — count occurrences
-        const ctaNorm = normalizeColor(bgColor);
+        const ctaNorm = normalizeColor(ctaFill);
         if (ctaNorm) {
-          const existing = ctaPrimaryMap.get(ctaNorm) || { original: bgColor, count: 0 };
+          const existing = ctaPrimaryMap.get(ctaNorm) || { original: ctaFill, count: 0 };
           existing.count++;
           ctaPrimaryMap.set(ctaNorm, existing);
         }
