@@ -274,6 +274,22 @@ export async function extractColors(page) {
 
     const colorLiteralRe = /^(#[0-9a-f]{3,8}|rgba?\([^)]*\)|hsla?\([^)]*\)|(?:oklch|oklab|lch|lab|hwb)\([^)]*\))$/i;
 
+    const BUTTON_BOX = { minHeight: 28, maxHeight: 80, minWidth: 64, maxWidth: 480 };
+
+    function isOpaque(color: string) {
+      return !!color && color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent' && colorAlpha(color) >= 0.7;
+    }
+
+    function isButtonBox(el: Element, rect: DOMRect) {
+      return (el.tagName === 'A' || el.getAttribute('role') === 'button') && (el.textContent || '').trim() !== '' &&
+        rect.height >= BUTTON_BOX.minHeight && rect.height <= BUTTON_BOX.maxHeight &&
+        rect.width >= BUTTON_BOX.minWidth && rect.width <= BUTTON_BOX.maxWidth;
+    }
+
+    function pseudoFill(el: Element): string | undefined {
+      return ['::before', '::after'].map((p) => toLegacy(getComputedStyle(el, p).backgroundColor)).find(isOpaque);
+    }
+
     // A palette being documented is not a palette being used. Swatch strips,
     // colour labels and code samples paint real pixels that carry no brand
     // intent, and any docs or style-guide page renders them.
@@ -376,21 +392,23 @@ export async function extractColors(page) {
 
       const isStatus = statusContext.test(context);
 
-      const ctaShaped = (context.includes('button') || context.includes('btn') || context.includes('cta')) &&
-        bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent' && colorAlpha(bgColor) >= 0.7;
+      const buttonBox = isButtonBox(el, rect);
+      const ctaFill = isOpaque(bgColor) || !buttonBox ? bgColor : pseudoFill(el) ?? bgColor;
+      const ctaShaped = (context.includes('button') || context.includes('btn') || context.includes('cta') || buttonBox) &&
+        isOpaque(ctaFill);
       const isCta = ctaShaped &&
-        bgColor !== 'rgb(255, 255, 255)' && bgColor !== 'rgb(0, 0, 0)' && bgColor !== 'rgb(239, 239, 239)';
-      if (ctaShaped && (bgColor === 'rgb(0, 0, 0)' || bgColor === 'rgb(255, 255, 255)')) {
-        const n = normalizeColor(bgColor);
-        if (n) { const e = ctaNeutralMap.get(n) || { original: bgColor, count: 0 }; e.count++; ctaNeutralMap.set(n, e); }
+        ctaFill !== 'rgb(255, 255, 255)' && ctaFill !== 'rgb(0, 0, 0)' && ctaFill !== 'rgb(239, 239, 239)';
+      if (ctaShaped && (ctaFill === 'rgb(0, 0, 0)' || ctaFill === 'rgb(255, 255, 255)')) {
+        const n = normalizeColor(ctaFill);
+        if (n) { const e = ctaNeutralMap.get(n) || { original: ctaFill, count: 0 }; e.count++; ctaNeutralMap.set(n, e); }
       }
 
       if (isCta) {
         score = Math.max(score, 25);
         // CTA background is a strong primary signal — count occurrences
-        const ctaNorm = normalizeColor(bgColor);
+        const ctaNorm = normalizeColor(ctaFill);
         if (ctaNorm) {
-          const existing = ctaPrimaryMap.get(ctaNorm) || { original: bgColor, count: 0 };
+          const existing = ctaPrimaryMap.get(ctaNorm) || { original: ctaFill, count: 0 };
           existing.count++;
           ctaPrimaryMap.set(ctaNorm, existing);
         }

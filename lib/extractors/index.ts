@@ -32,6 +32,7 @@ import {
 } from './auth-session.js';
 import { guardExtractor } from './guard.js';
 import { dismissConsent } from './consent.js';
+import { switchToDark } from './color-scheme.js';
 import type { Browser, Page } from 'playwright';
 import type { ExtractOptions, BrandingResult, Spinner, ExtractorError, WcagPair } from '../types.js';
 import type { VoiceResult } from '../voice/index.js';
@@ -1241,15 +1242,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
     if (options.darkMode) {
       try {
       spinner.start("Extracting dark mode colors...");
-      await page.evaluate(() => {
-        document.documentElement.setAttribute("data-theme", "dark");
-        document.documentElement.setAttribute("data-mode", "dark");
-        document.body.setAttribute("data-theme", "dark");
-        document.documentElement.classList.add("dark", "dark-mode", "theme-dark");
-        document.body.classList.add("dark", "dark-mode", "theme-dark");
-      });
-      await page.emulateMedia({ colorScheme: "dark" });
-      await page.waitForTimeout(500 * timeoutMultiplier);
+      await switchToDark(page, 3000 * timeoutMultiplier, 500 * timeoutMultiplier);
 
       const darkModeColors = await extractColors(page);
       const darkModeButtons = await extractButtonStyles(page);
