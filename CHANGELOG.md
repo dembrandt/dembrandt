@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.41.0] - 2026-11-19
+
+The primary is the colour the main button actually shows.
+
+### Fixed
+- A button whose colour is painted on a pseudo-element now sets the primary, instead of frequent link text winning. A link or role=button of button size counts as a call to action without a button class, and a transparent button reads its `::before` or `::after` fill. On a 175-site corpus the primary moves on 9 sites, 8 of them to a colour labelled as the brand's; accuracy 101 to 102 of 141 (#300)
+- `--dark-mode` reads a theme that switches some time after the colour-scheme change, instead of reporting its light version. The dark pass waits up to 3s for the page surface to change (#300)
+
+### Upgrading
+Schema 1.21.0, no field changes. A drift baseline can move on the primary role once: dembrandt.com drifts 24 against threshold 10. `--compare <baseline> --approve` once clears it. With `--dark-mode`, a site without a dark theme takes up to 3s longer.
+
 ## [0.40.2] - 2026-11-19
 
 An agent can wait on an extraction without pulling it into its context.
