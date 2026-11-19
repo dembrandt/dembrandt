@@ -47,7 +47,7 @@ The server runs on the machine that runs the agent. Web agents without a local p
 
 Extraction tools: `get_design_tokens`, `get_color_palette`, `get_typography`, `get_component_styles`, `get_surfaces`, `get_spacing`, `get_brand_identity`. Each accepts `slow`, `mobile`, `darkMode`, `wcag`, `cookie`, `cookieFile`, `basicAuth`, `header`, `userAgent`, `noSandbox`, `pages`, `paths` and `sitemap`. Interactive `--login` stays CLI-only.
 
-Extraction returns a `job_id`. Poll it with `get_job_status`, then hand the id to the pure tools instead of passing the extraction back as an argument: `compute_drift`, `get_findings`, `export_dtcg`, `generate_design_md`, `render_report`.
+Extraction returns a `job_id`. Wait on it with `get_job_status` (`wait_seconds` blocks until the job finishes, up to 50), then hand the id to the pure tools instead of passing the extraction back as an argument: `compute_drift`, `get_findings`, `export_dtcg`, `generate_design_md`, `render_report`. The status leaves the extraction out; set `include_result: true` for the raw result.
 
 The server honours robots.txt the same way the CLI does; see [ci.md](ci.md) for `DEMBRANDT_ENFORCE_ROBOTS`.
 

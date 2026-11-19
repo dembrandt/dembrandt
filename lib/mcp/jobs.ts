@@ -54,6 +54,7 @@ export class JobQueue<T = unknown> {
   /** Resolves once nothing is queued or running. Test seam; also useful for shutdown. */
   #idle: Promise<void> = Promise.resolve();
   #settleIdle: () => void = () => {};
+  #waiters = new Map<string, Set<() => void>>();
 
   constructor({ run, maxConcurrent = 2, ttlMs = DEFAULT_JOB_TTL_MS, now = Date.now }: JobQueueOptions<T>) {
     this.#run = run;
@@ -95,8 +96,29 @@ export class JobQueue<T = unknown> {
     job.completedAt = this.#now();
     const idx = this.#queue.indexOf(id);
     if (idx !== -1) this.#queue.splice(idx, 1);
+    this.#wake(id);
     if (this.#queue.length === 0 && this.#running.size === 0) this.#settleIdle();
     return true;
+  }
+
+  settled(id: string, timeoutMs: number): Promise<Job<T> | null> {
+    const job = this.#jobs.get(id);
+    if (!job || !isPending(job.status) || timeoutMs <= 0) return Promise.resolve(job ?? null);
+    return new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        this.#waiters.get(id)?.delete(done);
+        resolve(this.#jobs.get(id) ?? null);
+      };
+      const timer = setTimeout(done, timeoutMs);
+      if (!this.#waiters.has(id)) this.#waiters.set(id, new Set());
+      this.#waiters.get(id)!.add(done);
+    });
+  }
+
+  #wake(id: string): void {
+    for (const done of [...(this.#waiters.get(id) ?? [])]) done();
+    this.#waiters.delete(id);
   }
 
   /** Resolves when every queued and running job has settled. */
@@ -136,6 +158,7 @@ export class JobQueue<T = unknown> {
         .finally(() => {
           job.completedAt = this.#now();
           this.#running.delete(id);
+          this.#wake(id);
           if (this.#queue.length === 0 && this.#running.size === 0) this.#settleIdle();
           void this.#drain();
         });
@@ -155,6 +178,17 @@ export class JobQueue<T = unknown> {
       }
     }
   }
+}
+
+const isPending = (status: JobStatus) => status === 'queued' || status === 'running';
+
+export function jobStatusView(id: string, job: Job<unknown>, includeResult: boolean): Record<string, unknown> {
+  const view: Record<string, unknown> = { job_id: id, status: job.status, url: job.url };
+  if (job.status === 'completed') {
+    if (includeResult) view.result = job.result;
+    else view.next = 'Pass this job_id to generate_design_md, export_dtcg, get_findings or another tool, or call again with include_result: true for the raw extraction.';
+  }
+  return view;
 }
 
 export type Resolved<T> =

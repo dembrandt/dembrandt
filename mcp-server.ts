@@ -27,7 +27,7 @@ import { generateShadcnTheme } from "./lib/formatters/shadcn.js";
 import { mergeResults } from "./lib/merger.js";
 import { additionalPages, discoveryBudget, extractOptions, isMultiPage, launchArgs } from "./lib/mcp/options.js";
 import type { Extraction, ExtractionRequest } from "./lib/mcp/options.js";
-import { JobQueue, resolveExtraction } from "./lib/mcp/jobs.js";
+import { JobQueue, jobStatusView, resolveExtraction } from "./lib/mcp/jobs.js";
 import { checkRobotsTxt, fetchRobotsRules, filterAllowedUrls, robotsAgentFor, robotsVerdict } from "./lib/robots.js";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
@@ -275,7 +275,7 @@ async function main() {
 
   server.tool(
     "get_design_tokens",
-    "Extract the full design system from a live website. Launches a real browser, navigates to the site, and returns production-ready design tokens: color palette (hex, RGB, LCH, OKLCH) with semantic roles and CSS custom properties, typography scale (families, fallbacks, sizes, weights, line heights, letter spacing by context), spacing system with grid detection, border radii, border patterns, box shadows for elevation, component styles (buttons with hover/focus states, inputs, links, badges), responsive breakpoints, logo and favicons, site name, the frameworks and libraries that build the UI, and icon systems. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
+    "Extract the full design system from a live website. Launches a real browser, navigates to the site, and returns production-ready design tokens: color palette (hex, RGB, LCH, OKLCH) with semantic roles and CSS custom properties, typography scale (families, fallbacks, sizes, weights, line heights, letter spacing by context), spacing system with grid detection, border radii, border patterns, box shadows for elevation, component styles (buttons with hover/focus states, inputs, links, badges), responsive breakpoints, logo and favicons, site name, the frameworks and libraries that build the UI, and icon systems. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: wait on it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
     {
       url, sync, ...browserParams, ...crawlParams,
       wcag: z.boolean().optional().default(false).describe("Include WCAG contrast analysis between palette colors"),
@@ -285,7 +285,7 @@ async function main() {
 
   server.tool(
     "get_color_palette",
-    "Extract brand colors from a live website. Returns semantic colors (primary, secondary, accent, plus background and text promoted from the page surface and body text), full palette ranked by usage frequency and confidence (high/medium/low), CSS custom properties with their design-system names, and hover/focus state colors discovered by simulating real user interactions. Each color in hex, RGB, LCH, and OKLCH. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
+    "Extract brand colors from a live website. Returns semantic colors (primary, secondary, accent, plus background and text promoted from the page surface and body text), full palette ranked by usage frequency and confidence (high/medium/low), CSS custom properties with their design-system names, and hover/focus state colors discovered by simulating real user interactions. Each color in hex, RGB, LCH, and OKLCH. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: wait on it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
     {
       url, sync, ...browserParams, ...crawlParams,
       darkMode: z.boolean().optional().default(false).describe("Also extract dark mode palette"),
@@ -296,21 +296,21 @@ async function main() {
 
   server.tool(
     "get_typography",
-    "Extract typography from a live website. Returns every font family with its fallback stack, the complete type scale grouped by context (heading, body, text, button, link, caption) with pixel and rem sizes, weights, line heights, letter spacing, and text transforms. The body context marks the dominant reading-text font; text marks other body-eligible copy. Also reports font sources: Google Fonts URLs, Adobe Fonts usage, and variable font detection. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
+    "Extract typography from a live website. Returns every font family with its fallback stack, the complete type scale grouped by context (heading, body, text, button, link, caption) with pixel and rem sizes, weights, line heights, letter spacing, and text transforms. The body context marks the dominant reading-text font; text marks other body-eligible copy. Also reports font sources: Google Fonts URLs, Adobe Fonts usage, and variable font detection. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: wait on it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
     { url, sync, ...browserParams, ...crawlParams },
     toolHandler((d) => ({ url: d.url, typography: d.typography })),
   );
 
   server.tool(
     "get_component_styles",
-    "Extract UI component styles from a live website. Returns button variants with default, hover, active, and focus states (background, text color, padding, border radius, border, shadow, outline, opacity), input field styles (border, focus ring, padding, placeholder), link styles (color, text decoration, hover changes), and badge/tag styles. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
+    "Extract UI component styles from a live website. Returns button variants with default, hover, active, and focus states (background, text color, padding, border radius, border, shadow, outline, opacity), input field styles (border, focus ring, padding, placeholder), link styles (color, text decoration, hover changes), and badge/tag styles. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: wait on it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
     { url, sync, ...browserParams, ...crawlParams },
     toolHandler((d) => ({ url: d.url, components: d.components })),
   );
 
   server.tool(
     "get_surfaces",
-    "Extract surface treatment tokens from a live website: border radii with element context (which radii are used on buttons vs cards vs inputs vs modals), border patterns (width + style + color combinations), and box shadow elevation levels. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
+    "Extract surface treatment tokens from a live website: border radii with element context (which radii are used on buttons vs cards vs inputs vs modals), border patterns (width + style + color combinations), and box shadow elevation levels. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: wait on it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
     { url, sync, ...browserParams, ...crawlParams },
     toolHandler((d) => ({
       url: d.url,
@@ -322,21 +322,21 @@ async function main() {
 
   server.tool(
     "get_spacing",
-    "Extract the spacing system from a live website: common margin and padding values sorted by frequency, pixel and rem values, and grid system detection (4px, 8px, or custom scale). Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
+    "Extract the spacing system from a live website: common margin and padding values sorted by frequency, pixel and rem values, and grid system detection (4px, 8px, or custom scale). Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: wait on it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
     { url, sync, ...browserParams, ...crawlParams },
     toolHandler((d) => ({ url: d.url, spacing: d.spacing })),
   );
 
   server.tool(
     "get_motion",
-    "Extract the motion system from a live website: transition and animation durations with their usage counts, easing curves, the durations and easings used per component context (button, link, nav, card, modal), named keyframe animations, and the hover patterns discovered by simulating real interaction. Also returns gradients, which travel with motion as the decorative layer. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status.",
+    "Extract the motion system from a live website: transition and animation durations with their usage counts, easing curves, the durations and easings used per component context (button, link, nav, card, modal), named keyframe animations, and the hover patterns discovered by simulating real interaction. Also returns gradients, which travel with motion as the decorative layer. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: wait on it with get_job_status.",
     { url, sync, ...browserParams, ...crawlParams },
     toolHandler((d) => ({ url: d.url, motion: d.motion, gradients: d.gradients })),
   );
 
   server.tool(
     "get_brand_identity",
-    "Extract brand identity from a live website: site name, logo (source, dimensions, safe zone), all favicon variants (icon, apple-touch-icon, og:image, twitter:image with sizes and URLs), what builds the UI with versions where recoverable (JS and meta frameworks, CSS frameworks, component libraries, site builders), icon systems, and responsive breakpoints. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: poll it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
+    "Extract brand identity from a live website: site name, logo (source, dimensions, safe zone), all favicon variants (icon, apple-touch-icon, og:image, twitter:image with sizes and URLs), what builds the UI with versions where recoverable (JS and meta frameworks, CSS frameworks, component libraries, site builders), icon systems, and responsive breakpoints. Set pages > 1 to crawl and merge several pages, which yields a markedly stronger token set than a single page. Returns a job_id by default: wait on it with get_job_status, and pass the same job_id to compute_drift, get_findings, export_dtcg, generate_design_md or render_report instead of resending the extraction.",
     { url, sync, ...browserParams, ...crawlParams },
     toolHandler((d) => ({
       url: d.url,
@@ -509,14 +509,17 @@ async function main() {
 
   server.tool(
     "get_job_status",
-    "Poll for the result of an async extraction job. Returns status (queued/running/completed/failed/cancelled) and the full result once completed. Call this after any extraction tool that returned a job_id.",
-    { job_id: z.string().describe("The job_id returned by an extraction tool") },
-    ({ job_id }) => {
-      const job = jobQueue.get(job_id);
+    "Wait for an async extraction job and report its status (queued/running/completed/failed/cancelled). Set wait_seconds to block until the job finishes instead of polling. The result is left out by default, since a full extraction runs to hundreds of kilobytes: hand the job_id to generate_design_md, export_dtcg, get_findings or the other tools, or set include_result for the raw extraction.",
+    {
+      job_id: z.string().describe("The job_id returned by an extraction tool"),
+      wait_seconds: z.number().int().min(0).max(50).default(0).describe("Block up to this many seconds for the job to finish; returns as soon as it does"),
+      include_result: z.boolean().default(false).describe("Include the raw extraction. Large: prefer passing job_id to another tool"),
+    },
+    async ({ job_id, wait_seconds, include_result }) => {
+      const job = await jobQueue.settled(job_id, wait_seconds * 1000);
       if (!job) return errorResult(`No job found with id: ${job_id}`);
-      if (job.status === "completed") return jsonResult({ job_id, status: "completed", result: job.result });
       if (job.status === "failed") return errorResult(`Job failed: ${job.error}`);
-      return jsonResult({ job_id, status: job.status });
+      return jsonResult(jobStatusView(job_id, job, include_result));
     },
   );
 
