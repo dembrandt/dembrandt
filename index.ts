@@ -35,7 +35,7 @@ import { EXIT, classifyError } from "./lib/exit-codes.js";
 import { activeFlags, pathSummary } from "./lib/run-summary.js";
 import { consumeCloudHint } from "./lib/cli-state.js";
 import { installBrowsers, bundledPlaywrightVersion } from "./lib/install-browser.js";
-import { guardWarnings, loginNeedsTtyError, voiceNeedsOutputFile } from "./lib/cli-guards.js";
+import { apiKeyError, guardWarnings, loginNeedsTtyError, voiceNeedsOutputFile } from "./lib/cli-guards.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"));
@@ -136,7 +136,7 @@ program
     }
 
     // Resolve API key: --key flag takes precedence over env var
-    const apiKey: string | undefined = opts.key ?? process.env.DEMBRANDT_KEY;
+    const apiKey: string | undefined = (opts.key ?? process.env.DEMBRANDT_KEY)?.trim();
 
     const voiceWritesOutput: boolean = voiceNeedsOutputFile(opts, !!apiKey);
 
@@ -144,6 +144,11 @@ program
     const loginError = loginNeedsTtyError(opts, Boolean(process.stdin.isTTY));
     if (loginError) {
       console.error(color.error(`✖ ${loginError}`));
+      process.exit(EXIT.RUNTIME);
+    }
+    const keyError = apiKeyError(apiKey);
+    if (keyError) {
+      console.error(color.error(`✖ ${keyError}`));
       process.exit(EXIT.RUNTIME);
     }
 
