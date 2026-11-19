@@ -1,6 +1,6 @@
 {
   "name": "dembrandt",
-  "version": "0.40.1",
+  "version": "0.40.2",
   "description": "Extract design tokens and publicly visible CSS information from any website",
   "mcpName": "io.github.dembrandt/dembrandt",
   "main": "dist/index.js",
