@@ -43,7 +43,10 @@
  *          175 corpus sites: 8 to a colour labelled as the brand's, and one
  *          unlabelled site gains a primary. dembrandt.com drifts 24 against
  *          threshold 10 on the primary role alone; --compare <baseline>
- *          --approve once clears it.
+ *          --approve once clears it. With --dark-mode, the dark pass waits up
+ *          to 3s for the page surface to change instead of a fixed 500ms, so a
+ *          theme that switches late is read dark rather than as its light
+ *          version; sites without a dark theme take up to 3s longer.
  *  1.20.0 — components.buttons[] and components.inputs.*[] gain `box`: the
  *          rendered height in whole px with boxSizing, lineHeight, minHeight
  *          and derivedHeight (line-height + vertical padding + border, null
