@@ -157,8 +157,7 @@
     "fast-uri": "^4.1.1",
     "brace-expansion": "^5.0.8",
     "body-parser": "^2.3.0",
-    "adm-zip": "^0.6.0",
-    "@jridgewell/sourcemap-codec": "1.5.5"
+    "adm-zip": "^0.6.0"
   },
   "types": "./dist/index.d.ts"
 }
