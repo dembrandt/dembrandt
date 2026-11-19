@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_JOB_TTL_MS, JobQueue, resolveExtraction } from '../lib/mcp/jobs.js';
+import { DEFAULT_JOB_TTL_MS, JobQueue, jobStatusView, resolveExtraction } from '../lib/mcp/jobs.js';
 import type { JobResult } from '../lib/mcp/jobs.js';
 
 type Extract = { url: string; colors?: unknown };
@@ -211,4 +211,35 @@ test('an unfinished job reports its status instead of resolving to undefined', (
 
 test('the label names the argument the caller left out', () => {
   assert.match(resolveExtraction(undefined, undefined, 'baseline', queueWith(null)).error!, /Pass either baseline or job_id/);
+});
+
+test('waiting on a job returns as soon as it finishes, not at the timeout', async () => {
+  const r = deferredRunner();
+  const queue = new JobQueue<Extract>({ run: r.run });
+  const id = queue.enqueue('https://x/', {}, identity);
+  const started = Date.now();
+  const waiting = queue.settled(id, 10_000);
+  setTimeout(() => r.finish('https://x/', ok({ url: 'https://x/' })), 20);
+  assert.equal((await waiting)!.status, 'completed');
+  assert.ok(Date.now() - started < 2_000);
+});
+
+test('waiting past the timeout hands back the job still running', async () => {
+  const r = deferredRunner();
+  const queue = new JobQueue<Extract>({ run: r.run });
+  const id = queue.enqueue('https://x/', {}, identity);
+  assert.equal((await queue.settled(id, 30))!.status, 'running');
+  assert.equal(await queue.settled('job_missing', 30), null);
+});
+
+test('the status view leaves the extraction out unless it is asked for', async () => {
+  const queue = new JobQueue<Extract>({ run: async () => ok({ url: 'https://x/', colors: { primary: '#000' } }) });
+  const id = queue.enqueue('https://x/', {}, identity);
+  await queue.idle();
+  const job = queue.get(id)!;
+  const lean = jobStatusView(id, job, false);
+  assert.equal(lean.status, 'completed');
+  assert.equal('result' in lean, false);
+  assert.match(String(lean.next), /job_id/);
+  assert.deepEqual(jobStatusView(id, job, true).result, { url: 'https://x/', colors: { primary: '#000' } });
 });

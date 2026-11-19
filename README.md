@@ -169,11 +169,11 @@ Available tools include `get_design_tokens`, `get_color_palette`, `get_typograph
 
 Extraction tools accept `slow`, `mobile`, `darkMode`, `wcag`, `cookie`, `cookieFile`, `basicAuth` and `header` (for authenticated pages), `userAgent`, and `noSandbox` (Docker and most CI containers). Interactive `--login` stays CLI-only. Set `pages` above 1 to crawl and merge several pages, which produces a markedly stronger token set than one page; `paths` names them explicitly and `sitemap` discovers them from sitemap.xml.
 
-Extraction returns a `job_id`. Poll it with `get_job_status`, then hand that same id to the pure tools instead of passing the extraction back as an argument:
+Extraction returns a `job_id`. Wait on it with `get_job_status` and `wait_seconds`, then hand that same id to the pure tools instead of passing the extraction back as an argument. The status leaves the extraction out, since it runs to hundreds of kilobytes; `include_result: true` returns it:
 
 ```
 get_design_tokens(url: "example.com", pages: 5)  ->  job_id
-get_job_status(job_id)                           ->  tokens
+get_job_status(job_id, wait_seconds: 50)         ->  completed
 get_findings(job_id)                             ->  contrast and consistency issues
 export_dtcg(job_id)                              ->  W3C design tokens
 ```
