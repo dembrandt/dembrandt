@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.40.2] - 2026-11-19
+
+An agent can wait on an extraction without pulling it into its context.
+
+### Changed
+- `get_job_status` returns the status only. It used to return the whole extraction once a job completed, 70 to 250 KB pulled into an agent's context on an ordinary poll. `wait_seconds` (up to 50) blocks until the job finishes, so one call replaces a polling loop. `include_result: true` returns the raw extraction as before (#298)
+
+### Fixed
+- `npm audit` in a project that installs dembrandt no longer reports a high-severity advisory: zod moves from 4.6.5 to 4.6.7 (#296)
+- A control height that is zero, negative or not a number no longer reaches the HTML report, DESIGN.md or the terminal (#293)
+
+### Upgrading
+Output contract unchanged. An MCP client that read the extraction from `get_job_status` passes `include_result: true`, or hands the `job_id` to the export tools.
+
 ## [0.40.1] - 2026-11-18
 
 The first run after upgrading prints valid JSON again.
