@@ -40,8 +40,9 @@
  *          (28-80px tall, 64-480px wide, with text) counts as a call to action
  *          without a button class, and when its own background is transparent
  *          its ::before or ::after fill is read. semantic.primary moves on 9 of
- *          175 corpus sites, none to a worse colour; one site that reported no
- *          primary reports one. A baseline drifts on the primary role once.
+ *          175 corpus sites: 8 to a colour labelled as the brand's, and one
+ *          unlabelled site gains a primary. A baseline drifts on the primary
+ *          role once.
  *  1.20.0 — components.buttons[] and components.inputs.*[] gain `box`: the
  *          rendered height in whole px with boxSizing, lineHeight, minHeight
  *          and derivedHeight (line-height + vertical padding + border, null
