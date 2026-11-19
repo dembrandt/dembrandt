@@ -35,3 +35,9 @@ test('a pseudo fill on an element that is not button-shaped is not a CTA', async
   const { primary } = await primaryOf(`<a href="/" class="x9" style="width:1200px;height:400px">Hero</a>` + accents + links);
   assert.notEqual(primary, BRAND);
 });
+
+test('a tag-sized link painted on ::before is not a CTA', async () => {
+  const tags = Array.from({ length: 6 }, (_, i) => `<a href="/t${i}" class="x9" style="width:80px;height:24px">Tag</a>`).join('');
+  const { primary } = await primaryOf(tags + accents + links);
+  assert.notEqual(primary, BRAND);
+});

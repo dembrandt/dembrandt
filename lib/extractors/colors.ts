@@ -274,6 +274,22 @@ export async function extractColors(page) {
 
     const colorLiteralRe = /^(#[0-9a-f]{3,8}|rgba?\([^)]*\)|hsla?\([^)]*\)|(?:oklch|oklab|lch|lab|hwb)\([^)]*\))$/i;
 
+    const BUTTON_BOX = { minHeight: 28, maxHeight: 80, minWidth: 64, maxWidth: 480 };
+
+    function isOpaque(color: string) {
+      return !!color && color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent' && colorAlpha(color) >= 0.7;
+    }
+
+    function isButtonBox(el: Element, rect: DOMRect) {
+      return (el.tagName === 'A' || el.getAttribute('role') === 'button') && (el.textContent || '').trim() !== '' &&
+        rect.height >= BUTTON_BOX.minHeight && rect.height <= BUTTON_BOX.maxHeight &&
+        rect.width >= BUTTON_BOX.minWidth && rect.width <= BUTTON_BOX.maxWidth;
+    }
+
+    function pseudoFill(el: Element): string | undefined {
+      return ['::before', '::after'].map((p) => toLegacy(getComputedStyle(el, p).backgroundColor)).find(isOpaque);
+    }
+
     // A palette being documented is not a palette being used. Swatch strips,
     // colour labels and code samples paint real pixels that carry no brand
     // intent, and any docs or style-guide page renders them.
@@ -376,11 +392,8 @@ export async function extractColors(page) {
 
       const isStatus = statusContext.test(context);
 
-      const buttonBox = (el.tagName === 'A' || el.getAttribute('role') === 'button') && (el.textContent || '').trim() !== '' &&
-        rect.height >= 28 && rect.height <= 80 && rect.width >= 64 && rect.width <= 480;
-      const isOpaque = (c) => c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent' && colorAlpha(c) >= 0.7;
-      const ctaFill = isOpaque(bgColor) || !buttonBox ? bgColor
-        : [toLegacy(getComputedStyle(el, '::before').backgroundColor), toLegacy(getComputedStyle(el, '::after').backgroundColor)].find(isOpaque) ?? bgColor;
+      const buttonBox = isButtonBox(el, rect);
+      const ctaFill = isOpaque(bgColor) || !buttonBox ? bgColor : pseudoFill(el) ?? bgColor;
       const ctaShaped = (context.includes('button') || context.includes('btn') || context.includes('cta') || buttonBox) &&
         isOpaque(ctaFill);
       const isCta = ctaShaped &&

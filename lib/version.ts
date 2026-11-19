@@ -41,8 +41,9 @@
  *          without a button class, and when its own background is transparent
  *          its ::before or ::after fill is read. semantic.primary moves on 9 of
  *          175 corpus sites: 8 to a colour labelled as the brand's, and one
- *          unlabelled site gains a primary. A baseline drifts on the primary
- *          role once.
+ *          unlabelled site gains a primary. dembrandt.com drifts 24 against
+ *          threshold 10 on the primary role alone; --compare <baseline>
+ *          --approve once clears it.
  *  1.20.0 — components.buttons[] and components.inputs.*[] gain `box`: the
  *          rendered height in whole px with boxSizing, lineHeight, minHeight
  *          and derivedHeight (line-height + vertical padding + border, null
