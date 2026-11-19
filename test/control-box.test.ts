@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { controlBox, CONTROL_BOX_SOURCE } from '../lib/extractors/control-box.js';
+import { controlBox, renderableHeight, CONTROL_BOX_SOURCE } from '../lib/extractors/control-box.js';
 
 const computed = (over: Record<string, string> = {}) => ({
   boxSizing: 'border-box', lineHeight: '20px', minHeight: 'auto', fontSize: '14px',
@@ -41,4 +41,13 @@ test('the serialized twin re-hydrates to the same function', () => {
   const twin = new Function(CONTROL_BOX_SOURCE + '\nreturn controlBox;')();
   assert.deepEqual(twin(computed(), 38.4), controlBox(computed(), 38.4));
   assert.doesNotMatch(CONTROL_BOX_SOURCE, /\b(require|import|exports)\b/);
+});
+
+test('only a positive finite height is renderable', () => {
+  assert.equal(renderableHeight({ height: 40 }), 40);
+  for (const height of [0, -4, NaN, Infinity, '40', '1px;background:red', null, undefined]) {
+    assert.equal(renderableHeight({ height }), null, String(height));
+  }
+  assert.equal(renderableHeight(null), null);
+  assert.equal(renderableHeight('40px'), null);
 });

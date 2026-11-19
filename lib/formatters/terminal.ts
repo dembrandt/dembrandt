@@ -11,6 +11,7 @@ import { color } from './theme.js';
 import { formatPageList } from '../run-summary.js';
 import { convertColor, formatColor, gradeWcagPair, passesAA } from '../colors.js';
 import type { ColorFormat } from '../colors.js';
+import { renderableHeight } from '../extractors/control-box.js';
 
 /**
  * Creates a clickable terminal link using ANSI escape codes
@@ -619,8 +620,8 @@ function displayButtons(buttons, colorFormat: ColorFormat = 'hex') {
       }
 
       if (stateInfo.key === 'default') {
-        if (btn.box?.height) {
-          props.push({ key: 'height', value: `${btn.box.height}px` });
+        if (renderableHeight(btn.box)) {
+          props.push({ key: 'height', value: `${renderableHeight(btn.box)}px` });
         }
         if (state.padding && state.padding !== '0px') {
           props.push({ key: 'padding', value: state.padding });
@@ -811,8 +812,8 @@ function displayInputs(inputs, colorFormat: ColorFormat = 'hex') {
         defaultProps.push({ key: 'border', value: defaultState.border });
       }
 
-      if (input.box?.height) {
-        defaultProps.push({ key: 'height', value: `${input.box.height}px` });
+      if (renderableHeight(input.box)) {
+        defaultProps.push({ key: 'height', value: `${renderableHeight(input.box)}px` });
       }
 
       if (defaultState.padding && defaultState.padding !== '0px') {

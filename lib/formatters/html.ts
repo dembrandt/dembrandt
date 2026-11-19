@@ -28,6 +28,7 @@ import type { DriftReport, DriftChange } from "../drift.js";
 import { computeFindings } from "../findings.js";
 import { gradeWcagPair, passesAA, toHexColor } from "../colors.js";
 import type { FindingsReport, Finding } from "../findings.js";
+import { renderableHeight } from "../extractors/control-box.js";
 
 export interface HtmlReportOptions {
   /** When present, render a drift banner + changes at the top of the report. */
@@ -546,8 +547,10 @@ function shadowsSection(result: BrandingResult): string {
   return section("Shadows", `<div class="shadowpanel">${boxes}</div><div style="margin-top:12px;display:grid;gap:4px">${list}</div>`, undefined, all);
 }
 
-const boxHeight = (box?: { height?: unknown } | null): string =>
-  typeof box?.height === "number" && Number.isFinite(box.height) ? `${box.height}px` : "";
+const boxHeight = (box?: unknown): string => {
+  const h = renderableHeight(box);
+  return h === null ? "" : `${h}px`;
+};
 
 function buttonsSection(result: BrandingResult): string {
   const buttons = result.components?.buttons ?? [];
