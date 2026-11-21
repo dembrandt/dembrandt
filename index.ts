@@ -836,6 +836,7 @@ program
         color.accent('✨ Analysis summary: ') +
         chalk.dim(
           `${result.colors?.palette?.length ?? 0} colors, ` +
+          `${Object.keys(result.colors?.cssVariables ?? {}).length} colour variables, ` +
           `${result.typography?.styles?.length ?? 0} text styles, ` +
           `${result.breakpoints?.length ?? 0} breakpoints.`
         );
