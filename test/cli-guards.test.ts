@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  apiKeyError,
   approveWarning,
   colorFormatWarning,
   guardWarnings,
@@ -95,4 +96,14 @@ test('--login without a terminal is an error that names the reuse path', () => {
   assert.match(loginNeedsTtyError({ login: true }, false) ?? '', /not a TTY.*--cookie-file/);
   assert.equal(loginNeedsTtyError({ login: true }, true), null);
   assert.equal(loginNeedsTtyError({}, false), null);
+});
+
+test('a --key that cannot be sent as a header stops the run and is never echoed', () => {
+  const pasted = 'Jos tuloste kertoo\n"Synced to your account"';
+  const err = apiKeyError(pasted) ?? '';
+  assert.match(err, /--key is not an API key/);
+  assert.ok(!err.includes('Synced'), 'the value itself is not printed');
+  assert.match(apiKeyError('dmb_abc def') ?? '', /spaces, line breaks/);
+  assert.equal(apiKeyError('dmb_MzQ_0123abcdef'), null);
+  assert.equal(apiKeyError(undefined), null);
 });

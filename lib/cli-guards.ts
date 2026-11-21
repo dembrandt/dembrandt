@@ -77,6 +77,12 @@ export function loginNeedsTtyError(opts: GuardOptions, stdinIsTty: boolean): str
   return "--login needs an interactive terminal: stdin is not a TTY, so nobody can press Enter and no session would be saved. Run it in a terminal once with --save-storage-state, then reuse the file with --cookie-file.";
 }
 
+/** A key that cannot travel in a header fails the sync after the whole run, and the error would print it. */
+export function apiKeyError(key: string | undefined): string | null {
+  if (key === undefined || /^[\x21-\x7e]+$/.test(key)) return null;
+  return "--key is not an API key: it contains spaces, line breaks or non-ASCII characters. Paste only the dmb_ key from dembrandt.com/app/api-keys.";
+}
+
 /** Every applicable warning, in emit order. */
 export function guardWarnings(opts: GuardOptions, paths: string[] | undefined): string[] {
   return [
