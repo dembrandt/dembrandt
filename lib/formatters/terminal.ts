@@ -12,6 +12,28 @@ import { formatPageList } from '../run-summary.js';
 import { convertColor, formatColor, gradeWcagPair, passesAA } from '../colors.js';
 import type { ColorFormat } from '../colors.js';
 import { renderableHeight } from '../extractors/control-box.js';
+import { normalizeRadius } from '../radius-normalize.js';
+import { parseShadowLayer, splitShadowLayers } from '../shadow-parse.js';
+
+function visibleShadow(shadow: string): string {
+  return splitShadowLayers(shadow)
+    .filter((layer) => {
+      const parsed = parseShadowLayer(layer);
+      const paint = parsed?.color ? convertColor(parsed.color) : null;
+      return !paint || !/, 0\)$/.test(paint.rgb);
+    })
+    .join(', ');
+}
+
+function shortShadowOf(shadow: string): string {
+  const visible = visibleShadow(shadow);
+  return visible.length > 40 ? visible.substring(0, 37) + '...' : visible;
+}
+
+function hexOf(formats: { hex: string; rgb: string; hasAlpha: boolean }): string {
+  const alpha = formats.hasAlpha ? parseFloat(formats.rgb.split(',')[3]) : NaN;
+  return Number.isFinite(alpha) ? formats.hex + Math.round(alpha * 255).toString(16).padStart(2, '0') : formats.hex;
+}
 
 /**
  * Creates a clickable terminal link using ANSI escape codes
@@ -139,8 +161,8 @@ function normalizeColorFormat(colorString) {
 function colorCell(colorString, colorFormat: ColorFormat = 'hex'): string {
   const raw = String(colorString);
   const formats = normalizeColorFormat(raw);
-  const primary = colorFormat === 'source' ? raw : (formats[colorFormat] || formats.hex);
-  const secondary = colorFormat === 'rgb' ? formats.hex : formats.rgb;
+  const primary = colorFormat === 'source' ? raw : colorFormat === 'hex' ? hexOf(formats) : (formats[colorFormat] || formats.hex);
+  const secondary = colorFormat === 'rgb' ? hexOf(formats) : formats.rgb;
 
   let swatch;
   try {
@@ -270,7 +292,7 @@ function displayColors(colors, colorFormat: ColorFormat = 'hex') {
   // Display each color on a single line: swatch, hex, role, rgb, oklch.
   // lch is omitted here for compactness but remains in JSON output.
   const primaryOf = (c) => {
-    const notations = { hex: c.hex, rgb: c.rgb, lch: c.lch, oklch: c.oklch, source: c.source || c.hex };
+    const notations = { hex: hexOf(c), rgb: c.rgb, lch: c.lch, oklch: c.oklch, source: c.source || c.hex };
     return notations[colorFormat] || c.hex;
   };
   const primaryWidth = Math.max(7, ...uniqueColors.map((c) => primaryOf(c).length));
@@ -281,7 +303,7 @@ function displayColors(colors, colorFormat: ColorFormat = 'hex') {
     // chalk.bgHex needs one, and the identity column must remain stable.
     const primary = primaryOf(entry).padEnd(primaryWidth);
     // Secondary dim column never repeats the primary notation.
-    const secondary = colorFormat === 'rgb' ? hex : rgb;
+    const secondary = colorFormat === 'rgb' ? hexOf(entry) : rgb;
     const isLast = index === uniqueColors.length - 1;
     const branch = isLast ? '└─' : '├─';
 
@@ -338,7 +360,7 @@ function displayColors(colors, colorFormat: ColorFormat = 'hex') {
   const remaining = (colors.cssVariables ? Math.max(0, Object.keys(colors.cssVariables).length - cssVarLimit) : 0) +
     (colors.palette ? Math.max(0, colors.palette.length - paletteLimit) : 0);
   if (remaining > 0) {
-    console.log(chalk.dim(`│  └─`) + ' ' + chalk.dim(`+${remaining} more in JSON`));
+    console.log(chalk.dim(`│  └─`) + ' ' + chalk.dim(`+${remaining} more, all written by --save-output`));
   }
   console.log(chalk.dim('│'));
 }
@@ -520,7 +542,11 @@ function displayBorders(borders, colorFormat: ColorFormat = 'hex') {
 function displayShadows(shadows) {
   if (!shadows || shadows.length === 0) return;
 
-  const highConfShadows = shadows.filter(s => s.confidence === 'high' || s.confidence === 'medium');
+  const seen = new Set<string>();
+  const highConfShadows = shadows
+    .filter(s => s.confidence === 'high' || s.confidence === 'medium')
+    .map(s => ({ ...s, shadow: visibleShadow(s.shadow) }))
+    .filter(s => s.shadow && !seen.has(s.shadow) && seen.add(s.shadow));
   if (highConfShadows.length === 0) return;
 
   // Sort by confidence first (high > medium), then by count
@@ -627,7 +653,7 @@ function displayButtons(buttons, colorFormat: ColorFormat = 'hex') {
           props.push({ key: 'padding', value: state.padding });
         }
         if (state.borderRadius && state.borderRadius !== '0px') {
-          props.push({ key: 'radius', value: state.borderRadius });
+          props.push({ key: 'radius', value: normalizeRadius(state.borderRadius) });
         }
       }
 
@@ -635,11 +661,8 @@ function displayButtons(buttons, colorFormat: ColorFormat = 'hex') {
         props.push({ key: 'border', value: state.border });
       }
 
-      if (state.boxShadow && state.boxShadow !== 'none') {
-        const shortShadow = state.boxShadow.length > 40
-          ? state.boxShadow.substring(0, 37) + '...'
-          : state.boxShadow;
-        props.push({ key: 'shadow', value: shortShadow });
+      if (state.boxShadow && state.boxShadow !== 'none' && visibleShadow(state.boxShadow)) {
+        props.push({ key: 'shadow', value: shortShadowOf(state.boxShadow) });
       }
 
       if (state.outline && state.outline !== 'none') {
@@ -735,7 +758,7 @@ function displayBadges(badges, colorFormat: ColorFormat = 'hex') {
         props.push({ key: 'padding', value: badge.padding });
       }
       if (badge.borderRadius && badge.borderRadius !== '0px') {
-        props.push({ key: 'radius', value: badge.borderRadius });
+        props.push({ key: 'radius', value: normalizeRadius(badge.borderRadius) });
       }
       if (badge.fontSize) {
         props.push({ key: 'font-size', value: badge.fontSize });
@@ -821,7 +844,7 @@ function displayInputs(inputs, colorFormat: ColorFormat = 'hex') {
       }
 
       if (defaultState.borderRadius && defaultState.borderRadius !== '0px') {
-        defaultProps.push({ key: 'radius', value: defaultState.borderRadius });
+        defaultProps.push({ key: 'radius', value: normalizeRadius(defaultState.borderRadius) });
       }
 
       defaultProps.forEach((prop, propIndex) => {
@@ -852,11 +875,8 @@ function displayInputs(inputs, colorFormat: ColorFormat = 'hex') {
           focusProps.push({ key: 'border-color', value: colorCell(focusState.borderColor, colorFormat) });
         }
 
-        if (focusState.boxShadow && focusState.boxShadow !== 'none') {
-          const shortShadow = focusState.boxShadow.length > 40
-            ? focusState.boxShadow.substring(0, 37) + '...'
-            : focusState.boxShadow;
-          focusProps.push({ key: 'shadow', value: shortShadow });
+        if (focusState.boxShadow && focusState.boxShadow !== 'none' && visibleShadow(focusState.boxShadow)) {
+          focusProps.push({ key: 'shadow', value: shortShadowOf(focusState.boxShadow) });
         }
 
         if (focusState.outline && focusState.outline !== 'none') {

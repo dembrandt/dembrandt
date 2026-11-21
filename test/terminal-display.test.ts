@@ -196,3 +196,45 @@ test('a button and an input print their rendered height in the default state', (
   }).join('\n');
   assert.equal((out.match(/height: 40px/g) ?? []).length, 2);
 });
+
+test('a pill button prints 9999px, not the computed maximum length', () => {
+  const out = render({
+    ...MINIMAL,
+    components: {
+      buttons: [{ confidence: 'high', states: { default: { backgroundColor: '#1a73e8', borderRadius: '3.35544e+07px' } } }],
+      links: [], badges: {},
+    } as never,
+  }).join('\n');
+  assert.ok(out.includes('radius: 9999px'), out);
+  assert.ok(!out.includes('e+07'));
+});
+
+test('a translucent colour keeps its alpha in the hex column', () => {
+  const out = render({
+    ...MINIMAL,
+    components: {
+      buttons: [{ confidence: 'high', states: { default: { backgroundColor: 'rgba(255, 255, 255, 0.05)' } } }],
+      links: [], badges: {},
+    } as never,
+  }).join('\n');
+  assert.ok(out.includes('#ffffff0d'), out);
+});
+
+test('transparent padding layers are dropped from a shadow', () => {
+  const empty = 'rgba(0, 0, 0, 0) 0px 0px 0px 0px';
+  const out = render({
+    ...MINIMAL,
+    shadows: [
+      { shadow: `${empty}, ${empty}, rgba(0, 0, 0, 0.5) 0px 25px 50px -12px`, confidence: 'high', count: 9 },
+      { shadow: `${empty}, ${empty}`, confidence: 'high', count: 3 },
+    ] as never,
+  }).join('\n');
+  assert.ok(out.includes('● rgba(0, 0, 0, 0.5) 0px 25px 50px -12px'), out);
+  assert.ok(!out.includes('rgba(0, 0, 0, 0) 0px'));
+});
+
+test('hidden colours point at the flag that writes them', () => {
+  const palette = Array.from({ length: 25 }, (_, i) => ({ color: `#0000${(i + 16).toString(16)}`, confidence: 'high' }));
+  const out = render({ ...MINIMAL, colors: { semantic: {}, palette, cssVariables: {} } as never }).join('\n');
+  assert.ok(out.includes('more, all written by --save-output'), out);
+});
