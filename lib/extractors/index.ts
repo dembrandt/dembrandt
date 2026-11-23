@@ -36,6 +36,7 @@ import { switchToDark } from './color-scheme.js';
 import type { Browser, Page } from 'playwright';
 import type { ExtractOptions, BrandingResult, Spinner, ExtractorError, WcagPair } from '../types.js';
 import type { VoiceResult } from '../voice/index.js';
+import { waitForSettled, type ReadinessPhase } from '../readiness.js';
 
 // Gaussian noise via Box-Muller
 function gaussian(mean = 0, std = 1) {
@@ -69,40 +70,6 @@ function velocityProfile(t: number, overshootProb = 0.3): number {
 
 // Sleep helper
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
-
-/**
- * Adaptive readiness: resolve as soon as the page is actually settled — network
- * quiet, web fonts loaded, and the DOM done mutating — instead of always waiting
- * a fixed cap. Falls back to the cap on any failure, so the worst case matches a
- * fixed wait while typical pages finish in a fraction of the time. Every error
- * is swallowed: readiness is best-effort and must never abort extraction.
- */
-async function waitForSettled(page: Page, capMs: number, quietMs = 500) {
-  const start = Date.now();
-  try { await page.waitForLoadState("networkidle", { timeout: capMs }); } catch {}
-  // fonts.ready resolves only when no face is loading; a hung font request
-  // would stall it past every cap, so race it against the remaining budget.
-  try {
-    await Promise.race([
-      page.evaluate(() => document.fonts?.ready ?? null),
-      new Promise((r) => setTimeout(r, Math.max(250, capMs - (Date.now() - start)))),
-    ]);
-  } catch {}
-  const remaining = Math.max(250, capMs - (Date.now() - start));
-  try {
-    await page.evaluate(({ quietMs, remaining }) => new Promise<void>((resolve) => {
-      const target = document.body || document.documentElement;
-      if (!target) return resolve();
-      let quiet;
-      const finish = () => { try { obs.disconnect(); } catch {} resolve(); };
-      const obs = new MutationObserver(() => { clearTimeout(quiet); quiet = setTimeout(finish, quietMs); });
-      obs.observe(target, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "src", "href", "hidden", "data-theme"], characterData: true });
-      quiet = setTimeout(finish, quietMs);       // already quiet -> resolve after one window
-      setTimeout(finish, remaining);             // hard cap
-    }), { quietMs, remaining });
-  } catch {}
-  return Date.now() - start;
-}
 
 async function simulateHumanMouse(page: Page) {
   const vw = 1920, vh = 1080;
@@ -299,6 +266,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
   // let: escalates to the --slow budget automatically, see main-content wait below.
   let timeoutMultiplier = options.slow ? 3 : 1;
   const timeouts = [];
+  const readiness: Partial<Record<"hydration" | "stabilization", ReadinessPhase>> = {};
   const degraded: string[] = []; // post-extraction stages that failed but did not abort the run
   const extractorErrors: ExtractorError[] = []; // scoped failures of the parallel extractors
 
@@ -561,9 +529,9 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         }
 
         spinner.start("Waiting for SPA hydration...");
-        const elapsed = await waitForSettled(page, 8000 * timeoutMultiplier);
+        readiness.hydration = await waitForSettled(page, 8000 * timeoutMultiplier);
         spinner.stop();
-        log(color.success(`  ✓ Hydration settled (${(elapsed / 1000).toFixed(1)}s)`));
+        log(color.success(`  ✓ Hydration settled (${(readiness.hydration.ms / 1000).toFixed(1)}s)`));
 
         spinner.start("Waiting for main content...");
         // Framework-agnostic: any sizable rendered block, not a specific selector list.
@@ -776,7 +744,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         }
 
         spinner.start("Final content stabilization...");
-        await waitForSettled(page, 4000 * timeoutMultiplier, 400);
+        readiness.stabilization = await waitForSettled(page, 4000 * timeoutMultiplier, 400);
         spinner.stop();
         log(color.success(`  ✓ Page fully loaded and stable`));
 
@@ -1496,6 +1464,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
         requestedUrl: url,
         contentLength: lastContentLength,
         ...(timeouts.length ? { timeouts } : {}),
+        readiness,
         ...(sessionWarnings.length ? { sessionWarnings } : {}),
         flags: {
           ...(options.stealth && { stealth: true }),

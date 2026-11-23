@@ -1,6 +1,7 @@
 import type { CoverageSummary, TokenScope } from './coverage.js';
 import type { ConformanceReport } from './token-conformance.js';
 import type { ContextDescription } from './extractors/context-config.js';
+import type { ReadinessPhase } from './readiness.js';
 /**
  * Shared types for dembrandt extraction output and CLI options.
  * These were JSDoc @typedefs; promoted to real exported interfaces so the rest
@@ -511,6 +512,8 @@ export interface ExtractionMeta {
   contentLength?: number;
   /** Names of waits that timed out during extraction, present only when at least one did. */
   timeouts?: string[];
+  /** How each readiness wait ended: network idle, fonts loaded, DOM quiet or the cap reached. */
+  readiness?: { hydration?: ReadinessPhase; stabilization?: ReadinessPhase };
   /**
    * Present when `--crawl`, `--sitemap` or explicit paths were used to merge
    * more than one page into this result.
