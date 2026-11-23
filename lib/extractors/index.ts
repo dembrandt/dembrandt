@@ -96,7 +96,7 @@ async function waitForSettled(page: Page, capMs: number, quietMs = 500) {
       let quiet;
       const finish = () => { try { obs.disconnect(); } catch {} resolve(); };
       const obs = new MutationObserver(() => { clearTimeout(quiet); quiet = setTimeout(finish, quietMs); });
-      obs.observe(target, { childList: true, subtree: true, attributes: true, characterData: true });
+      obs.observe(target, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "src", "href", "hidden", "data-theme"], characterData: true });
       quiet = setTimeout(finish, quietMs);       // already quiet -> resolve after one window
       setTimeout(finish, remaining);             // hard cap
     }), { quietMs, remaining });
