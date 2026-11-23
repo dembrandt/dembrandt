@@ -40,6 +40,8 @@
  *          ms, networkIdle, fontsReady and endedBy (quiet | cap). BEHAVIOR:
  *          inline style changes no longer hold the DOM-quiet window open, so
  *          animated pages stop running both waits to their 8s and 4s caps.
+ *          dembrandt.com drifts 0 against 0.41.0. On 36 random corpus sites
+ *          semantic colours held on 35; drift ignores the new field.
  *  1.21.0 — no field changes. BEHAVIOR: a link or role=button of button size
  *          (28-80px tall, 64-480px wide, with text) counts as a call to action
  *          without a button class, and when its own background is transparent
