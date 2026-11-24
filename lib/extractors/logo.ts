@@ -1,3 +1,4 @@
+import { fetchFromPage } from '../public-fetch.js';
 import { DOM_COLOR_SNAPSHOT_SCRIPT, extractPlatformColors, resolvePlatformColors } from './platform-colors.js';
 import { LOGO_HEURISTICS_SOURCE } from './logo-heuristics.js';
 
@@ -50,27 +51,27 @@ const ASSET_ACCEPT = 'image/png,image/jpeg,image/svg+xml,image/*;q=0.8';
  * node for anything the page could not read: a cross-origin asset without CORS
  * headers is unreadable in the page but fine from node.
  */
-async function inlineAssets(page, urls: string[], maxBytes: number): Promise<Record<string, string>> {
+async function inlineAssets(page, pageUrl: string, urls: string[], maxBytes: number): Promise<Record<string, string>> {
   if (!urls.length) return {};
   const deadline = Date.now() + ASSET_PHASE_BUDGET_MS;
   const out = await inlineInPage(page, urls, maxBytes);
   for (const u of urls) {
     if (out[u] || Date.now() > deadline) continue;
-    const fromNode = await inlineInNode(u, maxBytes);
+    const fromNode = await inlineInNode(u, pageUrl, maxBytes);
     if (fromNode) out[u] = fromNode;
   }
   return out;
 }
 
-async function inlineInNode(url: string, maxBytes: number): Promise<string | null> {
+async function inlineInNode(url: string, pageUrl: string, maxBytes: number): Promise<string | null> {
   try {
-    const resp = await fetch(url, { headers: { accept: ASSET_ACCEPT }, signal: AbortSignal.timeout(ASSET_FETCH_TIMEOUT_MS) });
+    const resp = await fetchFromPage(url, pageUrl, { headers: { accept: ASSET_ACCEPT }, signal: AbortSignal.timeout(ASSET_FETCH_TIMEOUT_MS) });
     if (!resp.ok) return null;
     const type = (resp.headers.get('content-type') || '').split(';')[0].trim();
-    if (type && !type.startsWith('image/')) return null;
+    if (!type.startsWith('image/')) return null;
     const buf = Buffer.from(await resp.arrayBuffer());
     if (!buf.length || buf.length > maxBytes) return null;
-    return `data:${type || 'image/png'};base64,${buf.toString('base64')}`;
+    return `data:${type};base64,${buf.toString('base64')}`;
   } catch {
     return null;
   }
@@ -954,7 +955,7 @@ export async function extractLogo(page, url) {
     .filter(i => i && !i.dataUri && i.url && /^https?:/i.test(i.url) && i.source !== 'svg')
     .map(i => i.url as string);
   if (needsBytes.length) {
-    const inlined = await inlineAssets(page, [...new Set(needsBytes)], LOGO_MAX_BYTES);
+    const inlined = await inlineAssets(page, url, [...new Set(needsBytes)], LOGO_MAX_BYTES);
     for (const inst of [result.logo, ...result.instances]) {
       if (inst && !inst.dataUri && inlined[inst.url]) inst.dataUri = inlined[inst.url];
     }
@@ -965,7 +966,7 @@ export async function extractLogo(page, url) {
     .slice(0, FAVICON_INLINE_LIMIT)
     .map(f => f.url as string);
   if (faviconUrls.length) {
-    const inlined = await inlineAssets(page, [...new Set(faviconUrls)], FAVICON_MAX_BYTES);
+    const inlined = await inlineAssets(page, url, [...new Set(faviconUrls)], FAVICON_MAX_BYTES);
     for (const f of result.favicons) {
       if (f && !f.dataUri && inlined[f.url]) f.dataUri = inlined[f.url];
     }

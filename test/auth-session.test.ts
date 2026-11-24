@@ -17,11 +17,15 @@ import {
   waitForEnter,
   emptyAuthSession,
   serializeStorageState,
+  writeSessionFile,
   sessionStorageInitScript,
   isOffTarget,
   expiredSessionWarning,
   sessionRedirectWarning,
 } from '../lib/extractors/auth-session.js';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import vm from 'node:vm';
 
 const URL = 'https://app.example.com/dashboard';
@@ -293,4 +297,21 @@ test('parseNetscapeCookies tolerates leading whitespace on a cookie line', () =>
   const [c] = parseNetscapeCookies('  #HttpOnly_app.example.com\tTRUE\t/\tTRUE\t0\tsid\tv', URL);
   assert.equal(c.domain, 'app.example.com');
   assert.equal(c.httpOnly, true);
+});
+
+test('a session file is readable by its owner only, new or overwritten', { skip: process.platform === 'win32' }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dembrandt-session-'));
+  try {
+    const fresh = join(dir, 'new.json');
+    const old = join(dir, 'old.json');
+    writeFileSync(old, 'x');
+    chmodSync(old, 0o644);
+    for (const file of [fresh, old]) {
+      writeSessionFile(file, '{"cookies":[]}');
+      assert.equal(statSync(file).mode & 0o777, 0o600, file);
+      assert.equal(readFileSync(file, 'utf8'), '{"cookies":[]}');
+    }
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
 });
