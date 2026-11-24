@@ -955,7 +955,7 @@ export async function extractLogo(page, url) {
     .filter(i => i && !i.dataUri && i.url && /^https?:/i.test(i.url) && i.source !== 'svg')
     .map(i => i.url as string);
   if (needsBytes.length) {
-    const inlined = await inlineAssets(page, url, [...new Set(needsBytes)], LOGO_MAX_BYTES);
+    const inlined = await inlineAssets(page, page.url(), [...new Set(needsBytes)], LOGO_MAX_BYTES);
     for (const inst of [result.logo, ...result.instances]) {
       if (inst && !inst.dataUri && inlined[inst.url]) inst.dataUri = inlined[inst.url];
     }
@@ -966,7 +966,7 @@ export async function extractLogo(page, url) {
     .slice(0, FAVICON_INLINE_LIMIT)
     .map(f => f.url as string);
   if (faviconUrls.length) {
-    const inlined = await inlineAssets(page, url, [...new Set(faviconUrls)], FAVICON_MAX_BYTES);
+    const inlined = await inlineAssets(page, page.url(), [...new Set(faviconUrls)], FAVICON_MAX_BYTES);
     for (const f of result.favicons) {
       if (f && !f.dataUri && inlined[f.url]) f.dataUri = inlined[f.url];
     }

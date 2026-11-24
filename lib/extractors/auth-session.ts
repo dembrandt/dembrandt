@@ -187,7 +187,9 @@ export function serializeStorageState(state: StorageState, sessionStorage: Sessi
 
 // mode only applies on creation, so an existing file is narrowed before the tokens are written.
 export function writeSessionFile(path: string, text: string): void {
-  if (existsSync(path)) chmodSync(path, 0o600);
+  if (existsSync(path)) {
+    try { chmodSync(path, 0o600); } catch { /* not ours to narrow, e.g. /dev/stdout */ }
+  }
   writeFileSync(path, text, { mode: 0o600 });
 }
 

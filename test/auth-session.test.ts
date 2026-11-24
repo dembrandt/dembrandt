@@ -315,3 +315,7 @@ test('a session file is readable by its owner only, new or overwritten', { skip:
     rmSync(dir, { recursive: true });
   }
 });
+
+test('a path whose mode cannot be changed is still written', { skip: process.platform === 'win32' || process.getuid?.() === 0 }, () => {
+  assert.doesNotThrow(() => writeSessionFile('/dev/null', '{}'));
+});
