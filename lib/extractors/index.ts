@@ -15,7 +15,7 @@ import { extractTeach } from './teach.js';
 import { extractWcagPairs, bindContrastToPalette } from './colors.js';
 import { SCHEMA_VERSION } from '../version.js';
 import { hslChroma } from '../colors.js';
-import { buildContextOptions, describeContext, parseCookies, parseScreenSize, DEFAULT_LOCALE } from './context-config.js';
+import { buildContextOptions, describeContext, parseCookies, parseHeader, parseScreenSize, DEFAULT_LOCALE } from './context-config.js';
 import {
   loadAuthSession,
   mergeSessionCookies,
@@ -36,6 +36,7 @@ import { switchToDark } from './color-scheme.js';
 import type { Browser, Page } from 'playwright';
 import type { ExtractOptions, BrandingResult, Spinner, ExtractorError, WcagPair } from '../types.js';
 import type { VoiceResult } from '../voice/index.js';
+import { authOrigins, authScopeWarning, inAuthScope, scopeHeaders } from './auth-scope.js';
 import { waitForSettled, type ReadinessPhase } from '../readiness.js';
 
 // Gaussian noise via Box-Muller
@@ -283,8 +284,12 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
   const locale = options.locale || DEFAULT_LOCALE;
   const { width: screenW, height: screenH } = parseScreenSize(options.screenSize);
 
+  const authUrl = options.authUrl ?? url;
+  const origins = authOrigins(authUrl);
+  const credentialUrl = inAuthScope(url, origins) ? url : authUrl;
+  const scopedHeaders = parseHeader(options.header);
   const fileSession: AuthSession = options.cookieFile
-    ? loadAuthSession(options.cookieFile, url)
+    ? loadAuthSession(options.cookieFile, credentialUrl)
     : (options.storageState
       ? { cookies: [], storageState: options.storageState, sessionStorage: [] }
       : emptyAuthSession());
@@ -303,6 +308,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       ...(fileSession.storageState ? { storageState: fileSession.storageState } : {}),
     },
     browser.browserType().name(),
+    origins,
   );
 
   const context = await browser.newContext(contextOptions as Parameters<Browser['newContext']>[0]);
@@ -319,8 +325,10 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
     }
   };
 
+  await closingOnError(scopeHeaders(context, scopedHeaders, origins, browser.browserType().name()));
+
   // storageState already applied its cookies; file-only cookies merge over --cookie.
-  const cliCookies = parseCookies(options.cookie, url);
+  const cliCookies = parseCookies(options.cookie, credentialUrl);
   const fileCookies = fileSession.storageState ? [] : fileSession.cookies;
   const extraCookies = options.sessionCookies ?? [];
   const cookiesToAdd = mergeSessionCookies(
@@ -486,6 +494,8 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
             console.log(chalk.dim(`    To:   ${finalUrl}`));
             const rejected = sessionRedirectWarning(finalUrl, url, hasSession && !options.login);
             if (rejected) { sessionWarnings.push(rejected); console.log(color.warning(`  ! Session: ${rejected}`)); }
+            const unsent = authScopeWarning(finalUrl, origins, !!httpCredentials || Object.keys(scopedHeaders).length > 0);
+            if (unsent) { sessionWarnings.push(unsent); console.log(color.warning(`  ! Session: ${unsent}`)); }
           } else {
             console.log(color.info(`  i Page redirected within same domain:`));
             console.log(chalk.dim(`    From: ${initialUrl}`));

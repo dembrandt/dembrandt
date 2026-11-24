@@ -42,7 +42,10 @@
  *          animated pages stop running both waits to their 8s and 4s caps.
  *          dembrandt.com drifts 0 against 0.41.0. On 174 labelled sites every
  *          accuracy tier is equal or better; drift ignores the new field. A
- *          merged crawl keeps the first page's readiness.
+ *          merged crawl keeps the first page's readiness. --header and
+ *          --basic-auth reach the requested site only (with or without www, and
+ *          its https upgrade); meta.sessionWarnings says so when a redirect
+ *          leaves it.
  *  1.21.0 — no field changes. BEHAVIOR: a link or role=button of button size
  *          (28-80px tall, 64-480px wide, with text) counts as a call to action
  *          without a button class, and when its own background is transparent

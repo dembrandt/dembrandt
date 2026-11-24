@@ -149,7 +149,7 @@ async function runExtraction(url: string, options: ExtractionRequest = {}) {
     for (const pageUrl of extraUrls) {
       await new Promise((r) => setTimeout(r, 1500 + Math.random() * 1500));
       try {
-        const pageResult: Extraction = await extractBranding(pageUrl, nullSpinner, browser, extractOptions(options, version));
+        const pageResult: Extraction = await extractBranding(pageUrl, nullSpinner, browser, { ...extractOptions(options, version), authUrl: url });
         delete pageResult._discoveredLinks;
         results.push(pageResult);
       } catch {
