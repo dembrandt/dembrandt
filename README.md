@@ -4,6 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/dembrandt.svg)](https://www.npmjs.com/package/dembrandt)
 [![license](https://img.shields.io/npm/l/dembrandt.svg)](https://github.com/dembrandt/dembrandt/blob/main/LICENSE)
 [![GitHub Marketplace](https://img.shields.io/badge/GitHub%20Marketplace-Drift%20Gate-2088FF?logo=githubactions&logoColor=white)](https://github.com/marketplace/actions/dembrandt-drift-gate)
+[![dembrandt/dembrandt MCP server](https://glama.ai/mcp/servers/dembrandt/dembrandt/badges/score.svg)](https://glama.ai/mcp/servers/dembrandt/dembrandt)
 [![GitHub Sponsors](https://img.shields.io/badge/Sponsor-me-pink?style=flat&logo=github-sponsors)](https://github.com/sponsors/dembrandt)
 
 Extract any website's design system in one command. Enforce it in CI.
