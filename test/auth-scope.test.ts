@@ -104,6 +104,14 @@ test('the header follows redirects that stay on the site, and returns to it', as
   assert.equal(to('site').find((r) => r.path === '/backed')?.secret, 's');
 });
 
+test('a header the browser refuses fails the request instead of hanging it', async () => {
+  const context = await browser.newContext();
+  await scopeHeaders(context, { Host: 'other.test' }, authOrigins(siteUrl), 'chromium');
+  const page = await context.newPage();
+  await assert.rejects(page.goto(`${siteUrl}/app`, { timeout: 5000 }), /net::ERR_FAILED/);
+  await context.close();
+});
+
 test('basic auth answers the requested site and no other', async () => {
   const { to } = await visit('/basic-page', 'chromium', true);
   const granted = to('site').filter((r) => r.path === '/basic-page');

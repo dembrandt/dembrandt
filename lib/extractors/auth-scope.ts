@@ -31,7 +31,9 @@ async function scopePage(page: Page, scoped: Record<string, string>, origins: re
   cdp.on('Fetch.requestPaused', (e) => {
     const headers = inAuthScope(e.request.url, origins)
       && Object.entries({ ...without(e.request.headers, names), ...scoped }).map(([name, value]) => ({ name, value }));
-    cdp.send('Fetch.continueRequest', { requestId: e.requestId, ...(headers && { headers }) }).catch(() => {});
+    cdp.send('Fetch.continueRequest', { requestId: e.requestId, ...(headers && { headers }) })
+      .catch(() => cdp.send('Fetch.failRequest', { requestId: e.requestId, errorReason: 'Failed' }))
+      .catch(() => {});
   });
   await cdp.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
 }
