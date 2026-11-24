@@ -36,6 +36,13 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.22.0 — meta gains `readiness`: per wait (hydration, stabilization) its
+ *          ms, networkIdle, fontsReady and endedBy (quiet | cap | error). BEHAVIOR:
+ *          inline style changes no longer hold the DOM-quiet window open, so
+ *          animated pages stop running both waits to their 8s and 4s caps.
+ *          dembrandt.com drifts 0 against 0.41.0. On 174 labelled sites every
+ *          accuracy tier is equal or better; drift ignores the new field. A
+ *          merged crawl keeps the first page's readiness.
  *  1.21.0 — no field changes. BEHAVIOR: a link or role=button of button size
  *          (28-80px tall, 64-480px wide, with text) counts as a call to action
  *          without a button class, and when its own background is transparent
@@ -333,7 +340,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.21.0';
+export const SCHEMA_VERSION = '1.22.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';
