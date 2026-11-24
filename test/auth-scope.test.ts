@@ -5,8 +5,13 @@ import type { AddressInfo } from 'node:net';
 import { test, before, after } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { chromium, type Browser } from 'playwright';
-import { authOrigins, authScopeWarning, inAuthScope, scopeHeaders } from '../lib/extractors/auth-scope.js';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { chromium, firefox, type Browser } from 'playwright';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { authOrigins, authScopeWarning, credentialUrlFor, inAuthScope, scopeHeaders } from '../lib/extractors/auth-scope.js';
 import { extractBranding } from '../lib/extractors/index.js';
 import { buildContextOptions } from '../lib/extractors/context-config.js';
 
@@ -65,8 +70,12 @@ before(async () => {
     '/in': { redirect: '/page' },
     '/out': { redirect: `${otherUrl}/landed` },
     '/img': { redirect: `${otherUrl}/img` },
-    '/app': { html: `${tall}<link rel="stylesheet" href="${otherUrl}/basic">` },
-    '/page': { html: `<img src="/img"><img src="${otherUrl}/direct"><img src="${otherUrl}/back"><img src="${otherUrl}/basic">` },
+    '/to-app': { redirect: '/app' },
+    '/to-other': { redirect: `${otherUrl}/app` },
+    '/basic-app': { html: tall },
+    '/pic': { redirect: '/pic-moved' },
+    '/app': { html: `${tall}<img src="/pic"><link rel="stylesheet" href="${otherUrl}/basic">` },
+    '/page': { html: `<img src="/img"><img src="${otherUrl}/direct"><img src="${otherUrl}/back"><img src="${otherUrl}/basic"><script>fetch('/api', { headers: { 'x-secret': 'page' } })</script>` },
     '/basic-page': { html: `<link rel="stylesheet" href="${otherUrl}/basic">` },
   })[p] ?? {});
   siteUrl = `http://127.0.0.1:${(site.address() as AddressInfo).port}`;
@@ -98,6 +107,13 @@ for (const engine of ['chromium', 'firefox']) {
   });
 }
 
+test('a header the page sets under another case is replaced, not doubled', async () => {
+  for (const engine of ['chromium', 'firefox']) {
+    const { to } = await visit('/page', engine);
+    assert.deepEqual(to('site').filter((r) => r.path === '/api').map((r) => r.secret), ['s'], engine);
+  }
+});
+
 test('the header follows redirects that stay on the site, and returns to it', async () => {
   const { to } = await visit('/in', 'chromium');
   assert.equal(to('site').find((r) => r.path === '/page')?.secret, 's');
@@ -124,14 +140,14 @@ const spinner = { text: '', start() { return this; }, stop() { return this; }, s
   fail() { return this; }, warn() { return this; }, info() { return this; } };
 const credentials = { header: ['X-Secret: s', 'Authorization: Bearer t'], cookie: 'session=c' };
 
-async function extract(url: string, options: object) {
+async function extract(url: string, options: object, using = browser) {
   seen = [];
-  await extractBranding(url, spinner as never, browser, { ...credentials, ...options });
-  return { at: (where: string) => seen.filter((r) => r.at === where && r.path !== '/favicon.ico') };
+  const result = await extractBranding(url, spinner as never, using, options) as { meta: { sessionWarnings?: string[] } };
+  return { warnings: result.meta.sessionWarnings ?? [],  at: (where: string) => seen.filter((r) => r.at === where && r.path !== '/favicon.ico') };
 }
 
 test('an extraction sends every credential to the site and none to the hosts it loads from', async () => {
-  const { at } = await extract(`${siteUrl}/app`, {});
+  const { at } = await extract(`${siteUrl}/app`, credentials);
   const page = at('site').find((r) => r.path === '/app');
   assert.deepEqual([page?.secret, page?.auth, page?.cookie], ['s', 'Bearer t', 'session=c']);
   assert.ok(at('other').some((r) => r.path === '/basic'));
@@ -139,7 +155,7 @@ test('an extraction sends every credential to the site and none to the hosts it 
 });
 
 test('a crawled page on another site gets no credential', async () => {
-  const { at } = await extract(`${otherUrl}/app`, { authUrl: siteUrl });
+  const { at } = await extract(`${otherUrl}/app`, { ...credentials, authUrl: siteUrl });
   assert.ok(at('other').some((r) => r.path === '/app'));
   assert.deepEqual(at('other').filter((r) => r.secret || r.auth || r.cookie), []);
 });
@@ -149,6 +165,86 @@ test('a CLI crawl to another site carries no credential there', async () => {
   const cli = fileURLToPath(new URL('../index.js', import.meta.url));
   await promisify(execFile)(process.execPath, [cli, `${siteUrl}/app`, `${otherUrl}/app`, '--json-only',
     '--no-headed-fallback', '--header', 'X-Secret: s', '--cookie', 'session=c'], { maxBuffer: 1 << 26 });
+  assert.equal(seen.find((r) => r.at === 'site' && r.path === '/app')?.secret, 's');
+  assert.ok(seen.some((r) => r.at === 'other' && r.path === '/app'));
+  assert.deepEqual(seen.filter((r) => r.at === 'other' && (r.secret || r.cookie)), []);
+});
+
+test('basic auth given to an extraction opens the site', async () => {
+  const { at } = await extract(`${siteUrl}/basic-app`, { basicAuth: 'u:p' });
+  assert.ok(at('site').some((r) => r.path === '/basic-app' && r.auth?.startsWith('Basic ')));
+  assert.deepEqual(at('other').filter((r) => r.auth), []);
+});
+
+test('a cookie file without domains stays with the site on a crawl', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dembrandt-cookie-'));
+  const cookieFile = join(dir, 'cookies.json');
+  writeFileSync(cookieFile, JSON.stringify([{ name: 'session', value: 'f' }]));
+  try {
+    assert.equal((await extract(`${siteUrl}/app`, { cookieFile })).at('site').find((r) => r.path === '/app')?.cookie, 'session=f');
+    const crawled = await extract(`${otherUrl}/app`, { cookieFile, authUrl: siteUrl });
+    assert.ok(crawled.at('other').some((r) => r.path === '/app'));
+    assert.deepEqual(crawled.at('other').filter((r) => r.cookie), []);
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('a crawled page on the site keeps its cookie when the site answers on www', () => {
+  assert.equal(credentialUrlFor('https://www.example.com/a', 'https://example.com/'), 'https://www.example.com/a');
+  assert.equal(credentialUrlFor('https://other.test/a', 'https://example.com/'), 'https://example.com/');
+});
+
+test('leaving the site, by redirect or by crawl, is a warning even when only the port differs', async () => {
+  const redirected = await extract(`${siteUrl}/to-other`, { header: 'X-Secret: s' });
+  assert.deepEqual(redirected.at('other').filter((r) => r.secret), []);
+  assert.equal(redirected.warnings.length, 1);
+  assert.match(redirected.warnings[0], new RegExp(`against ${otherUrl}`));
+  const samehost = otherUrl.replace('localhost', '127.0.0.1');
+  assert.match((await extract(`${samehost}/app`, { header: 'X-Secret: s', authUrl: siteUrl })).warnings[0] ?? '', /requested site only/);
+  assert.deepEqual((await extract(`${siteUrl}/to-app`, { header: 'X-Secret: s' })).warnings, []);
+  assert.deepEqual((await extract(`${siteUrl}/to-other`, {})).warnings, []);
+});
+
+const hasFirefox = existsSync(firefox.executablePath());
+
+test('Firefox sends the header to the site, through its redirects, and to no other host', { skip: !hasFirefox && 'firefox is not installed' }, async () => {
+  const ff = await firefox.launch();
+  try {
+    const { at, warnings } = await extract(`${siteUrl}/to-app`, credentials, ff);
+    for (const path of ['/to-app', '/app', '/pic', '/pic-moved']) {
+      assert.equal(at('site').find((r) => r.path === path)?.secret, 's', path);
+      assert.equal(at('site').find((r) => r.path === path)?.cookie, 'session=c', path);
+    }
+    assert.ok(at('other').some((r) => r.path === '/basic'));
+    assert.deepEqual(at('other').filter((r) => r.secret || r.auth || r.cookie), []);
+    assert.deepEqual(warnings, []);
+    const crawled = await extract(`${otherUrl}/app`, { ...credentials, authUrl: siteUrl }, ff);
+    assert.ok(crawled.at('other').some((r) => r.path === '/app'));
+    assert.deepEqual(crawled.at('other').filter((r) => r.secret || r.auth || r.cookie), []);
+    const out = await extract(`${siteUrl}/to-other`, credentials, ff);
+    assert.ok(out.at('other').some((r) => r.path === '/app'));
+    assert.deepEqual(out.at('other').filter((r) => r.secret || r.auth || r.cookie), []);
+    assert.equal(out.warnings.filter((w) => /requested site only/.test(w)).length, 1);
+  } finally {
+    await ff.close();
+  }
+});
+
+test('an MCP crawl to another site carries no credential there', async () => {
+  seen = [];
+  const server = fileURLToPath(new URL('../mcp-server.js', import.meta.url));
+  const client = new Client({ name: 'auth-scope', version: '1' });
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [server] }));
+  try {
+    await client.callTool({ name: 'get_spacing', arguments: {
+      url: `${siteUrl}/app`, paths: [`${otherUrl}/app`], header: 'X-Secret: s', cookie: 'session=c' } });
+    for (let i = 0; i < 120 && !seen.some((r) => r.at === 'other' && r.path === '/app'); i++) {
+      await new Promise((r) => { setTimeout(r, 250); });
+    }
+  } finally {
+    await client.close();
+  }
   assert.equal(seen.find((r) => r.at === 'site' && r.path === '/app')?.secret, 's');
   assert.ok(seen.some((r) => r.at === 'other' && r.path === '/app'));
   assert.deepEqual(seen.filter((r) => r.at === 'other' && (r.secret || r.cookie)), []);
