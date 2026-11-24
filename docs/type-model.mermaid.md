@@ -36,6 +36,7 @@ classDiagram
     +Viewport viewport
     +boolean fontsReady
     +string[] pendingFonts
+    +Record readiness
     +string[] degraded
     +ExtractorError[] errors
   }

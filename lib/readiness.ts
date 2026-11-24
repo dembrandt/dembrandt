@@ -5,7 +5,7 @@ export interface MutationSample {
   attributeName?: string | null;
 }
 
-export type SettleEnd = 'quiet' | 'cap';
+export type SettleEnd = 'quiet' | 'cap' | 'error';
 
 export interface ReadinessPhase {
   ms: number;
@@ -23,7 +23,7 @@ export function isContentMutation(m: MutationSample): boolean {
 function settleInPage(isContent: (m: MutationSample) => boolean, quietMs: number, remaining: number): Promise<SettleEnd> {
   return new Promise((resolve) => {
     const target = document.body || document.documentElement;
-    if (!target) return resolve('quiet');
+    if (!target) return resolve('error');
     let quiet: ReturnType<typeof setTimeout>;
     const finish = (end: SettleEnd) => {
       try { obs.disconnect(); } catch {}
@@ -52,7 +52,7 @@ export async function waitForSettled(page: Page, capMs: number, quietMs = 500): 
   const left = () => Math.max(250, capMs - (Date.now() - start));
   let networkIdle = false;
   let fontsReady = false;
-  let endedBy: SettleEnd = 'cap';
+  let endedBy: SettleEnd = 'error';
   try { await page.waitForLoadState('networkidle', { timeout: capMs }); networkIdle = true; } catch {}
   // fonts.ready can hang on a stalled font request, so it races the remaining budget.
   try {

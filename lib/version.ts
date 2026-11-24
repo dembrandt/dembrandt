@@ -37,11 +37,12 @@
  * dembrandt output contract version. Bump per the policy documented above.
  *
  *  1.22.0 — meta gains `readiness`: per wait (hydration, stabilization) its
- *          ms, networkIdle, fontsReady and endedBy (quiet | cap). BEHAVIOR:
+ *          ms, networkIdle, fontsReady and endedBy (quiet | cap | error). BEHAVIOR:
  *          inline style changes no longer hold the DOM-quiet window open, so
  *          animated pages stop running both waits to their 8s and 4s caps.
- *          dembrandt.com drifts 0 against 0.41.0. On 36 random corpus sites
- *          semantic colours held on 35; drift ignores the new field.
+ *          dembrandt.com drifts 0 against 0.41.0. On 174 labelled sites every
+ *          accuracy tier is equal or better; drift ignores the new field. A
+ *          merged crawl keeps the first page's readiness.
  *  1.21.0 — no field changes. BEHAVIOR: a link or role=button of button size
  *          (28-80px tall, 64-480px wide, with text) counts as a call to action
  *          without a button class, and when its own background is transparent

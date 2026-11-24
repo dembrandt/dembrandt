@@ -52,11 +52,22 @@ test('a page that keeps adding nodes runs to the cap', async () => {
   assert.ok(phase.ms >= 1400, `took ${phase.ms}ms`);
 });
 
-test('content that arrives after the animation starts is waited for', async () => {
-  await page!.setContent(`<!doctype html><body>${animated}<script>
+test('class changes during the quiet window extend it', async () => {
+  await page!.setContent(`<!doctype html><body>${animated}</body>`);
+  const end = await page!.evaluate(`(() => {
     setTimeout(() => document.body.classList.add('late'), 200);
     setTimeout(() => document.body.classList.add('later'), 450);
-  </script></body>`);
-  await waitForSettled(page!, 3000, 300);
+    return ${settleScript(300, 3000)};
+  })()`);
+  assert.equal(end, 'quiet');
   assert.equal(await page!.evaluate(() => document.body.className), 'late later');
+});
+
+test('a wait that cannot run ends as an error', async () => {
+  const closed = await browser!.newPage();
+  await closed.close();
+  assert.equal((await waitForSettled(closed, 500, 100)).endedBy, 'error');
+  await page!.setContent('<p>x</p>');
+  await page!.evaluate(() => document.documentElement.remove());
+  assert.equal(await page!.evaluate(settleScript(100, 500)), 'error');
 });

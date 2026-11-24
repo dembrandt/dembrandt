@@ -512,7 +512,7 @@ export interface ExtractionMeta {
   contentLength?: number;
   /** Names of waits that timed out during extraction, present only when at least one did. */
   timeouts?: string[];
-  /** How each readiness wait ended: network idle, fonts loaded, DOM quiet or the cap reached. */
+  /** How each readiness wait ended: network idle, fonts loaded, DOM quiet, the cap reached or an error. A merged crawl keeps the first page's. */
   readiness?: { hydration?: ReadinessPhase; stabilization?: ReadinessPhase };
   /**
    * Present when `--crawl`, `--sitemap` or explicit paths were used to merge
