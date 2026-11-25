@@ -116,10 +116,10 @@ test('buildContextOptions grants the page no permissions', () => {
   assert.ok(!('permissions' in buildContextOptions({})));
 });
 
-test('buildContextOptions merges a custom header alongside Accept-Language', () => {
+test('buildContextOptions never puts a custom header on the whole context', () => {
   const opts = buildContextOptions({ header: 'X-Token: abc', screenSize: '800x600' });
   assert.deepEqual(opts.viewport, { width: 800, height: 600 });
-  assert.equal(opts.extraHTTPHeaders['X-Token'], 'abc');
+  assert.equal(opts.extraHTTPHeaders['X-Token'], undefined);
   assert.ok(opts.extraHTTPHeaders['Accept-Language']);
 });
 
@@ -147,8 +147,8 @@ test('buildContextOptions forwards httpCredentials and storageState when set', (
   const opts = buildContextOptions({
     httpCredentials: { username: 'u', password: 'p' },
     storageState,
-  });
-  assert.deepEqual(opts.httpCredentials, { username: 'u', password: 'p' });
+  }, ['https://example.com']);
+  assert.deepEqual(opts.httpCredentials, [{ username: 'u', password: 'p', origin: 'https://example.com' }]);
   assert.equal(opts.storageState, storageState);
 });
 
@@ -167,11 +167,8 @@ test('parseHeader takes a repeated flag and keeps the last value of a repeated n
   assert.deepEqual(parseHeader([]), {});
 });
 
-test('buildContextOptions applies every header of a repeated flag', () => {
-  const opts = buildContextOptions({ header: ['X-A: 1', 'X-B: 2'] });
-  assert.equal(opts.extraHTTPHeaders['X-A'], '1');
-  assert.equal(opts.extraHTTPHeaders['X-B'], '2');
-  assert.ok(opts.extraHTTPHeaders['Accept-Language']);
+test('parseHeader reads every header of a repeated flag', () => {
+  assert.deepEqual(parseHeader(['X-A: 1', 'X-B: 2']), { 'X-A': '1', 'X-B': '2' });
 });
 
 test('describeContext echoes the dials a default run is measured under', () => {

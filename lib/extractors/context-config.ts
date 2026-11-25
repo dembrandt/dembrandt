@@ -58,7 +58,7 @@ export interface ContextOptions {
   colorScheme: ColorScheme;
   reducedMotion: ReducedMotion;
   forcedColors: ForcedColors;
-  httpCredentials?: HttpCredentials;
+  httpCredentials?: Array<HttpCredentials & { origin: string }>;
   storageState?: StorageState;
 }
 
@@ -137,12 +137,14 @@ export function deriveAcceptLanguage(locale: string, explicit?: string): string 
  * access, no mutation of the input. Cookies and init scripts are applied
  * separately by the caller because they are side effects on a live context.
  */
-export function buildContextOptions(options: ExtractOptions): ContextOptions {
+export function buildContextOptions(
+  options: ExtractOptions,
+  origins: readonly string[] = [],
+): ContextOptions {
   const locale = options.locale || DEFAULT_LOCALE;
   const size = parseScreenSize(options.screenSize);
   const extraHTTPHeaders: Record<string, string> = {
     'Accept-Language': deriveAcceptLanguage(locale, options.acceptLanguage),
-    ...parseHeader(options.header),
   };
 
   const contextOptions: ContextOptions = {
@@ -161,10 +163,8 @@ export function buildContextOptions(options: ExtractOptions): ContextOptions {
   };
 
   if (options.httpCredentials) {
-    contextOptions.httpCredentials = {
-      username: options.httpCredentials.username,
-      password: options.httpCredentials.password,
-    };
+    const { username, password } = options.httpCredentials;
+    contextOptions.httpCredentials = origins.map((origin) => ({ username, password, origin }));
   }
 
   if (options.storageState) {

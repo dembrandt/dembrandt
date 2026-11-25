@@ -26,6 +26,7 @@ function mergeMeta(results) {
   const pendingFonts = [...new Set(metas.flatMap((m) => m.pendingFonts ?? []))].sort();
   const degraded = [...new Set(metas.flatMap((m) => m.degraded ?? []))];
   const errors = metas.flatMap((m) => m.errors ?? []);
+  const sessionWarnings = [...new Set(metas.flatMap((m) => m.sessionWarnings ?? []))];
   return {
     meta: {
       ...home.meta,
@@ -34,6 +35,7 @@ function mergeMeta(results) {
       ...(pendingFonts.length ? { pendingFonts } : {}),
       ...(degraded.length ? { degraded } : {}),
       ...(errors.length ? { errors } : {}),
+      ...(sessionWarnings.length ? { sessionWarnings } : {}),
     },
   };
 }
