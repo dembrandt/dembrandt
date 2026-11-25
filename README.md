@@ -25,7 +25,7 @@ The MCP server does not: run `npx dembrandt install-browser` before its first ex
 
 Or use npx without installing: `npx dembrandt dembrandt.com`.
 
-Requires Node.js 18+
+Requires Node.js 20+
 
 Or install the MCP server straight into your editor and let the agent run it:
 
