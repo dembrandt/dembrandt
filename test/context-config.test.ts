@@ -103,23 +103,21 @@ test('deriveAcceptLanguage prefers explicit value, else builds from locale', () 
 });
 
 test('buildContextOptions assembles defaults and is pure', () => {
-  const opts = buildContextOptions({}, 'chromium');
+  const opts = buildContextOptions({});
   assert.deepEqual(opts.viewport, DEFAULT_SCREEN);
   assert.equal(opts.userAgent, DEFAULT_USER_AGENT);
   assert.equal(opts.locale, 'en-US');
   assert.equal(opts.colorScheme, 'light');
   assert.equal(opts.reducedMotion, 'no-preference');
   assert.equal(opts.extraHTTPHeaders['Accept-Language'], 'en-US,en;q=0.9,en;q=0.8');
-  assert.deepEqual(opts.permissions, ['clipboard-read', 'clipboard-write']);
 });
 
-test('buildContextOptions omits clipboard permissions for non-chromium', () => {
-  const opts = buildContextOptions({}, 'firefox');
-  assert.equal(opts.permissions, undefined);
+test('buildContextOptions grants the page no permissions', () => {
+  assert.ok(!('permissions' in buildContextOptions({})));
 });
 
 test('buildContextOptions merges a custom header alongside Accept-Language', () => {
-  const opts = buildContextOptions({ header: 'X-Token: abc', screenSize: '800x600' }, 'webkit');
+  const opts = buildContextOptions({ header: 'X-Token: abc', screenSize: '800x600' });
   assert.deepEqual(opts.viewport, { width: 800, height: 600 });
   assert.equal(opts.extraHTTPHeaders['X-Token'], 'abc');
   assert.ok(opts.extraHTTPHeaders['Accept-Language']);
@@ -128,20 +126,20 @@ test('buildContextOptions merges a custom header alongside Accept-Language', () 
 test('buildContextOptions does not mutate its input options', () => {
   const input: ExtractOptions = { header: 'X-A: 1', screenSize: '640x480', locale: 'fi-FI' };
   const snapshot = JSON.stringify(input);
-  buildContextOptions(input, 'chromium');
+  buildContextOptions(input);
   assert.equal(JSON.stringify(input), snapshot);
 });
 
 test('buildContextOptions keeps viewport and screen as separate objects', () => {
   // Aliasing both to one object would let Playwright mutating one corrupt the other.
-  const opts = buildContextOptions({ screenSize: '800x600' }, 'chromium');
+  const opts = buildContextOptions({ screenSize: '800x600' });
   assert.notEqual(opts.viewport, opts.screen);
   assert.deepEqual(opts.viewport, opts.screen);
 });
 
 test('buildContextOptions is deterministic for identical input', () => {
   const opts: ExtractOptions = { locale: 'de-DE', screenSize: '1024x768', header: 'X-Z: y' };
-  assert.deepEqual(buildContextOptions(opts, 'chromium'), buildContextOptions(opts, 'chromium'));
+  assert.deepEqual(buildContextOptions(opts), buildContextOptions(opts));
 });
 
 test('buildContextOptions forwards httpCredentials and storageState when set', () => {
@@ -149,13 +147,13 @@ test('buildContextOptions forwards httpCredentials and storageState when set', (
   const opts = buildContextOptions({
     httpCredentials: { username: 'u', password: 'p' },
     storageState,
-  }, 'chromium');
+  });
   assert.deepEqual(opts.httpCredentials, { username: 'u', password: 'p' });
   assert.equal(opts.storageState, storageState);
 });
 
 test('buildContextOptions omits httpCredentials and storageState when unset', () => {
-  const opts = buildContextOptions({}, 'chromium');
+  const opts = buildContextOptions({});
   assert.ok(!('httpCredentials' in opts));
   assert.ok(!('storageState' in opts));
 });
@@ -170,14 +168,14 @@ test('parseHeader takes a repeated flag and keeps the last value of a repeated n
 });
 
 test('buildContextOptions applies every header of a repeated flag', () => {
-  const opts = buildContextOptions({ header: ['X-A: 1', 'X-B: 2'] }, 'chromium');
+  const opts = buildContextOptions({ header: ['X-A: 1', 'X-B: 2'] });
   assert.equal(opts.extraHTTPHeaders['X-A'], '1');
   assert.equal(opts.extraHTTPHeaders['X-B'], '2');
   assert.ok(opts.extraHTTPHeaders['Accept-Language']);
 });
 
 test('describeContext echoes the dials a default run is measured under', () => {
-  const described = describeContext(buildContextOptions({}, 'chromium'));
+  const described = describeContext(buildContextOptions({}));
   assert.deepEqual(described, {
     viewport: { width: DEFAULT_SCREEN.width, height: DEFAULT_SCREEN.height },
     deviceScaleFactor: 1,
@@ -193,9 +191,9 @@ test('describeContext echoes the dials a default run is measured under', () => {
 });
 
 test('describeContext carries the locale, timezone and viewport the caller set', () => {
-  const described = describeContext(buildContextOptions({ locale: 'fi-FI', timezoneId: 'Europe/Helsinki', screenSize: '390x844' }, 'chromium'));
+  const described = describeContext(buildContextOptions({ locale: 'fi-FI', timezoneId: 'Europe/Helsinki', screenSize: '390x844' }));
   assert.equal(described.locale, 'fi-FI');
   assert.equal(described.timezoneId, 'Europe/Helsinki');
   assert.deepEqual(described.viewport, { width: 390, height: 844 });
-  assert.notEqual(described.viewport, buildContextOptions({ screenSize: '390x844' }, 'chromium').viewport);
+  assert.notEqual(described.viewport, buildContextOptions({ screenSize: '390x844' }).viewport);
 });

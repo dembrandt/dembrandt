@@ -58,7 +58,6 @@ export interface ContextOptions {
   colorScheme: ColorScheme;
   reducedMotion: ReducedMotion;
   forcedColors: ForcedColors;
-  permissions?: string[];
   httpCredentials?: HttpCredentials;
   storageState?: StorageState;
 }
@@ -138,7 +137,7 @@ export function deriveAcceptLanguage(locale: string, explicit?: string): string 
  * access, no mutation of the input. Cookies and init scripts are applied
  * separately by the caller because they are side effects on a live context.
  */
-export function buildContextOptions(options: ExtractOptions, browserName: string): ContextOptions {
+export function buildContextOptions(options: ExtractOptions): ContextOptions {
   const locale = options.locale || DEFAULT_LOCALE;
   const size = parseScreenSize(options.screenSize);
   const extraHTTPHeaders: Record<string, string> = {
@@ -160,10 +159,6 @@ export function buildContextOptions(options: ExtractOptions, browserName: string
     reducedMotion: 'no-preference',
     forcedColors: 'none',
   };
-
-  if (browserName === 'chromium') {
-    contextOptions.permissions = ['clipboard-read', 'clipboard-write'];
-  }
 
   if (options.httpCredentials) {
     contextOptions.httpCredentials = {

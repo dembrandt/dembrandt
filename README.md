@@ -17,17 +17,13 @@ Logo, colors, typography, spacing, borders, shadows, motion, components. W3C des
 
 ```bash
 npm install -g dembrandt
-dembrandt install-browser        # one-time: fetches the matching Chromium
 dembrandt dembrandt.com
 ```
 
-The browser step is required. dembrandt drives Chromium through `playwright-core`,
-which ships no browser binaries, so a fresh install has nothing to launch until you
-run it. Skipping it fails with `browser engine not available`.
+The first run downloads the matching Chromium once, into a shared Playwright cache.
+The MCP server does not: run `npx dembrandt install-browser` before its first extraction.
 
-Or use npx without installing: `npx dembrandt dembrandt.com`. The browser step applies
-here too: run `npx dembrandt install-browser` first. Browsers land in a shared
-Playwright cache, so either route only needs it once.
+Or use npx without installing: `npx dembrandt dembrandt.com`.
 
 Requires Node.js 18+
 

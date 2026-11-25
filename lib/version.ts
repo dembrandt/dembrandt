@@ -37,7 +37,7 @@
  * dembrandt output contract version. Bump per the policy documented above.
  *
  *  1.22.0 — meta gains `readiness`: per wait (hydration, stabilization) its
- *          ms, networkIdle, fontsReady and endedBy (quiet | cap | error). BEHAVIOR:
+ *          ms, networkIdle, fontsSettled and endedBy (quiet | cap | error). BEHAVIOR:
  *          inline style changes no longer hold the DOM-quiet window open, so
  *          animated pages stop running both waits to their 8s and 4s caps.
  *          dembrandt.com drifts 0 against 0.41.0. On 174 labelled sites every

@@ -71,3 +71,12 @@ test('a wait that cannot run ends as an error', async () => {
   await page!.evaluate(() => document.documentElement.remove());
   assert.equal(await page!.evaluate(settleScript(100, 500)), 'error');
 });
+
+test('no timer outlives the wait', async () => {
+  const closed = await browser!.newPage();
+  await closed.close();
+  const timers = () => process.getActiveResourcesInfo().filter((r) => r === 'Timeout').length;
+  const before = timers();
+  await waitForSettled(closed, 60000, 100);
+  assert.equal(timers(), before);
+});
