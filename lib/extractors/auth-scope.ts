@@ -38,6 +38,7 @@ async function scopePage(page: Page, scoped: Record<string, string>, origins: re
 }
 
 const MAX_REDIRECTS = 20;
+const REDIRECTS = [301, 302, 303, 307, 308];
 
 interface Entry {
   page: Page | null;
@@ -53,10 +54,13 @@ async function fulfilScoped(route: Route, scoped: Record<string, string>, origin
     const response = await route.fetch({ headers: { ...request.headers(), ...scoped }, maxRedirects: 0, timeout: 0 });
     const opening = entry.page !== null && request.isNavigationRequest() && request.frame() === entry.page.mainFrame();
     const { location } = response.headers();
-    if (opening && location && response.status() >= 300 && response.status() < 400) {
-      entry.next = new URL(location, request.url()).href;
+    const next = location && REDIRECTS.includes(response.status()) ? new URL(location, request.url()).href : null;
+    if (next && opening && inAuthScope(next, origins)) {
+      entry.next = next;
       return await route.abort();
     }
+    // A fulfilled redirect never counts as finished, so the page would not go idle.
+    if (next && !request.isNavigationRequest() && request.method() === 'GET') return await route.continue();
     await route.fulfill({ response });
   } catch {
     await route.abort().catch(() => {});
@@ -67,7 +71,7 @@ export type Goto = (page: Page, url: string, options: { timeout: number; waitUnt
 
 /**
  * Sends the headers to the given origins only, on every page the context opens. Returns how to open a page:
- * where the engine cannot set them per redirect, each redirect is opened as its own request.
+ * where the engine cannot set them per redirect, each redirect within the site is opened as its own request.
  */
 export async function scopeHeaders(
   context: BrowserContext,
@@ -111,6 +115,6 @@ export async function scopeHeaders(
 }
 
 export function authScopeWarning(finalUrl: string, origins: readonly string[], hasScopedAuth: boolean): string | null {
-  if (!hasScopedAuth || inAuthScope(finalUrl, origins)) return null;
+  if (!hasScopedAuth || !/^https?:/.test(finalUrl) || inAuthScope(finalUrl, origins)) return null;
   return `--header and --basic-auth are sent to the requested site only; run against ${new URL(finalUrl).origin} to send them there`;
 }

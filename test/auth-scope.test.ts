@@ -37,6 +37,7 @@ test('a redirect off the site warns only when credentials were given', () => {
   assert.match(authScopeWarning('https://idp.test/login', origins, true) ?? '', /https:\/\/idp\.test/);
   assert.equal(authScopeWarning('https://idp.test/login', origins, false), null);
   assert.equal(authScopeWarning('https://www.example.com/', origins, true), null);
+  assert.equal(authScopeWarning('about:blank', origins, true), null);
 });
 
 let browser: Browser;
@@ -62,6 +63,10 @@ const serve = (at: 'site' | 'other', reply: (path: string) => { redirect?: strin
       }
       if (path === '/once' && seen.filter((r) => r.path === '/once').length > 1) {
         res.writeHead(410).end();
+        return;
+      }
+      if (path === '/choices') {
+        res.writeHead(300, { location: '/app', 'content-type': 'text/html' }).end('choices');
         return;
       }
       if (path === '/slow.js') {
@@ -92,6 +97,9 @@ before(async () => {
     '/once': { html: tall },
     '/styles': { redirect: '/deep/s.css' },
     '/pic': { redirect: '/pic-moved' },
+    '/to-file': { redirect: 'file:///etc/hosts' },
+    '/to-data': { redirect: 'data:text/html,<p>x</p>' },
+    '/idle': { html: `${tall}<img src="/pic">` },
     '/framing': { html: '<iframe src="/frame-hop"></iframe><script src="/slow.js"></script>' },
     '/frame-hop': { redirect: '/framed' },
     '/hop1': { redirect: '/hop2' },
@@ -239,8 +247,9 @@ test('Firefox sends the header to the site, through its redirects, and to no oth
     const { at, warnings } = await extract(`${siteUrl}/hop1`, credentials, ff);
     for (const path of ['/hop1', '/hop2', '/app', '/styles', '/pic']) {
       const requests = at('site').filter((r) => r.path === path);
-      assert.ok(requests.length === 1 || path === '/styles', `${path} was requested ${requests.length} times`);
-      for (const r of requests) assert.deepEqual([r.secret, r.cookie], ['s', 'session=c'], path);
+      const subresource = ['/styles', '/pic'].includes(path);
+      assert.ok(requests.length === 1 || subresource, `${path} was requested ${requests.length} times`);
+      assert.deepEqual([requests[0]?.secret, requests[0]?.cookie], ['s', 'session=c'], path);
     }
     assert.ok(at('site').some((r) => r.path === '/styles'));
     assert.ok(at('site').some((r) => r.path === '/deep/bg.png'), 'a redirected stylesheet resolves against where it landed');
@@ -292,6 +301,25 @@ test('Firefox lets a frame follow its own redirect', { skip: !hasFirefox && 'fir
     await page.waitForTimeout(1000);
     assert.deepEqual(page.frames().slice(1).map((f) => f.url()), [`${siteUrl}/framed`]);
     assert.equal(page.url(), `${siteUrl}/framing`);
+  }));
+
+test('Firefox opens no redirect a browser would refuse or ignore', { skip: !hasFirefox && 'firefox is not installed' }, () =>
+  firefoxPage(async (page, goto) => {
+    for (const path of ['/to-file', '/to-data']) {
+      await assert.rejects(goto(page, siteUrl + path, open), /page\.goto/, path);
+      assert.doesNotMatch(page.url(), /^(file|data):/, path);
+    }
+    const response = await goto(page, `${siteUrl}/choices`, open);
+    assert.equal(response?.status(), 300);
+    assert.equal(page.url(), `${siteUrl}/choices`);
+  }));
+
+test('a redirected image does not keep Firefox from going idle', { skip: !hasFirefox && 'firefox is not installed' }, () =>
+  firefoxPage(async (page, goto) => {
+    await goto(page, `${siteUrl}/idle`, open);
+    await page.waitForLoadState('networkidle', { timeout: 5000 });
+    assert.ok(seen.some((r) => r.path === '/pic-moved'));
+    assert.deepEqual(seen.filter((r) => r.at === 'other' && r.secret), []);
   }));
 
 test('Firefox gives up on a redirect loop, and passes other failures on', { skip: !hasFirefox && 'firefox is not installed' }, () =>
