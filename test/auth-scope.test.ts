@@ -8,10 +8,10 @@ import { promisify } from 'node:util';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromium, firefox, type Browser } from 'playwright';
+import { chromium, firefox, type Browser, type Page } from 'playwright';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { authOrigins, authScopeWarning, credentialUrlFor, inAuthScope, scopeHeaders } from '../lib/extractors/auth-scope.js';
+import { authOrigins, authScopeWarning, credentialUrlFor, inAuthScope, scopeHeaders, type Goto } from '../lib/extractors/auth-scope.js';
 import { extractBranding } from '../lib/extractors/index.js';
 import { buildContextOptions } from '../lib/extractors/context-config.js';
 
@@ -56,6 +56,22 @@ const serve = (at: 'site' | 'other', reply: (path: string) => { redirect?: strin
         res.writeHead(401, { 'www-authenticate': 'Basic realm="x"' }).end();
         return;
       }
+      if (path === '/deep/s.css') {
+        res.writeHead(200, { 'content-type': 'text/css' }).end('body { background: url(bg.png) }');
+        return;
+      }
+      if (path === '/once' && seen.filter((r) => r.path === '/once').length > 1) {
+        res.writeHead(410).end();
+        return;
+      }
+      if (path === '/slow.js') {
+        setTimeout(() => res.end(), 700);
+        return;
+      }
+      if (path === '/stream') {
+        res.writeHead(200, { 'content-type': 'text/event-stream' }).write('data: first\n\n');
+        return;
+      }
       const { redirect, html = 'ok' } = reply(path);
       res.writeHead(redirect ? 302 : 200, redirect ? { location: redirect } : { 'content-type': 'text/html' });
       res.end(html);
@@ -64,7 +80,7 @@ const serve = (at: 'site' | 'other', reply: (path: string) => { redirect?: strin
 
 before(async () => {
   browser = await chromium.launch();
-  other = await serve('other', (p) => (p === '/back' ? { redirect: `${siteUrl}/backed` } : p === '/app' ? { html: tall } : {}));
+  other = await serve('other', (p) => (p === '/back' ? { redirect: `${siteUrl}/backed` } : p === '/app' ? { html: `${tall}<link rel="stylesheet" href="/basic">` } : {}));
   otherUrl = `http://localhost:${(other.address() as AddressInfo).port}`;
   site = await serve('site', (p) => ({
     '/in': { redirect: '/page' },
@@ -72,15 +88,23 @@ before(async () => {
     '/img': { redirect: `${otherUrl}/img` },
     '/to-app': { redirect: '/app' },
     '/to-other': { redirect: `${otherUrl}/app` },
-    '/basic-app': { html: tall },
+    '/basic-app': { html: `${tall}<link rel="stylesheet" href="${otherUrl}/basic">` },
+    '/once': { html: tall },
+    '/styles': { redirect: '/deep/s.css' },
     '/pic': { redirect: '/pic-moved' },
-    '/app': { html: `${tall}<img src="/pic"><link rel="stylesheet" href="${otherUrl}/basic">` },
+    '/framing': { html: '<iframe src="/frame-hop"></iframe><script src="/slow.js"></script>' },
+    '/frame-hop': { redirect: '/framed' },
+    '/hop1': { redirect: '/hop2' },
+    '/hop2': { redirect: '/app' },
+    '/loop': { redirect: '/loop' },
+    '/wander': { html: `${tall}<script>setTimeout(() => { location.href = '${otherUrl}/app'; }, 200)</script>` },
+    '/app': { html: `${tall}<link rel="stylesheet" href="/styles"><img src="/pic"><link rel="stylesheet" href="${otherUrl}/basic">` },
     '/page': { html: `<img src="/img"><img src="${otherUrl}/direct"><img src="${otherUrl}/back"><img src="${otherUrl}/basic"><script>fetch('/api', { headers: { 'x-secret': 'page' } })</script>` },
     '/basic-page': { html: `<link rel="stylesheet" href="${otherUrl}/basic">` },
   })[p] ?? {});
   siteUrl = `http://127.0.0.1:${(site.address() as AddressInfo).port}`;
 });
-after(async () => { await browser?.close(); site?.close(); other?.close(); });
+after(async () => { await browser?.close(); site?.closeAllConnections(); site?.close(); other?.close(); });
 
 async function visit(path: string, engine: string, basic = false) {
   seen = [];
@@ -163,11 +187,12 @@ test('a crawled page on another site gets no credential', async () => {
 test('a CLI crawl to another site carries no credential there', async () => {
   seen = [];
   const cli = fileURLToPath(new URL('../index.js', import.meta.url));
-  await promisify(execFile)(process.execPath, [cli, `${siteUrl}/app`, `${otherUrl}/app`, '--json-only',
+  const { stdout } = await promisify(execFile)(process.execPath, [cli, `${siteUrl}/app`, `${otherUrl}/app`, '--json-only',
     '--no-headed-fallback', '--header', 'X-Secret: s', '--cookie', 'session=c'], { maxBuffer: 1 << 26 });
   assert.equal(seen.find((r) => r.at === 'site' && r.path === '/app')?.secret, 's');
   assert.ok(seen.some((r) => r.at === 'other' && r.path === '/app'));
   assert.deepEqual(seen.filter((r) => r.at === 'other' && (r.secret || r.cookie)), []);
+  assert.match(JSON.parse(stdout).meta.sessionWarnings?.[0] ?? '', /requested site only/);
 });
 
 test('basic auth given to an extraction opens the site', async () => {
@@ -211,14 +236,23 @@ const hasFirefox = existsSync(firefox.executablePath());
 test('Firefox sends the header to the site, through its redirects, and to no other host', { skip: !hasFirefox && 'firefox is not installed' }, async () => {
   const ff = await firefox.launch();
   try {
-    const { at, warnings } = await extract(`${siteUrl}/to-app`, credentials, ff);
-    for (const path of ['/to-app', '/app', '/pic', '/pic-moved']) {
-      assert.equal(at('site').find((r) => r.path === path)?.secret, 's', path);
-      assert.equal(at('site').find((r) => r.path === path)?.cookie, 'session=c', path);
+    const { at, warnings } = await extract(`${siteUrl}/hop1`, credentials, ff);
+    for (const path of ['/hop1', '/hop2', '/app', '/styles', '/pic']) {
+      const requests = at('site').filter((r) => r.path === path);
+      assert.ok(requests.length === 1 || path === '/styles', `${path} was requested ${requests.length} times`);
+      for (const r of requests) assert.deepEqual([r.secret, r.cookie], ['s', 'session=c'], path);
     }
+    assert.ok(at('site').some((r) => r.path === '/styles'));
+    assert.ok(at('site').some((r) => r.path === '/deep/bg.png'), 'a redirected stylesheet resolves against where it landed');
+    assert.ok(at('site').some((r) => r.path === '/pic-moved'));
     assert.ok(at('other').some((r) => r.path === '/basic'));
     assert.deepEqual(at('other').filter((r) => r.secret || r.auth || r.cookie), []);
     assert.deepEqual(warnings, []);
+    const once = await extract(`${siteUrl}/once`, credentials, ff);
+    assert.equal(once.at('site').filter((r) => r.path === '/once').length, 1, 'a one-time link is opened once');
+    const basic = await extract(`${siteUrl}/basic-app`, { basicAuth: 'u:p', header: 'X-Secret: s' }, ff);
+    assert.ok(basic.at('site').some((r) => r.path === '/basic-app' && r.auth?.startsWith('Basic ') && r.secret === 's'));
+    assert.deepEqual(basic.at('other').filter((r) => r.auth || r.secret), []);
     const crawled = await extract(`${otherUrl}/app`, { ...credentials, authUrl: siteUrl }, ff);
     assert.ok(crawled.at('other').some((r) => r.path === '/app'));
     assert.deepEqual(crawled.at('other').filter((r) => r.secret || r.auth || r.cookie), []);
@@ -229,6 +263,73 @@ test('Firefox sends the header to the site, through its redirects, and to no oth
   } finally {
     await ff.close();
   }
+});
+
+async function firefoxPage(run: (page: Page, goto: Goto) => Promise<void>) {
+  const ff = await firefox.launch();
+  try {
+    const context = await ff.newContext();
+    const goto = await scopeHeaders(context, { 'X-Secret': 's' }, authOrigins(siteUrl), 'firefox');
+    seen = [];
+    await run(await context.newPage(), goto);
+  } finally {
+    await ff.close();
+  }
+}
+const open = { timeout: 8000, waitUntil: 'domcontentloaded' as const };
+
+test('Firefox reports the page it landed on, with its fragment and status', { skip: !hasFirefox && 'firefox is not installed' }, () =>
+  firefoxPage(async (page, goto) => {
+    const response = await goto(page, `${siteUrl}/hop1#part`, open);
+    assert.equal(response?.status(), 200);
+    assert.equal(response?.url(), `${siteUrl}/app`);
+    assert.equal(page.url(), `${siteUrl}/app#part`);
+  }));
+
+test('Firefox lets a frame follow its own redirect', { skip: !hasFirefox && 'firefox is not installed' }, () =>
+  firefoxPage(async (page, goto) => {
+    await goto(page, `${siteUrl}/framing`, open);
+    await page.waitForTimeout(1000);
+    assert.deepEqual(page.frames().slice(1).map((f) => f.url()), [`${siteUrl}/framed`]);
+    assert.equal(page.url(), `${siteUrl}/framing`);
+  }));
+
+test('Firefox gives up on a redirect loop, and passes other failures on', { skip: !hasFirefox && 'firefox is not installed' }, () =>
+  firefoxPage(async (page, goto) => {
+    await assert.rejects(goto(page, `${siteUrl}/loop`, open), /too many redirects/);
+    await assert.rejects(goto(page, 'http://127.0.0.1:1/', open), /page\.goto/);
+  }));
+
+test('Firefox still opens event streams, without the header', { skip: !hasFirefox && 'firefox is not installed' }, () =>
+  firefoxPage(async (page, goto) => {
+    await goto(page, `${siteUrl}/plain`, open);
+    const first = await page.evaluate(() => new Promise((ok) => {
+      const source = new EventSource('/stream');
+      source.onmessage = (e) => { source.close(); ok(e.data); };
+      setTimeout(() => ok('nothing'), 4000);
+    }));
+    assert.equal(first, 'first');
+    assert.equal(seen.find((r) => r.path === '/stream')?.secret, undefined);
+  }));
+
+test('a page that wanders off the site after loading is a warning too', async () => {
+  const { warnings, at } = await extract(`${siteUrl}/wander`, { header: 'X-Secret: s' });
+  assert.ok(at('other').some((r) => r.path === '/app'));
+  assert.deepEqual(at('other').filter((r) => r.secret), []);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /requested site only/);
+});
+
+test('basic auth alone earns the warning, and a crawl to another site does not carry it', async () => {
+  const { warnings, at } = await extract(`${otherUrl}/app`, { basicAuth: 'u:p', authUrl: siteUrl });
+  assert.ok(at('other').some((r) => r.path === '/basic'));
+  assert.deepEqual(at('other').filter((r) => r.auth), []);
+  assert.match(warnings[0] ?? '', /requested site only/);
+});
+
+test('basic auth covers every origin of the site', () => {
+  const options = buildContextOptions({ httpCredentials: { username: 'u', password: 'p' } }, 'chromium', authOrigins('https://example.com'));
+  assert.deepEqual(options.httpCredentials?.map((c) => c.origin), ['https://example.com', 'https://www.example.com']);
 });
 
 test('an MCP crawl to another site carries no credential there', async () => {

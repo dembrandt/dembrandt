@@ -36,7 +36,7 @@ import { switchToDark } from './color-scheme.js';
 import type { Browser, Page } from 'playwright';
 import type { ExtractOptions, BrandingResult, Spinner, ExtractorError, WcagPair } from '../types.js';
 import type { VoiceResult } from '../voice/index.js';
-import { authOrigins, authScopeWarning, credentialUrlFor, resolveEntry, scopeHeaders } from './auth-scope.js';
+import { authOrigins, authScopeWarning, credentialUrlFor, scopeHeaders } from './auth-scope.js';
 import { waitForSettled, type ReadinessPhase } from '../readiness.js';
 
 // Gaussian noise via Box-Muller
@@ -325,7 +325,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
     }
   };
 
-  await closingOnError(scopeHeaders(context, scopedHeaders, origins, browser.browserType().name()));
+  const goto = await closingOnError(scopeHeaders(context, scopedHeaders, origins, browser.browserType().name()));
 
   // storageState already applied its cookies; file-only cookies merge over --cookie.
   const cliCookies = parseCookies(options.cookie, credentialUrl);
@@ -447,6 +447,12 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
   }
 
   const page = await closingOnError(context.newPage());
+  const warnIfOffSite = () => {
+    const unsent = authScopeWarning(page.url(), origins, !!httpCredentials || Object.keys(scopedHeaders).length > 0);
+    if (!unsent || sessionWarnings.includes(unsent)) return;
+    sessionWarnings.push(unsent);
+    console.log(color.warning(`  ! Session: ${unsent}`));
+  };
   await watchTechSources(page).catch(() => {});
 
   // Track font requests to identify self-hosted custom fonts
@@ -477,19 +483,12 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       spinner.text = `Navigating to ${url} (attempt ${attempts}/${maxAttempts})...`;
       try {
         const initialUrl = url;
-        const entry = await resolveEntry(
-          context, url, scopedHeaders, origins, browser.browserType().name(), (options.navigationTimeout || 20000) * timeoutMultiplier);
-        const navigationResponse = await page.goto(entry, {
+        const navigationResponse = await goto(page, url, {
           waitUntil: "domcontentloaded",
           timeout: (options.navigationTimeout || 20000) * timeoutMultiplier,
         });
         lastNavigationStatus = navigationResponse ? navigationResponse.status() : null;
         const finalUrl = page.url();
-        const unsent = authScopeWarning(finalUrl, origins, !!httpCredentials || Object.keys(scopedHeaders).length > 0);
-        if (unsent && !sessionWarnings.includes(unsent)) {
-          sessionWarnings.push(unsent);
-          console.log(color.warning(`  ! Session: ${unsent}`));
-        }
 
         if (initialUrl !== finalUrl) {
           spinner.stop();
@@ -760,6 +759,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
 
         spinner.start("Final content stabilization...");
         readiness.stabilization = await waitForSettled(page, 4000 * timeoutMultiplier, 400);
+        warnIfOffSite();
         spinner.stop();
         log(color.success(`  ✓ Page fully loaded and stable`));
 

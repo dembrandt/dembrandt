@@ -118,7 +118,7 @@ program
   .option("--sitemap", "Discover pages from sitemap.xml instead of DOM links; use alone or combine with --crawl to set page limit")
   .option("--cookie <string>", "Cookie string for authenticated pages, e.g. \"session=abc; token=xyz\"")
   .option("--cookie-file <path>", "Cookie export for authenticated pages: JSON array, Playwright storageState (cookies + localStorage), or Netscape cookies.txt")
-  .option("--basic-auth <user:password>", "HTTP Basic credentials for the browser context, e.g. \"staging:secret\"")
+  .option("--basic-auth <user:password>", "HTTP Basic credentials for the requested site only, e.g. \"staging:secret\"")
   .option("--login", "Open a visible browser to sign in; press Enter when ready, then continue extraction (interactive terminal only)")
   .option("--save-storage-state <path>", "With --login, save the signed-in session to a file for later runs via --cookie-file")
   .option("--header <string>", "Extra HTTP header for the requested site only, e.g. \"Authorization: Bearer eyJ...\"; repeat the flag for several", (v: string, all: string[] = []) => [...all, v])

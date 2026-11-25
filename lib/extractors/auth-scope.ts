@@ -1,4 +1,4 @@
-import type { BrowserContext, Page, Route } from 'playwright';
+import type { BrowserContext, Page, Response, Route } from 'playwright';
 
 /** The origins a run's credentials may reach: the requested site, with or without www, and its https upgrade. */
 export function authOrigins(authUrl: string): string[] {
@@ -37,28 +37,25 @@ async function scopePage(page: Page, scoped: Record<string, string>, origins: re
   await cdp.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
 }
 
-const MAX_REDIRECTS = 10;
+const MAX_REDIRECTS = 20;
 
-function siteRedirect(status: number, location: string | undefined, from: string, origins: readonly string[]): string | null {
-  if (status < 300 || status > 399 || !location) return null;
-  const next = new URL(location, from).href;
-  return inAuthScope(next, origins) ? next : null;
+interface Entry {
+  page: Page | null;
+  next: string | null;
 }
 
 // Without CDP the response is fetched and fulfilled here, because a redirect the browser follows carries no override.
-async function fulfilScoped(route: Route, scoped: Record<string, string>, origins: readonly string[]): Promise<void> {
+async function fulfilScoped(route: Route, scoped: Record<string, string>, origins: readonly string[], entry: Entry): Promise<void> {
   const request = route.request();
-  if (!inAuthScope(request.url(), origins)) return route.continue();
-  const headers = { ...request.headers(), ...scoped };
-  const follow = request.method() === 'GET' && !request.isNavigationRequest();
+  const streams = ['media', 'eventsource'].includes(request.resourceType());
+  if (streams || !inAuthScope(request.url(), origins)) return route.continue();
   try {
-    let url = request.url();
-    let response = await route.fetch({ headers, maxRedirects: 0 });
-    for (let hop = 0; follow && hop < MAX_REDIRECTS; hop++) {
-      const next = siteRedirect(response.status(), response.headers().location, url, origins);
-      if (!next) break;
-      url = next;
-      response = await route.fetch({ url, headers, maxRedirects: 0 });
+    const response = await route.fetch({ headers: { ...request.headers(), ...scoped }, maxRedirects: 0, timeout: 0 });
+    const opening = entry.page !== null && request.isNavigationRequest() && request.frame() === entry.page.mainFrame();
+    const { location } = response.headers();
+    if (opening && location && response.status() >= 300 && response.status() < 400) {
+      entry.next = new URL(location, request.url()).href;
+      return await route.abort();
     }
     await route.fulfill({ response });
   } catch {
@@ -66,44 +63,50 @@ async function fulfilScoped(route: Route, scoped: Record<string, string>, origin
   }
 }
 
-/** The URL to open: past the redirects that stay on the site, where the browser would follow them without the headers. */
-export async function resolveEntry(
-  context: BrowserContext,
-  url: string,
-  scoped: Record<string, string>,
-  origins: readonly string[],
-  browserName: string,
-  timeout: number,
-): Promise<string> {
-  if (browserName === 'chromium' || Object.keys(scoped).length === 0 || !inAuthScope(url, origins)) return url;
-  let current = url;
-  for (let hop = 0; hop < MAX_REDIRECTS; hop++) {
-    const response = await context.request.get(current, { headers: scoped, maxRedirects: 0, timeout }).catch(() => null);
-    const next = response && siteRedirect(response.status(), response.headers().location, current, origins);
-    await response?.dispose();
-    if (!next) break;
-    current = next;
-  }
-  return current;
-}
+export type Goto = (page: Page, url: string, options: { timeout: number; waitUntil: 'domcontentloaded' }) => Promise<Response | null>;
 
-/** Sends the headers to the given origins only, on every page the context opens. */
+/**
+ * Sends the headers to the given origins only, on every page the context opens. Returns how to open a page:
+ * where the engine cannot set them per redirect, each redirect is opened as its own request.
+ */
 export async function scopeHeaders(
   context: BrowserContext,
   scoped: Record<string, string>,
   origins: readonly string[],
   browserName: string,
-): Promise<void> {
-  if (Object.keys(scoped).length === 0) return;
-  if (browserName !== 'chromium') {
-    await context.route('**/*', (route) => fulfilScoped(route, scoped, origins));
-    return;
+): Promise<Goto> {
+  if (Object.keys(scoped).length === 0) return (page, url, options) => page.goto(url, options);
+  if (browserName === 'chromium') {
+    const newPage = context.newPage.bind(context);
+    context.newPage = async () => {
+      const page = await newPage();
+      await scopePage(page, scoped, origins);
+      return page;
+    };
+    return (page, url, options) => page.goto(url, options);
   }
-  const newPage = context.newPage.bind(context);
-  context.newPage = async () => {
-    const page = await newPage();
-    await scopePage(page, scoped, origins);
-    return page;
+  const entry: Entry = { page: null, next: null };
+  await context.route('**/*', (route) => fulfilScoped(route, scoped, origins, entry));
+  return async (page, url, { timeout, waitUntil }) => {
+    const deadline = Date.now() + timeout;
+    let current = url;
+    try {
+      for (let hop = 0; hop < MAX_REDIRECTS; hop++) {
+        entry.page = page;
+        entry.next = null;
+        try {
+          return await page.goto(current, { timeout: Math.max(1, deadline - Date.now()), waitUntil });
+        } catch (err) {
+          if (!entry.next) throw err;
+          const next = new URL(entry.next);
+          next.hash ||= new URL(current).hash;
+          current = next.href;
+        }
+      }
+      throw new Error(`too many redirects from ${url}`);
+    } finally {
+      entry.page = null;
+    }
   };
 }
 
