@@ -111,7 +111,7 @@ reference is **[docs/usage.md](docs/usage.md)**.
 | `--basic-auth <user:pass>` | HTTP Basic for the requested site, with or without `www`, and its `https` upgrade |
 | `--login` | Open a visible browser to sign in; press Enter when ready, then extract (interactive terminal only) |
 | `--save-storage-state <path>` | With `--login`, save the signed-in session (cookies, localStorage, sessionStorage) to a file; reuse it later with `--cookie-file`, also in CI |
-| `--header <string>` | Extra request header for the requested site only, repeat for several. Not sent by service workers, popups or WebSockets, nor in Firefox by streams, media or redirects other than the requested URL's own |
+| `--header <string>` | Extra request header for the requested site only, repeat for several. Not sent by service workers, popups or WebSockets, nor in Firefox by streams, media or redirects other than the requested URL's own; Firefox also holds each response in memory |
 | `--no-headed-fallback` | Never open a visible browser on a failed navigation; for batch runs |
 | `--user-agent <string>` | Custom user agent |
 | `--locale <string>` | Locale for the fingerprint |
