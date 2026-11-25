@@ -767,6 +767,8 @@ export interface ExtractOptions {
   login?: boolean;
   saveStorageState?: string;
   httpCredentials?: { username: string; password: string };
+  /** The URL the user asked for; credentials never leave its site. Set for pages reached from it. */
+  authUrl?: string;
   storageState?: {
     cookies: Array<{
       name: string;
