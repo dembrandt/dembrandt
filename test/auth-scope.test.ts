@@ -118,7 +118,7 @@ async function visit(path: string, engine: string, basic = false) {
   seen = [];
   const origins = authOrigins(siteUrl);
   const options = buildContextOptions(
-    { header: 'X-Secret: s', ...(basic && { httpCredentials: { username: 'u', password: 'p' } }) }, 'chromium', origins);
+    { header: 'X-Secret: s', ...(basic && { httpCredentials: { username: 'u', password: 'p' } }) }, origins);
   const context = await browser.newContext(options as Parameters<Browser['newContext']>[0]);
   await scopeHeaders(context, { 'X-Secret': 's' }, origins, engine);
   const page = await context.newPage();
@@ -356,7 +356,7 @@ test('basic auth alone earns the warning, and a crawl to another site does not c
 });
 
 test('basic auth covers every origin of the site', () => {
-  const options = buildContextOptions({ httpCredentials: { username: 'u', password: 'p' } }, 'chromium', authOrigins('https://example.com'));
+  const options = buildContextOptions({ httpCredentials: { username: 'u', password: 'p' } }, authOrigins('https://example.com'));
   assert.deepEqual(options.httpCredentials?.map((c) => c.origin), ['https://example.com', 'https://www.example.com']);
 });
 

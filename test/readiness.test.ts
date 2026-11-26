@@ -71,3 +71,18 @@ test('a wait that cannot run ends as an error', async () => {
   await page!.evaluate(() => document.documentElement.remove());
   assert.equal(await page!.evaluate(settleScript(100, 500)), 'error');
 });
+
+test('no timer outlives the wait', async () => {
+  const closed = await browser!.newPage();
+  await closed.close();
+  const timers = () => process.getActiveResourcesInfo().filter((r) => r === 'Timeout').length;
+  const before = timers();
+  await waitForSettled(closed, 60000, 100);
+  assert.equal(timers(), before);
+});
+
+test('a settled page reports its fonts under the name the schema documents', async () => {
+  await page!.setContent('<p>x</p>');
+  assert.deepEqual(Object.keys(await waitForSettled(page!, 3000, 100)).sort(), ['endedBy', 'fontsSettled', 'ms', 'networkIdle']);
+  assert.equal((await waitForSettled(page!, 3000, 100)).fontsSettled, true);
+});

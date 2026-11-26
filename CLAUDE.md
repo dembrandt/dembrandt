@@ -160,4 +160,4 @@ All extraction functions use `page.evaluate()` to run analysis in browser contex
 - `commander` — CLI parsing
 - `ora` — spinners
 
-Requires Node.js 18+.
+Requires Node.js 20+.

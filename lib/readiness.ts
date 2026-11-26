@@ -10,7 +10,7 @@ export type SettleEnd = 'quiet' | 'cap' | 'error';
 export interface ReadinessPhase {
   ms: number;
   networkIdle: boolean;
-  fontsReady: boolean;
+  fontsSettled: boolean;
   endedBy: SettleEnd;
 }
 
@@ -51,16 +51,17 @@ export async function waitForSettled(page: Page, capMs: number, quietMs = 500): 
   const start = Date.now();
   const left = () => Math.max(250, capMs - (Date.now() - start));
   let networkIdle = false;
-  let fontsReady = false;
+  let fontsSettled = false;
   let endedBy: SettleEnd = 'error';
   try { await page.waitForLoadState('networkidle', { timeout: capMs }); networkIdle = true; } catch {}
   // fonts.ready can hang on a stalled font request, so it races the remaining budget.
+  let budget: ReturnType<typeof setTimeout> | undefined;
   try {
-    fontsReady = await Promise.race([
+    fontsSettled = await Promise.race([
       page.evaluate(() => Promise.resolve(document.fonts?.ready).then(() => true)),
-      new Promise<boolean>((r) => setTimeout(() => r(false), left())),
+      new Promise<boolean>((r) => { budget = setTimeout(() => r(false), left()); }),
     ]);
-  } catch {}
+  } catch {} finally { clearTimeout(budget); }
   try { endedBy = await page.evaluate(settleScript(quietMs, left())) as SettleEnd; } catch {}
-  return { ms: Date.now() - start, networkIdle, fontsReady, endedBy };
+  return { ms: Date.now() - start, networkIdle, fontsSettled, endedBy };
 }

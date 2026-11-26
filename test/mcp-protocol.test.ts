@@ -186,6 +186,7 @@ test('check_robots answers on an unreachable host instead of hanging', async () 
 test('job listing works before any job exists', async () => {
   const res = await call('list_jobs', {});
   assert.deepEqual(JSON.parse(res.content[0].text), { jobs: [] });
+});
 
 test('an extraction tool queues instead of blocking, and the job can be cancelled', async () => {
   const queued = await call('get_motion', { url: 'https://example.com/' });
@@ -198,8 +199,6 @@ test('an extraction tool queues instead of blocking, and the job can be cancelle
   assert.notEqual(cancelled.isError, true);
   const after = await call('get_job_status', { job_id: jobId });
   assert.doesNotMatch(after.content[0].text, /"status":\s*"completed"/, 'a cancelled job must not complete');
-});
-
 });
 
 test('the process exits when its transport closes', async () => {

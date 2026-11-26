@@ -307,7 +307,6 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
       ...(httpCredentials ? { httpCredentials } : {}),
       ...(fileSession.storageState ? { storageState: fileSession.storageState } : {}),
     },
-    browser.browserType().name(),
     origins,
   );
 

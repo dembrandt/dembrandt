@@ -58,7 +58,6 @@ export interface ContextOptions {
   colorScheme: ColorScheme;
   reducedMotion: ReducedMotion;
   forcedColors: ForcedColors;
-  permissions?: string[];
   httpCredentials?: Array<HttpCredentials & { origin: string }>;
   storageState?: StorageState;
 }
@@ -140,7 +139,6 @@ export function deriveAcceptLanguage(locale: string, explicit?: string): string 
  */
 export function buildContextOptions(
   options: ExtractOptions,
-  browserName: string,
   origins: readonly string[] = [],
 ): ContextOptions {
   const locale = options.locale || DEFAULT_LOCALE;
@@ -163,10 +161,6 @@ export function buildContextOptions(
     reducedMotion: 'no-preference',
     forcedColors: 'none',
   };
-
-  if (browserName === 'chromium') {
-    contextOptions.permissions = ['clipboard-read', 'clipboard-write'];
-  }
 
   if (options.httpCredentials) {
     const { username, password } = options.httpCredentials;
