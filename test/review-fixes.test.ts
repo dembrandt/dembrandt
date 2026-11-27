@@ -52,6 +52,8 @@ test('a link with a zero-size underline gradient is not a filled button', async 
   const buttons = await withPage(html, (p) => extractButtonStyles(p));
   assert.equal(buttons[0]?.text, 'Sign up');
   assert.ok(!buttons.some((b) => b.text === 'our documentation'), 'underline link read as a button');
+});
+
 test('a dark background painted on a wrapper is the page background', async (t) => {
   if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
   const html = `<!doctype html><body style="margin:0;color:#eee"><div style="background:#0b0d12;min-height:100vh">` +
