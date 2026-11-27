@@ -8,6 +8,21 @@ export async function extractButtonStyles(page) {
       'button, a[href], [role="button"]'
     ));
 
+    const splitTopLevel = (value, sep) => {
+      const parts = [];
+      let depth = 0, quote = '', start = 0;
+      for (let i = 0; i < value.length; i++) {
+        const ch = value[i];
+        if (quote) { if (ch === quote && value[i - 1] !== '\\') quote = ''; continue; }
+        if (ch === '"' || ch === "'") quote = ch;
+        else if (ch === '(') depth++;
+        else if (ch === ')') depth = Math.max(0, depth - 1);
+        else if (depth === 0 && (sep === ' ' ? /\s/.test(ch) : ch === sep)) { parts.push(value.slice(start, i)); start = i + 1; }
+      }
+      parts.push(value.slice(start));
+      return parts.map((p) => p.trim()).filter(Boolean);
+    };
+
     const isTransparent = (color) =>
       !color || color === 'transparent' || color === 'rgba(0, 0, 0, 0)';
 
@@ -29,16 +44,8 @@ export async function extractButtonStyles(page) {
         // Must have a visible background or border — not just inherited
         const bg = computed.backgroundColor;
         const borderWidth = Math.max(...[computed.borderTopWidth, computed.borderRightWidth, computed.borderBottomWidth, computed.borderLeftWidth].map((w) => parseFloat(w) || 0));
-        const layers = [];
-        let depth = 0, start = 0;
-        for (let i = 0; i < computed.backgroundImage.length; i++) {
-          const ch = computed.backgroundImage[i];
-          if (ch === '(') depth++;
-          else if (ch === ')') depth--;
-          else if (ch === ',' && depth === 0) { layers.push(computed.backgroundImage.slice(start, i).trim()); start = i + 1; }
-        }
-        layers.push(computed.backgroundImage.slice(start).trim());
-        const sizes = computed.backgroundSize.split(',').map((l) => l.trim().split(/\s+/));
+        const layers = splitTopLevel(computed.backgroundImage, ',');
+        const sizes = splitTopLevel(computed.backgroundSize, ',').map((l) => splitTopLevel(l, ' '));
         const gradientShows = layers.some((l, i) => /gradient\(/.test(l) && !(sizes[i % sizes.length] ?? []).some((v) => parseFloat(v) === 0));
         const gradient = gradientShows ? computed.backgroundImage : undefined;
         const hasBackground = !isTransparent(bg) || Boolean(gradient);

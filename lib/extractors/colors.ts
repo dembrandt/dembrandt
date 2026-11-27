@@ -483,26 +483,35 @@ export async function extractColors(page) {
     const surfaceEl = document.body || document.documentElement;
     if (surfaceEl) {
       let bgNode: Element | null = surfaceEl;
+      let backgroundPainted = false;
       for (let hop = 0; hop < 5 && bgNode; hop++) {
         const bg = toLegacy(getComputedStyle(bgNode).backgroundColor);
-        if (bg && colorAlpha(bg) >= 0.9) { semanticColors.background = bg; break; }
+        if (bg && colorAlpha(bg) >= 0.9) { semanticColors.background = bg; backgroundPainted = true; break; }
         bgNode = bgNode.parentElement;
       }
       if (!semanticColors.background) semanticColors.background = 'rgb(255, 255, 255)';
       const txt = toLegacy(getComputedStyle(surfaceEl).color);
       if (txt && colorAlpha(txt) >= 0.5) semanticColors.text = txt;
       const separates = (c) => Math.abs(colorLightness(c) - colorLightness(semanticColors.background)) >= 0.3;
-      if (semanticColors.text && !separates(semanticColors.text)) {
+      if (backgroundPainted && semanticColors.text && !separates(semanticColors.text)) {
         const byLength = new Map();
-        const docWidth = document.documentElement.scrollWidth;
+        const range = document.createRange();
+        const onScreen = (r) => r.width > 1 && r.height > 1 && r.right > 0 && r.left < innerWidth && r.bottom + window.scrollY > 0;
         for (const el of Array.from(document.body?.querySelectorAll('*') ?? []).slice(0, 4000)) {
-          if (el.closest('a, button, [role="button"]')) continue;
-          const own = Array.from(el.childNodes).reduce((n, c) => n + (c.nodeType === 3 ? (c.textContent || '').trim().length : 0), 0);
+          if (el.closest('button, [role="button"]')) continue;
+          const link = el.closest('a');
+          if (link && getComputedStyle(link).display.startsWith('inline')) continue;
+          const texts = Array.from(el.childNodes).filter((c) => c.nodeType === 3 && (c.textContent || '').trim());
+          if (!texts.length) continue;
+          if (typeof el.checkVisibility === 'function' && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
+          if (!onScreen(el.getBoundingClientRect())) continue;
+          let own = 0;
+          for (const t of texts) {
+            range.selectNodeContents(t);
+            if (Array.from(range.getClientRects()).some(onScreen)) own += (t.textContent || '').trim().length;
+          }
           if (!own) continue;
           const cs = getComputedStyle(el);
-          if (cs.visibility === 'hidden' || cs.display === 'none' || +cs.opacity === 0) continue;
-          const r = el.getBoundingClientRect();
-          if (!r.width || !r.height || r.right <= 0 || r.left >= docWidth || r.bottom + window.scrollY <= 0) continue;
           const c = toLegacy(cs.color);
           if (c && colorAlpha(c) >= 0.5 && separates(c)) byLength.set(c, (byLength.get(c) || 0) + own);
         }

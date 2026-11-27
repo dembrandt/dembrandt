@@ -90,3 +90,46 @@ test('a gradient layer of zero size is not a fill, whichever layer it is', async
   const buttons = await withPage(html, (p) => extractButtonStyles(p));
   assert.ok(!buttons.some((b) => b.text === 'Layered link'));
 });
+
+test('a guessed white background never replaces the body text colour', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const html = `<!doctype html><body style="margin:0;color:#eee"><div style="background:#0b0d12;min-height:100vh">` +
+    Array.from({ length: 6 }, () => `<p>copy</p>`).join('') +
+    `<div style="background:#fff;color:#333">We use cookies</div></div></body>`;
+  const { semantic } = await withPage(html, (p) => extractColors(p));
+  assert.equal(semantic.text, 'rgb(238, 238, 238)');
+});
+
+test('hidden text never sets the replacement colour', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const seo = 'hidden seo text '.repeat(100);
+  const html = `<!doctype html><body style="margin:0;background:#111;color:#111;overflow-x:hidden">` +
+    `<div style="position:absolute;left:99999px;color:#ff0">${seo}</div>` +
+    `<div style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);color:#ff0">${seo}</div>` +
+    Array.from({ length: 40 }, () => `<h2 style="text-indent:-9999px;white-space:nowrap;overflow:hidden;color:#ff0">Hidden heading text</h2>`).join('') +
+    `<div style="opacity:0"><p style="color:#ff0">${seo}</p></div>` +
+    `<p style="color:#eee">Readable copy.</p><p style="color:#eee">More readable copy.</p></body>`;
+  const { semantic } = await withPage(html, (p) => extractColors(p));
+  assert.equal(semantic.text, 'rgb(238, 238, 238)');
+});
+
+test('copy inside block card links still counts as body text', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const html = `<!doctype html><body style="margin:0;background:#000;color:#000">` +
+    Array.from({ length: 10 }, () => `<a href="/c" style="display:block;color:#eee"><h3>Card title</h3><p>A teaser that is the page's main copy.</p></a>`).join('') +
+    `<footer style="color:#777">Footer</footer></body>`;
+  const { semantic } = await withPage(html, (p) => extractColors(p));
+  assert.equal(semantic.text, 'rgb(238, 238, 238)');
+});
+
+test('layer and size lists split on top-level commas only', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const gif = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+  const html = `<!doctype html><body style="margin:0;background:#fff"><main>` +
+    `<a href="/m" style="display:inline-block;background-image:url(${gif}),linear-gradient(red,blue);background-size:min(10px, 5%) 10px,0px 2px;background-repeat:no-repeat;border:0;padding:12px 24px;color:#111">Min link</a>` +
+    `<a href="/q" style="display:inline-block;background-image:url('${gif}#a(b'),linear-gradient(red,blue);background-size:10px 10px,0px 2px;background-repeat:no-repeat;border:0;padding:12px 24px;color:#111">Quote link</a>` +
+    `</main></body>`;
+  const buttons = await withPage(html, (p) => extractButtonStyles(p));
+  assert.ok(!buttons.some((b) => b.text === 'Min link'), 'min() shifted the size list');
+  assert.ok(!buttons.some((b) => b.text === 'Quote link'), 'a paren inside a quoted url merged the layers');
+});
