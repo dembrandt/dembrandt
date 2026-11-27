@@ -1,3 +1,5 @@
+import { fetchFromPage } from './public-fetch.js';
+
 /**
  * Page Discovery
  *
@@ -144,9 +146,9 @@ async function findSitemapUrls(origin, knownSitemaps: string[] = []) {
 /**
  * Fetch a single sitemap URL, returning its XML text or empty string.
  */
-async function fetchSitemap(url) {
+async function fetchSitemap(url, pageUrl: string) {
   try {
-    const res = await fetch(url, {
+    const res = await fetchFromPage(url, pageUrl, {
       ...FETCH_OPTS,
       signal: AbortSignal.timeout(10000),
     });
@@ -175,7 +177,7 @@ export async function parseSitemap(baseUrl, maxPages, knownSitemaps: string[] = 
   const candidates = await findSitemapUrls(base.origin, knownSitemaps);
   let xml = '';
   for (const candidate of candidates) {
-    xml = await fetchSitemap(candidate);
+    xml = await fetchSitemap(candidate, baseUrl);
     if (xml) break;
   }
   if (!xml) return [];
@@ -196,7 +198,7 @@ export async function parseSitemap(baseUrl, maxPages, knownSitemaps: string[] = 
       .filter(u => { try { return acceptedHostnames.has(new URL(u).hostname); } catch { return false; } });
 
     const childUrls = extractLocs(xml).slice(0, 10);
-    const childXmls = await Promise.all(childUrls.map(u => fetchSitemap(u)));
+    const childXmls = await Promise.all(childUrls.map(u => fetchSitemap(u, baseUrl)));
 
     // Check if children are also sitemapindex (e.g. Spotify's 3-level hierarchy)
     const grandchildFetches = [];
@@ -205,7 +207,7 @@ export async function parseSitemap(baseUrl, maxPages, knownSitemaps: string[] = 
       if (!childXml) continue;
       if (childXml.includes('<sitemapindex')) {
         const gcUrls = extractLocs(childXml).slice(0, 3);
-        grandchildFetches.push(...gcUrls.map(u => fetchSitemap(u)));
+        grandchildFetches.push(...gcUrls.map(u => fetchSitemap(u, baseUrl)));
       } else {
         pageXmls.push(childXml);
       }

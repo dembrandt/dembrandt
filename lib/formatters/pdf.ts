@@ -10,6 +10,7 @@
 
 import { loadBrowserEngines } from '../browser.js';
 import { buildHTML, getLogoImageUrl } from './brand-guide.js';
+import { fetchFromPage } from '../public-fetch.js';
 
 export { buildHTML };
 
@@ -36,7 +37,7 @@ function contentTypeFromUrl(url: string): string | null {
  * if the bytes cannot be fetched, drop the logo entirely — a guide without a
  * logo beats one with broken-image placeholders on every page.
  */
-export async function inlineLogoForPdf(data, fetchImpl = fetch) {
+export async function inlineLogoForPdf(data, fetchImpl: typeof fetch = (u, init) => fetchFromPage(String(u), data.url, init)) {
   const url = getLogoImageUrl(data);
   if (!url) return data;
   if (url.startsWith('data:')) return data;

@@ -1,6 +1,5 @@
 import chalk from 'chalk';
 import { randomUUID } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
 import { color } from '../formatters/theme.js';
 import { discoverLinks } from '../discovery.js';
 import { extractLogo, extractSiteName } from './logo.js';
@@ -27,6 +26,7 @@ import {
   sessionRedirectWarning,
   readSessionStorage,
   serializeStorageState,
+  writeSessionFile,
   sessionStorageInitScript,
   type AuthSession,
 } from './auth-session.js';
@@ -522,7 +522,7 @@ export async function extractBranding(url: string, spinner: Spinner, browser: Br
               origin: new URL(p.url()).origin,
               sessionStorage: await p.evaluate(readSessionStorage).catch(() => []),
             })));
-            writeFileSync(options.saveStorageState, serializeStorageState(state, perTab));
+            writeSessionFile(options.saveStorageState, serializeStorageState(state, perTab));
             log(color.success(`  ✓ Storage state saved to ${options.saveStorageState}`));
           }
         }

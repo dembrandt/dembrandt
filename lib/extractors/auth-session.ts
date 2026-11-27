@@ -2,7 +2,7 @@
  * Cookie-file / storageState / HTTP Basic parsing for authenticated extraction.
  * File I/O is behind loadAuthSession so tests inject a reader.
  */
-import { readFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Readable, Writable } from 'node:stream';
 
@@ -183,6 +183,14 @@ export function parseCookieFileText(text: string, targetUrl: string): AuthSessio
 export function serializeStorageState(state: StorageState, sessionStorage: SessionStorageOrigin[]): string {
   const kept = sessionStorage.filter((o) => o.sessionStorage.length > 0);
   return JSON.stringify(kept.length ? { ...state, sessionStorage: kept } : state, null, 2) + '\n';
+}
+
+// mode only applies on creation, so an existing file is narrowed before the tokens are written.
+export function writeSessionFile(path: string, text: string): void {
+  if (existsSync(path)) {
+    try { chmodSync(path, 0o600); } catch { /* not ours to narrow, e.g. /dev/stdout */ }
+  }
+  writeFileSync(path, text, { mode: 0o600 });
 }
 
 /** Runs in the page: the tab's sessionStorage as name/value rows. */
