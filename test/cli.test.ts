@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { EXIT } from '../lib/exit-codes.js';
 
 // Browser-free CLI plumbing tests: arg parsing, exit codes, help output. These
 // run before any extraction, so they need no browser. Import resolution is now
@@ -81,4 +82,27 @@ test('--color-format is case-insensitive', () => {
   // Validation lowercases before the check, so OKLCH must not be a hard error.
   const r = run(['--color-format=OKLCH', '--help']);
   assert.equal(r.status, 0);
+});
+
+test('an empty DEMBRANDT_KEY, as the Action passes without a key, means no key', async () => {
+  const http = await import('node:http');
+  const server = http.createServer((_req, res) => res.end('User-agent: *\nDisallow: /\n'));
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+  const { port } = server.address() as { port: number };
+  try {
+    for (const key of ['', '  ']) {
+      const r = await new Promise<{ status: number | null; stderr: string }>((resolve) => {
+        const child = spawn('node', [indexJs, `http://127.0.0.1:${port}/`, '--json-only'], {
+          env: { ...process.env, DEMBRANDT_KEY: key, DEMBRANDT_ENFORCE_ROBOTS: '1' },
+        });
+        let stderr = '';
+        child.stderr.on('data', (d) => (stderr += d));
+        child.on('close', (status) => resolve({ status, stderr }));
+      });
+      assert.doesNotMatch(r.stderr, /not an API key/);
+      assert.equal(r.status, EXIT.ROBOTS_DENIED, 'the run reaches the robots check after the key guard');
+    }
+  } finally {
+    server.close();
+  }
 });
