@@ -29,7 +29,8 @@ const UA_DEFAULT_FAMILIES = new Set(['times', 'times new roman', 'serif']);
  * So a family must carry real usage to stay: at least MIN_FAMILY_SHARE of counted
  * elements, and at least MIN_FAMILY_COUNT of them. The share is what does the
  * work — an absolute floor alone would either strip a small page bare or let a
- * widget through on a large one. Nothing is deleted silently: the dropped
+ * widget through on a large one. A face that sets the h1 or display text stays
+ * whatever its share, since widgets do not set the page headline. Nothing is deleted silently: the dropped
  * families are reported so a caller can see what the floor removed.
  *
  * Pure and exported so the floor is unit-testable without a browser.
@@ -37,7 +38,9 @@ const UA_DEFAULT_FAMILIES = new Set(['times', 'times new roman', 'serif']);
 const MIN_FAMILY_SHARE = 0.02;
 const MIN_FAMILY_COUNT = 3;
 
-export function applyFamilyUsageFloor<T extends { family: string; count?: number }>(
+const HEADLINE_CONTEXTS = new Set(['display', 'heading-1']);
+
+export function applyFamilyUsageFloor<T extends { family: string; count?: number; context?: string }>(
   styles: T[],
 ): { styles: T[]; filteredFamilies: string[] } {
   const totals: Record<string, number> = {};
@@ -53,6 +56,7 @@ export function applyFamilyUsageFloor<T extends { family: string; count?: number
   // Never strip the page down to nothing: if no family clears the floor, the
   // page is small enough that every family it uses is part of its type system.
   if (keep.size === 0) return { styles, filteredFamilies: [] };
+  for (const s of styles) if (s.context && HEADLINE_CONTEXTS.has(s.context)) keep.add(s.family);
 
   return {
     styles: styles.filter((s) => keep.has(s.family)),
