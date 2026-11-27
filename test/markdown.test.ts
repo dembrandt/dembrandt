@@ -236,3 +236,51 @@ test('DESIGN.md writes a control height only when it is a number of pixels', () 
   assert.doesNotMatch(bad, /injected/);
   assert.doesNotMatch(md(NaN), /NaN/);
 });
+
+test('a dark site keeps its extracted background and text as surface and on-surface', () => {
+  const output = generateDesignMd({
+    url: 'https://example.com',
+    colors: {
+      semantic: { background: 'rgb(6, 9, 15)', text: 'rgb(226, 236, 239)', primary: 'rgb(56, 189, 248)' },
+      palette: [
+        { color: '#ffffff', confidence: 'high' },
+        { color: '#000000', confidence: 'high' },
+        { color: '#38bdf8', confidence: 'high' },
+      ],
+    },
+  });
+  assert.match(output, /\n {2}surface: "#06090F"\n/i);
+  assert.match(output, /\n {2}on-surface: "#E2ECEF"\n/i);
+});
+
+test('with no extracted text, on-surface contrasts with the surface it sits on', () => {
+  const output = generateDesignMd({
+    url: 'https://example.com',
+    colors: {
+      semantic: { background: 'rgb(6, 9, 15)', primary: 'rgb(56, 189, 248)' },
+      palette: [
+        { color: '#ffffff', confidence: 'high' },
+        { color: '#000000', confidence: 'high' },
+        { color: '#38bdf8', confidence: 'high' },
+      ],
+    },
+  });
+  assert.match(output, /\n {2}surface: "#06090F"\n/i);
+  assert.match(output, /\n {2}on-surface: "#FFFFFF"\n/i);
+});
+
+test('an extracted text colour that matches the surface is not used as on-surface', () => {
+  const output = generateDesignMd({
+    url: 'https://example.com',
+    colors: {
+      semantic: { background: 'rgb(0, 0, 0)', text: 'rgb(0, 0, 0)', primary: 'rgb(255, 212, 168)' },
+      palette: [
+        { color: '#ffffff', confidence: 'high' },
+        { color: '#000000', confidence: 'high' },
+        { color: '#ffd4a8', confidence: 'high' },
+      ],
+    },
+  });
+  assert.match(output, /\n {2}surface: "#000000"\n/i);
+  assert.match(output, /\n {2}on-surface: "#FFFFFF"\n/i);
+});

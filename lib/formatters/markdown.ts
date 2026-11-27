@@ -85,16 +85,16 @@ function buildColorRoles(result) {
   const palette = result.colors?.palette;
 
   const allCandidates = new Map();
+  const channels = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const lumOf = (hex: string) => { const [r, g, b] = channels(hex); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
   const addCandidate = (raw, source) => {
     if (raw == null) return;
     if (isTransparentColor(raw)) return;
     const parsed = convertColor(String(raw));
     if (!parsed) return;
     const hex = normalizeHex(parsed.hex);
-    const r = parseInt(hex.slice(1, 3), 16) / 255;
-    const g = parseInt(hex.slice(3, 5), 16) / 255;
-    const b = parseInt(hex.slice(5, 7), 16) / 255;
-    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const [r, g, b] = channels(hex);
+    const lum = lumOf(hex);
     const sat = Math.max(r, g, b) - Math.min(r, g, b);
     if (!allCandidates.has(hex)) allCandidates.set(hex, { hex, lum, sat, source });
   };
@@ -151,9 +151,10 @@ function buildColorRoles(result) {
     };
 
     if (!roles.primary) roles.primary = pick(byRank);
+    roles.surface ??= roles.background ?? pick([...byLum].reverse());
+    const readableText = roles.text && !(roles.surface && Math.abs(lumOf(roles.text) - lumOf(roles.surface)) < 0.3) ? roles.text : null;
+    roles['on-surface'] ??= readableText ?? pick(roles.surface && lumOf(roles.surface) < 0.5 ? [...byLum].reverse() : byLum);
     if (!roles.secondary) roles.secondary = pick(byRank);
-    if (!roles.surface) roles.surface = pick([...byLum].reverse());
-    if (!roles['on-surface']) roles['on-surface'] = pick(byLum);
   }
 
   return compactObject({
