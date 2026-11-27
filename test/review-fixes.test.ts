@@ -52,4 +52,20 @@ test('a link with a zero-size underline gradient is not a filled button', async 
   const buttons = await withPage(html, (p) => extractButtonStyles(p));
   assert.equal(buttons[0]?.text, 'Sign up');
   assert.ok(!buttons.some((b) => b.text === 'our documentation'), 'underline link read as a button');
+test('a dark background painted on a wrapper is the page background', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const html = `<!doctype html><body style="margin:0;color:#eee"><div style="background:#0b0d12;min-height:100vh">` +
+    Array.from({ length: 6 }, () => `<p style="padding:8px">Readable copy on the dark wrapper.</p>`).join('') +
+    `</div></body>`;
+  const { semantic } = await withPage(html, (p) => extractColors(p));
+  assert.equal(semantic.background, 'rgb(11, 13, 18)');
+});
+
+test('body text that matches the background gives way to the text the page shows', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const html = `<!doctype html><body style="margin:0;background:#000;color:#000"><main>` +
+    Array.from({ length: 6 }, () => `<p style="color:#fff;padding:8px">White copy on black.</p>`).join('') +
+    `</main></body>`;
+  const { semantic } = await withPage(html, (p) => extractColors(p));
+  assert.equal(semantic.text, 'rgb(255, 255, 255)');
 });

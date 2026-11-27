@@ -488,12 +488,37 @@ export async function extractColors(page) {
         if (bg && colorAlpha(bg) >= 0.9) { semanticColors.background = bg; break; }
         bgNode = bgNode.parentElement;
       }
-      // Body and html often paint nothing, leaving the default white canvas the
-      // user actually sees. Dark sites always set an explicit dark background, so
-      // an unset chain means the rendered backdrop is white.
-      if (!semanticColors.background) semanticColors.background = 'rgb(255, 255, 255)';
+      if (!semanticColors.background) {
+        const painted = new Map();
+        for (const [fx, fy] of [[0.5, 0.3], [0.5, 0.6], [0.25, 0.5], [0.75, 0.5]]) {
+          let node = document.elementFromPoint(innerWidth * fx, innerHeight * fy);
+          while (node && node !== document.documentElement && node !== document.body) {
+            const bg = toLegacy(getComputedStyle(node).backgroundColor);
+            if (bg && colorAlpha(bg) >= 0.9 && node.getBoundingClientRect().width >= innerWidth * 0.9) {
+              painted.set(bg, (painted.get(bg) || 0) + 1);
+              break;
+            }
+            node = node.parentElement;
+          }
+        }
+        const [backdrop, hits] = [...painted.entries()].sort((a, b) => b[1] - a[1])[0] ?? [];
+        semanticColors.background = hits >= 2 ? backdrop : 'rgb(255, 255, 255)';
+      }
       const txt = toLegacy(getComputedStyle(surfaceEl).color);
       if (txt && colorAlpha(txt) >= 0.5) semanticColors.text = txt;
+      if (semanticColors.text && Math.abs(colorLightness(semanticColors.text) - colorLightness(semanticColors.background)) < 0.3) {
+        const byLength = new Map();
+        for (const el of Array.from(document.body?.querySelectorAll('*') ?? []).slice(0, 4000)) {
+          const own = Array.from(el.childNodes).reduce((n, c) => n + (c.nodeType === 3 ? (c.textContent || '').trim().length : 0), 0);
+          if (!own) continue;
+          const cs = getComputedStyle(el);
+          if (cs.visibility === 'hidden' || cs.display === 'none' || !el.getClientRects().length) continue;
+          const c = toLegacy(cs.color);
+          if (c && colorAlpha(c) >= 0.5) byLength.set(c, (byLength.get(c) || 0) + own);
+        }
+        const shown = [...byLength.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+        if (shown) semanticColors.text = shown;
+      }
     }
 
     // Use most-common CTA background as primary if class-based detection missed it
