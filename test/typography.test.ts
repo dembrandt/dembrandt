@@ -159,6 +159,16 @@ test('applyFamilyUsageFloor drops an embed face that covers a sliver of the page
   assert.deepEqual(filteredFamilies, ['Inter', 'Montserrat', 'Nohemi']);
 });
 
+test('applyFamilyUsageFloor keeps the face that sets the page headline, however rare', () => {
+  const { styles, filteredFamilies } = applyFamilyUsageFloor([
+    style('Inter', 600),
+    { ...style('IBM Plex Serif', 2), context: 'display' },
+    style('Helvetica', 1),
+  ]);
+  assert.deepEqual(styles.map((s) => s.family), ['Inter', 'IBM Plex Serif']);
+  assert.deepEqual(filteredFamilies, ['Helvetica']);
+});
+
 test('applyFamilyUsageFloor keeps a genuine second family on a small page', () => {
   const { styles, filteredFamilies } = applyFamilyUsageFloor([
     style('Inter', 30),
