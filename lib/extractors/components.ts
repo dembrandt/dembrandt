@@ -29,8 +29,17 @@ export async function extractButtonStyles(page) {
         // Must have a visible background or border — not just inherited
         const bg = computed.backgroundColor;
         const borderWidth = Math.max(...[computed.borderTopWidth, computed.borderRightWidth, computed.borderBottomWidth, computed.borderLeftWidth].map((w) => parseFloat(w) || 0));
-        const firstLayerSize = computed.backgroundSize.split(',')[0].trim().split(/\s+/);
-        const gradientShows = /gradient\(/.test(computed.backgroundImage) && !firstLayerSize.some((v) => parseFloat(v) === 0);
+        const layers = [];
+        let depth = 0, start = 0;
+        for (let i = 0; i < computed.backgroundImage.length; i++) {
+          const ch = computed.backgroundImage[i];
+          if (ch === '(') depth++;
+          else if (ch === ')') depth--;
+          else if (ch === ',' && depth === 0) { layers.push(computed.backgroundImage.slice(start, i).trim()); start = i + 1; }
+        }
+        layers.push(computed.backgroundImage.slice(start).trim());
+        const sizes = computed.backgroundSize.split(',').map((l) => l.trim().split(/\s+/));
+        const gradientShows = layers.some((l, i) => /gradient\(/.test(l) && !(sizes[i % sizes.length] ?? []).some((v) => parseFloat(v) === 0));
         const gradient = gradientShows ? computed.backgroundImage : undefined;
         const hasBackground = !isTransparent(bg) || Boolean(gradient);
         const hasBorder = borderWidth > 0 && !isTransparent(computed.borderColor);

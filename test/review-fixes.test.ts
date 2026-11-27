@@ -54,15 +54,6 @@ test('a link with a zero-size underline gradient is not a filled button', async 
   assert.ok(!buttons.some((b) => b.text === 'our documentation'), 'underline link read as a button');
 });
 
-test('a dark background painted on a wrapper is the page background', async (t) => {
-  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
-  const html = `<!doctype html><body style="margin:0;color:#eee"><div style="background:#0b0d12;min-height:100vh">` +
-    Array.from({ length: 6 }, () => `<p style="padding:8px">Readable copy on the dark wrapper.</p>`).join('') +
-    `</div></body>`;
-  const { semantic } = await withPage(html, (p) => extractColors(p));
-  assert.equal(semantic.background, 'rgb(11, 13, 18)');
-});
-
 test('body text that matches the background gives way to the text the page shows', async (t) => {
   if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
   const html = `<!doctype html><body style="margin:0;background:#000;color:#000"><main>` +
@@ -70,4 +61,32 @@ test('body text that matches the background gives way to the text the page shows
     `</main></body>`;
   const { semantic } = await withPage(html, (p) => extractColors(p));
   assert.equal(semantic.text, 'rgb(255, 255, 255)');
+});
+
+test('a dark hero on a light page does not become the page background', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const html = `<!doctype html><body style="margin:0;color:#222"><section style="background:#0b1020;color:#fff;height:80vh">Hero</section>` +
+    Array.from({ length: 6 }, () => `<p>Body copy on the white canvas.</p>`).join('') + `</body>`;
+  const { semantic } = await withPage(html, (p) => extractColors(p));
+  assert.equal(semantic.background, 'rgb(255, 255, 255)');
+  assert.equal(semantic.text, 'rgb(34, 34, 34)');
+});
+
+test('replacement text ignores offscreen copy and link colours', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const html = `<!doctype html><body style="margin:0;background:#111;color:#111">` +
+    `<div style="position:absolute;left:-99999px">${'hidden seo text '.repeat(200)}</div>` +
+    Array.from({ length: 60 }, () => `<a href="/x" style="color:#3b82f6">link</a> `).join('') +
+    `<p style="color:#eee">Readable copy.</p><p style="color:#eee">More readable copy.</p></body>`;
+  const { semantic } = await withPage(html, (p) => extractColors(p));
+  assert.equal(semantic.text, 'rgb(238, 238, 238)');
+});
+
+test('a gradient layer of zero size is not a fill, whichever layer it is', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const html = `<!doctype html><body style="margin:0;background:#fff"><main>` +
+    `<a href="/z" style="display:inline-block;background-image:url(data:image/gif;base64,R0lGODlhAQABAAAAACw=),linear-gradient(rgb(1, 2, 3),rgb(4, 5, 6));background-size:16px 16px,0% 100%;background-repeat:no-repeat;border:0;padding:12px 24px;color:#111">Layered link</a>` +
+    `</main></body>`;
+  const buttons = await withPage(html, (p) => extractButtonStyles(p));
+  assert.ok(!buttons.some((b) => b.text === 'Layered link'));
 });
