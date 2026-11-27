@@ -47,7 +47,8 @@
  *          painted behind the content before white, and a semantic.text that
  *          does not separate from the background gives way to the colour with
  *          the most visible text. 14 of 16 measured sites unchanged against
- *          0.42.0; the two that move had black text on black.
+ *          0.42.0; the two that move had black text on black. dembrandt.com and
+ *          stripe.com drift 0 against 0.42.0.
  *  1.22.0 — meta gains `readiness`: per wait (hydration, stabilization) its
  *          ms, networkIdle, fontsSettled and endedBy (quiet | cap | error). BEHAVIOR:
  *          inline style changes no longer hold the DOM-quiet window open, so
