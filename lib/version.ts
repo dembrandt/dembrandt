@@ -43,6 +43,11 @@
  *          ranks as filled; a zero-size underline gradient does not count. A
  *          family that sets a visible h1 stays in typography.styles whatever
  *          its share of counted text, so it leaves sources.filteredFamilies.
+ *          colors.semantic.background falls back to the full-width element
+ *          painted behind the content before white, and a semantic.text that
+ *          does not separate from the background gives way to the colour with
+ *          the most visible text. 14 of 16 measured sites unchanged against
+ *          0.42.0; the two that move had black text on black.
  *  1.22.0 — meta gains `readiness`: per wait (hydration, stabilization) its
  *          ms, networkIdle, fontsSettled and endedBy (quiet | cap | error). BEHAVIOR:
  *          inline style changes no longer hold the DOM-quiet window open, so
