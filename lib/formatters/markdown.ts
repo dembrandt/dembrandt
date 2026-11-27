@@ -344,6 +344,11 @@ function buildShapesSection(roundedTokens) {
 function buildComponentsSection(result) {
   const lines = ['## Components'];
 
+  const lead = result.components?.buttons?.[0]?.states?.default;
+  if (lead?.backgroundImage) {
+    lines.push(`- **Lead button**: gradient fill ${lead.backgroundImage}, radius ${lead.borderRadius}`);
+  }
+
   const button = firstButton(result.components?.buttons);
   if (button) {
     const btn = button.states?.default ?? button;

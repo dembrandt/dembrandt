@@ -561,6 +561,7 @@ function buttonsSection(result: BrandingResult): string {
       const st: CssState = b.states?.default ?? {};
       const style = [
         st.backgroundColor ? `background:${safeCss(st.backgroundColor)}` : "",
+        st.backgroundImage ? `background-image:${safeCss(st.backgroundImage)}` : "",
         st.color ? `color:${safeCss(st.color)}` : "",
         st.borderRadius ? `border-radius:${safeCss(st.borderRadius)}` : "",
         st.padding ? `padding:${safeCss(st.padding)}` : "padding:8px 14px",
@@ -593,6 +594,7 @@ function inputsSection(result: BrandingResult): string {
       const st = i.states?.default ?? {};
       const style = [
         st.backgroundColor ? `background:${safeCss(st.backgroundColor)}` : "",
+        st.backgroundImage ? `background-image:${safeCss(st.backgroundImage)}` : "",
         st.color ? `color:${safeCss(st.color)}` : "",
         st.borderRadius ? `border-radius:${safeCss(st.borderRadius)}` : "",
         st.padding ? `padding:${safeCss(st.padding)}` : "padding:8px 12px",

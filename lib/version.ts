@@ -36,6 +36,13 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.23.0 — components.buttons[].states.default gains `backgroundImage`: a
+ *          visible gradient fill, set when the button's backgroundColor is
+ *          transparent because the fill sits in background-image. BEHAVIOR: a
+ *          gradient-filled call to action counts as filled, so it is kept and
+ *          ranks as filled; a zero-size underline gradient does not count. A
+ *          family that sets a visible h1 stays in typography.styles whatever
+ *          its share of counted text, so it leaves sources.filteredFamilies.
  *  1.22.0 — meta gains `readiness`: per wait (hydration, stabilization) its
  *          ms, networkIdle, fontsSettled and endedBy (quiet | cap | error). BEHAVIOR:
  *          inline style changes no longer hold the DOM-quiet window open, so
@@ -343,7 +350,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.22.0';
+export const SCHEMA_VERSION = '1.23.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';

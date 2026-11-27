@@ -211,7 +211,7 @@ function mergeTypography(results) {
 function fingerprintComponent(c) {
   const base = c.states?.default || c;
   return [
-    base.backgroundColor || '', base.color || '', base.borderRadius || '',
+    base.backgroundColor || '', base.backgroundImage || '', base.color || '', base.borderRadius || '',
     base.fontSize || '', base.fontWeight || '', base.border || '', base.padding || ''
   ].join('|');
 }

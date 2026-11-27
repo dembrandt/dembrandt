@@ -42,3 +42,14 @@ test('a button filled by a gradient is a filled button and keeps its gradient', 
   assert.ok(cta, 'gradient-filled button dropped');
   assert.match(cta.states.default.backgroundImage ?? '', /radial-gradient/);
 });
+
+test('a link with a zero-size underline gradient is not a filled button', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const html = `<!doctype html><body style="margin:0;background:#fff"><main>` +
+    `<p><a href="/docs" style="display:inline-block;background-image:linear-gradient(currentColor,currentColor);background-size:0 2px;background-repeat:no-repeat;padding:6px 0;color:#111">our documentation</a></p>` +
+    `<a href="/signup" style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:8px;padding:12px 24px">Sign up</a>` +
+    `</main></body>`;
+  const buttons = await withPage(html, (p) => extractButtonStyles(p));
+  assert.equal(buttons[0]?.text, 'Sign up');
+  assert.ok(!buttons.some((b) => b.text === 'our documentation'), 'underline link read as a button');
+});

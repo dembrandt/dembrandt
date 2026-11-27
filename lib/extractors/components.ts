@@ -29,7 +29,9 @@ export async function extractButtonStyles(page) {
         // Must have a visible background or border — not just inherited
         const bg = computed.backgroundColor;
         const borderWidth = Math.max(...[computed.borderTopWidth, computed.borderRightWidth, computed.borderBottomWidth, computed.borderLeftWidth].map((w) => parseFloat(w) || 0));
-        const gradient = /gradient\(/.test(computed.backgroundImage) ? computed.backgroundImage : undefined;
+        const firstLayerSize = computed.backgroundSize.split(',')[0].trim().split(/\s+/);
+        const gradientShows = /gradient\(/.test(computed.backgroundImage) && !firstLayerSize.some((v) => parseFloat(v) === 0);
+        const gradient = gradientShows ? computed.backgroundImage : undefined;
         const hasBackground = !isTransparent(bg) || Boolean(gradient);
         const hasBorder = borderWidth > 0 && !isTransparent(computed.borderColor);
 

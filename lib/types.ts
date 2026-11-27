@@ -251,6 +251,8 @@ export interface Gradient {
 /** Computed CSS for one interaction state (rest/hover/active/focus). */
 export interface CssState {
   backgroundColor?: string;
+  /** A visible gradient fill. backgroundColor is usually transparent when this is set. */
+  backgroundImage?: string;
   color?: string;
   borderRadius?: string;
   padding?: string;
