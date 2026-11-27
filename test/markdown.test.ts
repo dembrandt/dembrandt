@@ -249,6 +249,6 @@ test('a dark site keeps its extracted background and text as surface and on-surf
       ],
     },
   });
-  assert.match(output, /\n  surface: "#06090F"\n/i);
-  assert.match(output, /\n  on-surface: "#E2ECEF"\n/i);
+  assert.match(output, /\n {2}surface: "#06090F"\n/i);
+  assert.match(output, /\n {2}on-surface: "#E2ECEF"\n/i);
 });
