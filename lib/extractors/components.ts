@@ -29,7 +29,8 @@ export async function extractButtonStyles(page) {
         // Must have a visible background or border — not just inherited
         const bg = computed.backgroundColor;
         const borderWidth = Math.max(...[computed.borderTopWidth, computed.borderRightWidth, computed.borderBottomWidth, computed.borderLeftWidth].map((w) => parseFloat(w) || 0));
-        const hasBackground = !isTransparent(bg);
+        const gradient = /gradient\(/.test(computed.backgroundImage) ? computed.backgroundImage : undefined;
+        const hasBackground = !isTransparent(bg) || Boolean(gradient);
         const hasBorder = borderWidth > 0 && !isTransparent(computed.borderColor);
 
         if (!hasBackground && !hasBorder) continue;
@@ -55,13 +56,14 @@ export async function extractButtonStyles(page) {
         if (text.length === 0) continue;
 
         // Skip fully transparent backgrounds with no border (ghost-only inherited bg)
-        if (isTransparent(bg) && !hasBorder) continue;
+        if (!hasBackground && !hasBorder) continue;
 
         results.push({
           el,
           score,
           state: {
             backgroundColor: bg,
+            backgroundImage: gradient,
             color: computed.color,
             padding: computed.padding,
             borderRadius: computed.borderRadius,
@@ -83,7 +85,7 @@ export async function extractButtonStyles(page) {
     const unique = [];
     for (const r of results) {
       const s = r.state;
-      const key = `${s.backgroundColor}|${s.color}|${s.borderRadius}|${s.border}|${s.padding}|${s.fontSize}`;
+      const key = `${s.backgroundColor}|${s.backgroundImage}|${s.color}|${s.borderRadius}|${s.border}|${s.padding}|${s.fontSize}`;
       if (!seen.has(key)) {
         seen.add(key);
         unique.push({

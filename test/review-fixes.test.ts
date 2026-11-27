@@ -31,3 +31,14 @@ test('an svg element never contributes "[object" as a colour source', async (t) 
   const { palette, detected } = await withPage(html, (p) => extractColors(p));
   for (const c of [...palette, ...detected]) for (const s of c.sources ?? []) assert.ok(!s.startsWith('[object'), `source ${s}`);
 });
+
+test('a button filled by a gradient is a filled button and keeps its gradient', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const html = `<!doctype html><body style="margin:0;background:#13111c"><main>` +
+    `<a href="/new" style="display:inline-block;background-image:radial-gradient(#b301b3,#381dbd);border:0;border-radius:8px;color:#fff;padding:12px 24px">Deploy a new project</a>` +
+    `</main></body>`;
+  const buttons = await withPage(html, (p) => extractButtonStyles(p));
+  const cta = buttons.find((b) => b.text === 'Deploy a new project');
+  assert.ok(cta, 'gradient-filled button dropped');
+  assert.match(cta.states.default.backgroundImage ?? '', /radial-gradient/);
+});
