@@ -79,7 +79,7 @@ export function loginNeedsTtyError(opts: GuardOptions, stdinIsTty: boolean): str
 
 /** A key that cannot travel in a header fails the sync after the whole run, and the error would print it. */
 export function apiKeyError(key: string | undefined): string | null {
-  if (key === undefined || /^[\x21-\x7e]+$/.test(key)) return null;
+  if (!key || /^[\x21-\x7e]+$/.test(key)) return null;
   return "--key is not an API key: it contains spaces, line breaks or non-ASCII characters. Paste only the dmb_ key from dembrandt.com/app/api-keys.";
 }
 

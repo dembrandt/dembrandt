@@ -106,4 +106,5 @@ test('a --key that cannot be sent as a header stops the run and is never echoed'
   assert.match(apiKeyError('dmb_abc def') ?? '', /spaces, line breaks/);
   assert.equal(apiKeyError('dmb_MzQ_0123abcdef'), null);
   assert.equal(apiKeyError(undefined), null);
+  assert.equal(apiKeyError(''), null);
 });
