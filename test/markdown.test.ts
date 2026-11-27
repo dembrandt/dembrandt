@@ -236,3 +236,19 @@ test('DESIGN.md writes a control height only when it is a number of pixels', () 
   assert.doesNotMatch(bad, /injected/);
   assert.doesNotMatch(md(NaN), /NaN/);
 });
+
+test('a dark site keeps its extracted background and text as surface and on-surface', () => {
+  const output = generateDesignMd({
+    url: 'https://example.com',
+    colors: {
+      semantic: { background: 'rgb(6, 9, 15)', text: 'rgb(226, 236, 239)', primary: 'rgb(56, 189, 248)' },
+      palette: [
+        { color: '#ffffff', confidence: 'high' },
+        { color: '#000000', confidence: 'high' },
+        { color: '#38bdf8', confidence: 'high' },
+      ],
+    },
+  });
+  assert.match(output, /\n  surface: "#06090F"\n/i);
+  assert.match(output, /\n  on-surface: "#E2ECEF"\n/i);
+});

@@ -152,8 +152,8 @@ function buildColorRoles(result) {
 
     if (!roles.primary) roles.primary = pick(byRank);
     if (!roles.secondary) roles.secondary = pick(byRank);
-    if (!roles.surface) roles.surface = pick([...byLum].reverse());
-    if (!roles['on-surface']) roles['on-surface'] = pick(byLum);
+    roles.surface ??= roles.background ?? pick([...byLum].reverse());
+    roles['on-surface'] ??= roles.text ?? pick(byLum);
   }
 
   return compactObject({
