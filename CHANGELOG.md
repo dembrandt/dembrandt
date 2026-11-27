@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.42.0] - 2026-11-27
+
+Credentials stay on the site they were given for.
+
+### Fixed
+- `--header` and `--basic-auth` reach the requested site only, with or without `www`, and its `https` upgrade. 0.41.0 sent them to every host the page loaded from, and a crawl could carry them, and `--cookie`, to a page on another site. `meta.sessionWarnings` names the host when a redirect, script or crawl leaves the site (#306)
+- Animated pages no longer run both readiness waits to their 8s and 4s caps. `meta.readiness` records each wait and how it ended (#304)
+- A pasted `--key` with spaces or line breaks exits 2 before the browser starts, without echoing the value (#302)
+- Terminal output prints pills as 9999px, keeps a translucent colour's alpha and drops padded zero shadows. JSON and exports are unchanged (#303)
+- Extracted pages no longer get clipboard access (#308)
+
+### Upgrading
+Node 20 or newer. 0.38.0, 0.40.2 and 0.41.0 already failed to start on Node 18; the stated minimum now matches. Schema 1.22.0 adds `meta.readiness`. dembrandt.com and stripe.com drift 0 against 0.41.0. Service workers, popups and WebSockets no longer carry `--header`; in Firefox neither do streams, media and redirects other than the requested URL's own.
+
 ## [0.41.0] - 2026-11-19
 
 The primary is the colour the main button actually shows.
