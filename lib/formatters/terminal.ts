@@ -607,7 +607,9 @@ function displayButtons(buttons, colorFormat: ColorFormat = 'hex') {
       const defaultBg = btn.states.default.backgroundColor;
       const isTransparent = defaultBg.includes('rgba(0, 0, 0, 0)') || defaultBg === 'transparent';
 
-      if (isTransparent) {
+      if (btn.states.default.backgroundImage) {
+        console.log(chalk.dim(`│  ${btnBranch}`) + ' ' + chalk.bold('Variant: gradient') + ' ' + chalk.dim(btn.states.default.backgroundImage));
+      } else if (isTransparent) {
         console.log(chalk.dim(`│  ${btnBranch}`) + ' ' + chalk.bold('Variant: transparent'));
       } else {
         console.log(chalk.dim(`│  ${btnBranch}`) + ' ' + chalk.bold(`Variant: ${colorCell(defaultBg, colorFormat)}`));

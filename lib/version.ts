@@ -36,6 +36,16 @@
 /**
  * dembrandt output contract version. Bump per the policy documented above.
  *
+ *  1.23.0 — components.buttons[].states.default gains `backgroundImage`,
+ *          set when a gradient layer paints the button at rest: it has a
+ *          visible colour stop, is not clipped to text, and by its size,
+ *          position and repeat covers at least half the button each way.
+ *          BEHAVIOR: a gradient-filled call to action with a transparent
+ *          backgroundColor counts as filled, so it is kept and ranks as filled.
+ *          A family that sets an h1 a reader can see (on screen, not clipped,
+ *          not transparent, larger than 1px) stays in typography.styles
+ *          whatever its share of counted text, so it leaves
+ *          sources.filteredFamilies.
  *  1.22.0 — meta gains `readiness`: per wait (hydration, stabilization) its
  *          ms, networkIdle, fontsSettled and endedBy (quiet | cap | error). BEHAVIOR:
  *          inline style changes no longer hold the DOM-quiet window open, so
@@ -343,7 +353,7 @@
  *          normalizeExtraction().
  *  1.0.0 — baselined on the 0.16.0 shape.
  */
-export const SCHEMA_VERSION = '1.22.0';
+export const SCHEMA_VERSION = '1.23.0';
 
 /** W3C DTCG spec revision the `--dtcg` export targets. */
 export const DTCG_SPEC_VERSION = '2025.10';

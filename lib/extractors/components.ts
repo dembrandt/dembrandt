@@ -8,6 +8,25 @@ export async function extractButtonStyles(page) {
       'button, a[href], [role="button"]'
     ));
 
+    const splitTopLevel = (value, sep) => {
+      const parts = [];
+      let depth = 0, quote = '', start = 0;
+      for (let i = 0; i < value.length; i++) {
+        const ch = value[i];
+        if (quote) {
+          if (ch === '\\') { i++; continue; }
+          if (ch === quote) quote = '';
+          continue;
+        }
+        if (ch === '"' || ch === "'") quote = ch;
+        else if (ch === '(') depth++;
+        else if (ch === ')') depth = Math.max(0, depth - 1);
+        else if (depth === 0 && (sep === ' ' ? /\s/.test(ch) : ch === sep)) { parts.push(value.slice(start, i)); start = i + 1; }
+      }
+      parts.push(value.slice(start));
+      return parts.map((p) => p.trim()).filter(Boolean);
+    };
+
     const isTransparent = (color) =>
       !color || color === 'transparent' || color === 'rgba(0, 0, 0, 0)';
 
@@ -29,7 +48,40 @@ export async function extractButtonStyles(page) {
         // Must have a visible background or border — not just inherited
         const bg = computed.backgroundColor;
         const borderWidth = Math.max(...[computed.borderTopWidth, computed.borderRightWidth, computed.borderBottomWidth, computed.borderLeftWidth].map((w) => parseFloat(w) || 0));
-        const hasBackground = !isTransparent(bg);
+        const layers = splitTopLevel(computed.backgroundImage, ',');
+        const sizes = splitTopLevel(computed.backgroundSize, ',').map((l) => splitTopLevel(l, ' '));
+        const positions = splitTopLevel(computed.backgroundPosition, ',').map((l) => splitTopLevel(l, ' '));
+        const repeats = splitTopLevel(computed.backgroundRepeat, ',').map((l) => splitTopLevel(l, ' '));
+        const clips = splitTopLevel(computed.backgroundClip || (computed as any).webkitBackgroundClip || 'border-box', ',');
+        const KEYWORD = { left: '0%', top: '0%', center: '50%', right: '100%', bottom: '100%' };
+        const sizeOf = (token, full) => (token === 'auto' ? full : token.endsWith('%') ? full * parseFloat(token) / 100 : parseFloat(token));
+        const coversAxis = (sizeToken, posToken, repeats, full) => {
+          if (repeats) return true;
+          const size = sizeOf(sizeToken ?? 'auto', full);
+          const pos = KEYWORD[posToken] ?? posToken ?? '0%';
+          const start = pos.endsWith('%') ? (full - size) * parseFloat(pos) / 100 : parseFloat(pos);
+          return Math.min(start + size, full) - Math.max(start, 0) >= full / 2;
+        };
+        const fillsBox = (i) => {
+          if (/text/.test(clips[i % clips.length] ?? '')) return false;
+          const size = sizes[i % sizes.length] ?? ['auto'];
+          if (size.length === 1 && /^(cover|contain)$/.test(size[0])) return true;
+          const pos = positions[i % positions.length] ?? ['0%', '0%'];
+          const rep = repeats[i % repeats.length] ?? ['repeat'];
+          const [rx, ry] = rep.length === 2 ? rep.map((r) => r !== 'no-repeat') : [/^(repeat|repeat-x|space|round)$/.test(rep[0]), /^(repeat|repeat-y|space|round)$/.test(rep[0])];
+          return coversAxis(size[0], pos[0], rx, rect.width) && coversAxis(size[1] ?? 'auto', pos[1], ry, rect.height);
+        };
+        const stopAlpha = (c) => {
+          const parts = c.slice(c.indexOf('(') + 1, -1).split(/[\s,/]+/).filter(Boolean);
+          const commaRgba = /^rgba\(/.test(c) && parts.length === 4;
+          const slash = c.includes('/') ? parts[parts.length - 1] : null;
+          const a = commaRgba ? parts[3] : slash;
+          return a == null ? 1 : a.endsWith('%') ? parseFloat(a) / 100 : parseFloat(a);
+        };
+        const hasVisibleStop = (layer) => (layer.match(/(?:rgba?|hsla?|oklch|oklab|lch|lab|color)\([^()]*\)/g) ?? []).some((c) => stopAlpha(c) > 0.1);
+        const gradientShows = layers.some((l, i) => /gradient\(/.test(l) && hasVisibleStop(l) && fillsBox(i));
+        const gradient = gradientShows ? computed.backgroundImage : undefined;
+        const hasBackground = !isTransparent(bg) || Boolean(gradient);
         const hasBorder = borderWidth > 0 && !isTransparent(computed.borderColor);
 
         if (!hasBackground && !hasBorder) continue;
@@ -55,13 +107,14 @@ export async function extractButtonStyles(page) {
         if (text.length === 0) continue;
 
         // Skip fully transparent backgrounds with no border (ghost-only inherited bg)
-        if (isTransparent(bg) && !hasBorder) continue;
+        if (!hasBackground && !hasBorder) continue;
 
         results.push({
           el,
           score,
           state: {
             backgroundColor: bg,
+            backgroundImage: gradient,
             color: computed.color,
             padding: computed.padding,
             borderRadius: computed.borderRadius,
@@ -83,7 +136,7 @@ export async function extractButtonStyles(page) {
     const unique = [];
     for (const r of results) {
       const s = r.state;
-      const key = `${s.backgroundColor}|${s.color}|${s.borderRadius}|${s.border}|${s.padding}|${s.fontSize}`;
+      const key = `${s.backgroundColor}|${s.backgroundImage}|${s.color}|${s.borderRadius}|${s.border}|${s.padding}|${s.fontSize}`;
       if (!seen.has(key)) {
         seen.add(key);
         unique.push({

@@ -29,7 +29,8 @@ const UA_DEFAULT_FAMILIES = new Set(['times', 'times new roman', 'serif']);
  * So a family must carry real usage to stay: at least MIN_FAMILY_SHARE of counted
  * elements, and at least MIN_FAMILY_COUNT of them. The share is what does the
  * work — an absolute floor alone would either strip a small page bare or let a
- * widget through on a large one. Nothing is deleted silently: the dropped
+ * widget through on a large one. A face that sets a visible h1 stays whatever its
+ * share, since widgets do not set the page headline. Nothing is deleted silently: the dropped
  * families are reported so a caller can see what the floor removed.
  *
  * Pure and exported so the floor is unit-testable without a browser.
@@ -37,7 +38,7 @@ const UA_DEFAULT_FAMILIES = new Set(['times', 'times new roman', 'serif']);
 const MIN_FAMILY_SHARE = 0.02;
 const MIN_FAMILY_COUNT = 3;
 
-export function applyFamilyUsageFloor<T extends { family: string; count?: number }>(
+export function applyFamilyUsageFloor<T extends { family: string; count?: number; h1?: boolean }>(
   styles: T[],
 ): { styles: T[]; filteredFamilies: string[] } {
   const totals: Record<string, number> = {};
@@ -53,6 +54,7 @@ export function applyFamilyUsageFloor<T extends { family: string; count?: number
   // Never strip the page down to nothing: if no family clears the floor, the
   // page is small enough that every family it uses is part of its type system.
   if (keep.size === 0) return { styles, filteredFamilies: [] };
+  for (const s of styles) if (s.h1) keep.add(s.family);
 
   return {
     styles: styles.filter((s) => keep.has(s.family)),
@@ -416,12 +418,20 @@ export async function extractTypography(page) {
         if (directTextLen > 0) familyBodyWeight[family] = (familyBodyWeight[family] || 0) + directTextLen;
       }
 
+      const h1Rect = el.tagName === "H1" ? el.getBoundingClientRect() : null;
+      const h1TextOnScreen = () => { const r = document.createRange(); r.selectNodeContents(el); return Array.from(r.getClientRects()).some((t) => t.width > 1 && t.right > 0 && t.left < document.documentElement.clientWidth); };
+      const isH1 = Boolean(h1Rect && h1Rect.width > 1 && h1Rect.height > 1 && h1Rect.right > 0 && h1Rect.left < document.documentElement.clientWidth
+        && h1Rect.bottom + window.scrollY > 0 && h1TextOnScreen()
+        && !(() => { for (let n: Element | null = el; n; n = n.parentElement) if (/rect\(\s*0(px)?[\s,]+0(px)?[\s,]+0(px)?[\s,]+0(px)?\s*\)/.test(getComputedStyle(n).clip || '')) return true; return false; })()
+        && !(() => { for (let n: Element | null = el; n; n = n.parentElement) if (/inset\(\s*(50|100)%/.test(getComputedStyle(n).clipPath || '')) return true; return false; })()
+        && (typeof el.checkVisibility !== 'function' || el.checkVisibility({ opacityProperty: true, visibilityProperty: true })));
       const key = `${family}|${size}|${weight}|${context}|${letterSpacing}|${textTransform}`;
       if (seen.has(key)) {
         // First occurrence still defines the style, but how often it recurs is
         // the only evidence that separates a real type token from one element
         // that a third-party embed dropped on the page.
         seen.get(key).count++;
+        if (isH1) seen.get(key).h1 = true;
         return;
       }
 
@@ -446,6 +456,7 @@ export async function extractTypography(page) {
         spacing: letterSpacing !== "normal" ? letterSpacing : null,
         transform: textTransform !== "none" ? textTransform : null,
         isFluid: isFluid || undefined,
+        h1: isH1 || undefined,
         fontFeatures: fontFeatures || undefined,
       });
     });
@@ -502,7 +513,9 @@ export async function extractTypography(page) {
     }
   }
 
-  const { styles, filteredFamilies } = applyFamilyUsageFloor(data.styles);
+  const floored = applyFamilyUsageFloor(data.styles);
+  const styles = floored.styles.map(({ h1: _h1, ...style }) => style);
+  const { filteredFamilies } = floored;
 
   const hosted = [
     ...data.sources.googleFonts,
