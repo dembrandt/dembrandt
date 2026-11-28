@@ -123,9 +123,17 @@ test('a gradient parked outside the button or clipped to text is not a fill', as
 test('an h1 a reader cannot see does not keep a rare face', async (t) => {
   if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
   const copy = Array.from({ length: 200 }, () => '<p style="font-family:Arial">Body copy set in Arial.</p>').join('');
-  for (const hide of ['position:absolute;left:-10000px', 'clip-path:inset(50%)', 'opacity:0']) {
+  for (const hide of ['position:absolute;left:-10000px', 'position:absolute;top:-9999px', 'position:absolute;clip:rect(0 0 0 0)', 'clip-path:inset(50%)', 'clip-path:inset(100%)', 'opacity:0']) {
     const html = `<!doctype html><body style="margin:0"><div style="${hide}"><h1 style="font-family:Georgia;font-size:56px">Hidden headline</h1></div>${copy}</body>`;
     const { sources } = await withPage(html, (p) => extractTypography(p));
     assert.ok((sources.filteredFamilies ?? []).includes('Georgia'), hide);
   }
+});
+
+test('an image-replacement h1 pushed out by text-indent does not keep a rare face', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const copy = Array.from({ length: 200 }, () => '<p style="font-family:Arial">Body copy set in Arial.</p>').join('');
+  const html = `<!doctype html><body style="margin:0"><h1 style="font-family:Georgia;font-size:32px;text-indent:-9999px;white-space:nowrap;overflow:hidden;width:200px;height:60px">Logo</h1>${copy}</body>`;
+  const { sources } = await withPage(html, (p) => extractTypography(p));
+  assert.ok((sources.filteredFamilies ?? []).includes('Georgia'));
 });

@@ -419,8 +419,11 @@ export async function extractTypography(page) {
       }
 
       const h1Rect = el.tagName === "H1" ? el.getBoundingClientRect() : null;
+      const h1TextOnScreen = () => { const r = document.createRange(); r.selectNodeContents(el); return Array.from(r.getClientRects()).some((t) => t.width > 1 && t.right > 0 && t.left < document.documentElement.clientWidth); };
       const isH1 = Boolean(h1Rect && h1Rect.width > 1 && h1Rect.height > 1 && h1Rect.right > 0 && h1Rect.left < document.documentElement.clientWidth
-        && !(() => { for (let n: Element | null = el; n; n = n.parentElement) if (/inset\(\s*50%/.test(getComputedStyle(n).clipPath || '')) return true; return false; })()
+        && h1Rect.bottom + window.scrollY > 0 && h1TextOnScreen()
+        && !(() => { for (let n: Element | null = el; n; n = n.parentElement) if (/rect\(\s*0(px)?[\s,]+0(px)?[\s,]+0(px)?[\s,]+0(px)?\s*\)/.test(getComputedStyle(n).clip || '')) return true; return false; })()
+        && !(() => { for (let n: Element | null = el; n; n = n.parentElement) if (/inset\(\s*(50|100)%/.test(getComputedStyle(n).clipPath || '')) return true; return false; })()
         && (typeof el.checkVisibility !== 'function' || el.checkVisibility({ opacityProperty: true, visibilityProperty: true })));
       const key = `${family}|${size}|${weight}|${context}|${letterSpacing}|${textTransform}`;
       if (seen.has(key)) {
