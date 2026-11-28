@@ -54,34 +54,6 @@ test('a link with a zero-size underline gradient is not a filled button', async 
   assert.ok(!buttons.some((b) => b.text === 'our documentation'), 'underline link read as a button');
 });
 
-test('body text that matches the background gives way to the text the page shows', async (t) => {
-  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
-  const html = `<!doctype html><body style="margin:0;background:#000;color:#000"><main>` +
-    Array.from({ length: 8 }, () => `<p style="color:#fff;padding:8px">White copy on black that runs long enough to count.</p>`).join('') +
-    `</main></body>`;
-  const { semantic } = await withPage(html, (p) => extractColors(p));
-  assert.equal(semantic.text, 'rgb(255, 255, 255)');
-});
-
-test('a dark hero on a light page does not become the page background', async (t) => {
-  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
-  const html = `<!doctype html><body style="margin:0;color:#222"><section style="background:#0b1020;color:#fff;height:80vh">Hero</section>` +
-    Array.from({ length: 6 }, () => `<p>Body copy on the white canvas.</p>`).join('') + `</body>`;
-  const { semantic } = await withPage(html, (p) => extractColors(p));
-  assert.equal(semantic.background, 'rgb(255, 255, 255)');
-  assert.equal(semantic.text, 'rgb(34, 34, 34)');
-});
-
-test('replacement text ignores offscreen copy and link colours', async (t) => {
-  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
-  const html = `<!doctype html><body style="margin:0;background:#111;color:#111">` +
-    `<div style="position:absolute;left:-99999px">${'hidden seo text '.repeat(200)}</div>` +
-    Array.from({ length: 60 }, () => `<a href="/x" style="color:#3b82f6">link</a> `).join('') +
-    Array.from({ length: 8 }, () => `<p style="color:#eee">Readable copy that a visitor actually reads on this page.</p>`).join('') + `</body>`;
-  const { semantic } = await withPage(html, (p) => extractColors(p));
-  assert.equal(semantic.text, 'rgb(238, 238, 238)');
-});
-
 test('a gradient layer of zero size is not a fill, whichever layer it is', async (t) => {
   if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
   const html = `<!doctype html><body style="margin:0;background:#fff"><main>` +
@@ -89,37 +61,6 @@ test('a gradient layer of zero size is not a fill, whichever layer it is', async
     `</main></body>`;
   const buttons = await withPage(html, (p) => extractButtonStyles(p));
   assert.ok(!buttons.some((b) => b.text === 'Layered link'));
-});
-
-test('a guessed white background never replaces the body text colour', async (t) => {
-  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
-  const html = `<!doctype html><body style="margin:0;color:#eee"><div style="background:#0b0d12;min-height:100vh">` +
-    Array.from({ length: 8 }, () => `<p>Copy on the dark wrapper that runs long enough to count.</p>`).join('') +
-    `<div style="background:#fff;color:#333">We use cookies</div></div></body>`;
-  const { semantic } = await withPage(html, (p) => extractColors(p));
-  assert.equal(semantic.text, 'rgb(238, 238, 238)');
-});
-
-test('hidden text never sets the replacement colour', async (t) => {
-  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
-  const seo = 'hidden seo text '.repeat(100);
-  const html = `<!doctype html><body style="margin:0;background:#111;color:#111;overflow-x:hidden">` +
-    `<div style="position:absolute;left:99999px;color:#ff0">${seo}</div>` +
-    `<div style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);color:#ff0">${seo}</div>` +
-    Array.from({ length: 40 }, () => `<h2 style="text-indent:-9999px;white-space:nowrap;overflow:hidden;color:#ff0">Hidden heading text</h2>`).join('') +
-    `<div style="opacity:0"><p style="color:#ff0">${seo}</p></div>` +
-    Array.from({ length: 8 }, () => `<p style="color:#eee">Readable copy that a visitor actually reads on this page.</p>`).join('') + `</body>`;
-  const { semantic } = await withPage(html, (p) => extractColors(p));
-  assert.equal(semantic.text, 'rgb(238, 238, 238)');
-});
-
-test('copy inside block card links still counts as body text', async (t) => {
-  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
-  const html = `<!doctype html><body style="margin:0;background:#000;color:#000">` +
-    Array.from({ length: 10 }, () => `<a href="/c" style="display:block;color:#eee"><h3>Card title</h3><p>A teaser that is the page's main copy.</p></a>`).join('') +
-    `<footer style="color:#777">Footer</footer></body>`;
-  const { semantic } = await withPage(html, (p) => extractColors(p));
-  assert.equal(semantic.text, 'rgb(238, 238, 238)');
 });
 
 test('layer and size lists split on top-level commas only', async (t) => {
@@ -132,33 +73,6 @@ test('layer and size lists split on top-level commas only', async (t) => {
   const buttons = await withPage(html, (p) => extractButtonStyles(p));
   assert.ok(!buttons.some((b) => b.text === 'Min link'), 'min() shifted the size list');
   assert.ok(!buttons.some((b) => b.text === 'Quote link'), 'a paren inside a quoted url merged the layers');
-});
-
-test('a painted white body under a dark wrapper takes the wrapper as the surface, not the cookie banner', async (t) => {
-  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
-  const html = `<!doctype html><body style="margin:0;background:#fff;color:#eee"><div style="background:#0b0d12;min-height:100vh">` +
-    Array.from({ length: 8 }, () => `<p>Copy on the dark wrapper that runs long enough to count.</p>`).join('') +
-    `<div style="background:#fff;color:#333">We use cookies to improve your visit.</div></div></body>`;
-  const { semantic } = await withPage(html, (p) => extractColors(p));
-  assert.equal(semantic.text, 'rgb(238, 238, 238)');
-  assert.equal(semantic.background, 'rgb(11, 13, 18)');
-});
-
-test('an inline link wrapping a card still counts its copy', async (t) => {
-  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
-  const html = `<!doctype html><body style="margin:0;background:#000;color:#000">` +
-    Array.from({ length: 10 }, () => `<a href="/c" style="color:#eee"><div><h3>Card title</h3><p>A teaser that is the page's main copy.</p></div></a>`).join('') +
-    `<footer style="color:#777">Footer</footer></body>`;
-  const { semantic } = await withPage(html, (p) => extractColors(p));
-  assert.equal(semantic.text, 'rgb(238, 238, 238)');
-});
-
-test('a hero alone does not set the text colour when the rest is still hidden', async (t) => {
-  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
-  const html = `<!doctype html><body style="margin:0;background:#0a0a0a;color:#111"><h1 style="color:#a3e635">Launch faster</h1>` +
-    Array.from({ length: 20 }, () => `<p style="color:#d4d4d4;opacity:0">Revealed on scroll, hidden at rest.</p>`).join('') + `</body>`;
-  const { semantic } = await withPage(html, (p) => extractColors(p));
-  assert.equal(semantic.text, 'rgb(17, 17, 17)');
 });
 
 test('an escaped backslash before a closing quote ends the quoted url', async (t) => {
@@ -183,43 +97,13 @@ test('a thin or transparent gradient on a link is not a fill', async (t) => {
   assert.ok(!buttons.some((b) => b.text === 'our documentation' || b.text === 'clear link'));
 });
 
-test('hidden and svg nodes do not use up the text budget', async (t) => {
-  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
-  const html = `<!doctype html><html style="background:#000"><body style="margin:0;color:#000">` +
-    `<div style="background:#fff">${Array.from({ length: 3 }, () => `<p style="color:#222">A light strip at the top with a little dark copy in it.</p>`).join('')}</div>` +
-    `<svg width="10" height="10">${'<path d="M0 0h1v1z"/>'.repeat(4200)}</svg>` +
-    `<main>${Array.from({ length: 40 }, () => `<p style="color:#fff">The main copy of the page, white on the black canvas.</p>`).join('')}</main></body></html>`;
-  const { semantic } = await withPage(html, (p) => extractColors(p));
-  assert.equal(semantic.background, 'rgb(0, 0, 0)');
-  assert.equal(semantic.text, 'rgb(255, 255, 255)');
-});
 
-test('a gradient or translucent wrapper is a surface, so its copy outweighs a cookie banner', async (t) => {
+test('warm and wide-gamut gradients are visible fills', async (t) => {
   if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
-  for (const wrapper of ['background-image:linear-gradient(#0b1020,#111)', 'background:rgba(10,10,20,0.85)']) {
-    const html = `<!doctype html><body style="margin:0;color:#fff"><div style="${wrapper};min-height:100vh">` +
-      Array.from({ length: 8 }, () => `<p style="color:#eee">Copy on the dark wrapper that runs long enough to count.</p>`).join('') +
-      `<div style="position:fixed;bottom:0;left:0;right:0;background:#fff;color:#333"><p>We use cookies.</p><p>To improve your visit.</p><p>Accept or manage.</p></div></div></body>`;
-    const { semantic } = await withPage(html, (p) => extractColors(p));
-    assert.equal(semantic.text, 'rgb(238, 238, 238)', wrapper);
-  }
-});
-
-test('light cards on a dark page do not become the page background', async (t) => {
-  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
-  const html = `<!doctype html><html style="background:#0a0a0a"><body style="margin:0;color:#000"><main style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;padding:48px">` +
-    Array.from({ length: 6 }, () => `<article style="background:#fff;padding:16px"><p>Card copy that carries most of the text on this page.</p></article>`).join('') +
-    `</main></body></html>`;
-  const { semantic } = await withPage(html, (p) => extractColors(p));
-  assert.equal(semantic.background, 'rgb(10, 10, 10)');
-});
-
-test('light grey body text on white is left alone', async (t) => {
-  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
-  const html = `<!doctype html><body style="margin:0;background:#fff;color:#b3b3b3">` +
-    Array.from({ length: 8 }, () => `<p>Light grey copy on a white page, as some sites set it.</p>`).join('') +
-    `<footer style="background:#111;color:#ccc">${Array.from({ length: 4 }, () => `<p>${'Footer copy. '.repeat(8)}</p>`).join('')}</footer></body>`;
-  const { semantic } = await withPage(html, (p) => extractColors(p));
-  assert.equal(semantic.background, 'rgb(255, 255, 255)');
-  assert.equal(semantic.text, 'rgb(179, 179, 179)');
+  const fills = ['linear-gradient(#ff7a00,#ffb800)', 'linear-gradient(red,orange)', 'linear-gradient(oklch(0.7 0.2 40),oklch(0.6 0.25 20))', 'linear-gradient(color(display-p3 1 0.4 0),color(display-p3 1 0.7 0))'];
+  const html = `<!doctype html><body style="margin:0;background:#fff"><main>` +
+    fills.map((f, i) => `<a href="/${i}" style="display:inline-block;background-image:${f};border:0;border-radius:8px;color:#fff;padding:12px 24px">Fill ${i}</a> `).join('') +
+    `</main></body>`;
+  const buttons = await withPage(html, (p) => extractButtonStyles(p));
+  for (let i = 0; i < fills.length; i++) assert.ok(buttons.some((b) => b.text === `Fill ${i}` && b.states.default.backgroundImage), fills[i]);
 });

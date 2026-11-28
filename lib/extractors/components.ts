@@ -52,7 +52,14 @@ export async function extractButtonStyles(page) {
         const sizes = splitTopLevel(computed.backgroundSize, ',').map((l) => splitTopLevel(l, ' '));
         const covers = (token, full) => token === 'auto' || (token.endsWith('%') ? parseFloat(token) >= 50 : parseFloat(token) >= full / 2);
         const fillsBox = (size) => size.length === 1 && /^(cover|contain)$/.test(size[0]) || (covers(size[0] ?? 'auto', rect.width) && covers(size[1] ?? 'auto', rect.height));
-        const hasVisibleStop = (layer) => (layer.match(/rgba?\([^)]*\)/g) ?? []).some((c) => { const a = c.match(/,\s*([\d.]+)\)$/); return !a || parseFloat(a[1]) > 0.1; });
+        const stopAlpha = (c) => {
+          const parts = c.slice(c.indexOf('(') + 1, -1).split(/[\s,/]+/).filter(Boolean);
+          const commaRgba = /^rgba\(/.test(c) && parts.length === 4;
+          const slash = c.includes('/') ? parts[parts.length - 1] : null;
+          const a = commaRgba ? parts[3] : slash;
+          return a == null ? 1 : a.endsWith('%') ? parseFloat(a) / 100 : parseFloat(a);
+        };
+        const hasVisibleStop = (layer) => (layer.match(/(?:rgba?|hsla?|oklch|oklab|lch|lab|color)\([^()]*\)/g) ?? []).some((c) => stopAlpha(c) > 0.1);
         const gradientShows = layers.some((l, i) => /gradient\(/.test(l) && hasVisibleStop(l) && fillsBox(sizes[i % sizes.length] ?? ['auto']));
         const gradient = gradientShows ? computed.backgroundImage : undefined;
         const hasBackground = !isTransparent(bg) || Boolean(gradient);

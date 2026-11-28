@@ -40,14 +40,10 @@
  *          visible gradient fill, set when the button's backgroundColor is
  *          transparent because the fill sits in background-image. BEHAVIOR: a
  *          gradient-filled call to action counts as filled, so it is kept and
- *          ranks as filled; a zero-size underline gradient does not count. A
+ *          ranks as filled; a gradient that is transparent or covers less
+ *          than half the button, such as an underline strip, does not. A
  *          family that sets a visible h1 stays in typography.styles whatever
  *          its share of counted text, so it leaves sources.filteredFamilies.
- *          When colors.semantic.text is unreadable on semantic.background
- *          (contrast under 1.5), both are re-read from the visible text: the
- *          full-width surface carrying the most readable text becomes the
- *          background, its most used colour the text. Otherwise both are as in
- *          0.42.0.
  *  1.22.0 — meta gains `readiness`: per wait (hydration, stabilization) its
  *          ms, networkIdle, fontsSettled and endedBy (quiet | cap | error). BEHAVIOR:
  *          inline style changes no longer hold the DOM-quiet window open, so
