@@ -190,7 +190,9 @@ export async function extractInputStyles(page) {
       const seen = new Map();
       for (const item of group) {
         const key = `${item.states.default.border}|${item.states.default.borderRadius}|${item.states.default.backgroundColor}|${item.box?.height}`;
-        if (!seen.has(key)) seen.set(key, item);
+        const kept = seen.get(key);
+        if (!kept) seen.set(key, { ...item, types: [item.specificType] });
+        else if (!kept.types.includes(item.specificType)) kept.types.push(item.specificType);
       }
       return Array.from(seen.values());
     };
