@@ -50,7 +50,10 @@ export async function extractButtonStyles(page) {
         const borderWidth = Math.max(...[computed.borderTopWidth, computed.borderRightWidth, computed.borderBottomWidth, computed.borderLeftWidth].map((w) => parseFloat(w) || 0));
         const layers = splitTopLevel(computed.backgroundImage, ',');
         const sizes = splitTopLevel(computed.backgroundSize, ',').map((l) => splitTopLevel(l, ' '));
-        const gradientShows = layers.some((l, i) => /gradient\(/.test(l) && !(sizes[i % sizes.length] ?? []).some((v) => parseFloat(v) === 0));
+        const covers = (token, full) => token === 'auto' || (token.endsWith('%') ? parseFloat(token) >= 50 : parseFloat(token) >= full / 2);
+        const fillsBox = (size) => size.length === 1 && /^(cover|contain)$/.test(size[0]) || (covers(size[0] ?? 'auto', rect.width) && covers(size[1] ?? 'auto', rect.height));
+        const hasVisibleStop = (layer) => (layer.match(/rgba?\([^)]*\)/g) ?? []).some((c) => { const a = c.match(/,\s*([\d.]+)\)$/); return !a || parseFloat(a[1]) > 0.1; });
+        const gradientShows = layers.some((l, i) => /gradient\(/.test(l) && hasVisibleStop(l) && fillsBox(sizes[i % sizes.length] ?? ['auto']));
         const gradient = gradientShows ? computed.backgroundImage : undefined;
         const hasBackground = !isTransparent(bg) || Boolean(gradient);
         const hasBorder = borderWidth > 0 && !isTransparent(computed.borderColor);

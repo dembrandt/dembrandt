@@ -491,43 +491,58 @@ export async function extractColors(page) {
       if (!semanticColors.background) semanticColors.background = 'rgb(255, 255, 255)';
       const txt = toLegacy(getComputedStyle(surfaceEl).color);
       if (txt && colorAlpha(txt) >= 0.5) semanticColors.text = txt;
-      const separatesFrom = (c, bg) => Math.abs(colorLightness(c) - colorLightness(bg)) >= 0.3;
-      if (semanticColors.text && !separatesFrom(semanticColors.text, semanticColors.background)) {
+      const channels = (c) => { const m = String(c).match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/); return m ? [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]] : null; };
+      const luminance = ([r, g, b]: number[]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+      const contrast = (a, b) => { const ca = channels(a), cb = channels(b); if (!ca || !cb) return 21; const [hi, lo] = [luminance(ca), luminance(cb)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+      if (semanticColors.text && contrast(semanticColors.text, semanticColors.background) < 1.5) {
+        const flatten = (over, base) => {
+          const [r, g, b] = over.reduceRight(([br, bg2, bb], [lr, lg, lb, la]) => [lr * la + br * (1 - la), lg * la + bg2 * (1 - la), lb * la + bb * (1 - la)], base);
+          return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+        };
         const surfaceOf = (el) => {
+          const over = [];
           for (let node = el; node && node !== document.documentElement; node = node.parentElement) {
-            const bg = toLegacy(getComputedStyle(node).backgroundColor);
-            if (bg && colorAlpha(bg) >= 0.9) return bg;
+            const cs = getComputedStyle(node);
+            if (/url\(/.test(cs.backgroundImage)) return null;
+            const stop = /gradient\(/.test(cs.backgroundImage) ? (cs.backgroundImage.match(/rgba?\([^)]*\)/g) ?? []).map(channels).find((c) => c && c[3] >= 0.9) : null;
+            const own = channels(toLegacy(cs.backgroundColor));
+            const layer = stop ?? own;
+            if (layer && layer[3] >= 0.9) return { color: flatten(over, layer), width: node.getBoundingClientRect().width };
+            if (layer && layer[3] > 0.05) over.push(layer);
           }
-          return semanticColors.background;
+          return { color: flatten(over, channels(semanticColors.background) ?? [255, 255, 255, 1]), width: innerWidth };
         };
         const textBySurface = new Map();
+        const perElement = new Map();
         const range = document.createRange();
         const onScreen = (r) => r.width > 1 && r.height > 1 && r.right > 0 && r.left < innerWidth && r.bottom + window.scrollY > 0;
-        for (const el of Array.from(document.body?.querySelectorAll('*') ?? []).slice(0, 4000)) {
+        const walker = document.createTreeWalker(document.body ?? document.documentElement, NodeFilter.SHOW_TEXT);
+        for (let n = 0, t = walker.nextNode(); t && n < 20000; n++, t = walker.nextNode()) {
+          const length = (t.textContent || '').trim().length;
+          const el = t.parentElement;
+          if (!length || !el) continue;
+          range.selectNodeContents(t);
+          if (!Array.from(range.getClientRects()).some(onScreen)) continue;
+          perElement.set(el, (perElement.get(el) || 0) + length);
+        }
+        for (const [el, own] of perElement) {
           if (el.closest('button, [role="button"]')) continue;
           const link = el.closest('a');
           if (link && !link.querySelector('div, p, li, h1, h2, h3, h4, h5, h6, section, article')) continue;
-          const texts = Array.from(el.childNodes).filter((c) => c.nodeType === 3 && (c.textContent || '').trim());
-          if (!texts.length) continue;
           if (typeof el.checkVisibility === 'function' && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
           if (!onScreen(el.getBoundingClientRect())) continue;
-          let own = 0;
-          for (const t of texts) {
-            range.selectNodeContents(t);
-            if (Array.from(range.getClientRects()).some(onScreen)) own += (t.textContent || '').trim().length;
-          }
-          if (!own) continue;
           const color = toLegacy(getComputedStyle(el).color);
           const surface = surfaceOf(el);
-          if (!color || colorAlpha(color) < 0.5 || !separatesFrom(color, surface)) continue;
-          const entry = textBySurface.get(surface) ?? { total: 0, elements: 0, colors: new Map() };
+          if (!color || !surface || colorAlpha(color) < 0.5 || contrast(color, surface.color) < 3) continue;
+          const entry = textBySurface.get(surface.color) ?? { total: 0, elements: 0, width: 0, colors: new Map() };
           entry.total += own;
           entry.elements++;
+          entry.width = Math.max(entry.width, surface.width);
           entry.colors.set(color, (entry.colors.get(color) || 0) + own);
-          textBySurface.set(surface, entry);
+          textBySurface.set(surface.color, entry);
         }
         const [surface, read] = [...textBySurface.entries()].sort((x, y) => y[1].total - x[1].total)[0] ?? [];
-        if (read && read.total >= 200 && read.elements >= 3) {
+        if (read && read.total >= 200 && read.elements >= 3 && read.width >= innerWidth * 0.9) {
           semanticColors.background = surface;
           semanticColors.text = [...read.colors.entries()].sort((x, y) => y[1] - x[1])[0][0];
         }

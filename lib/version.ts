@@ -43,11 +43,11 @@
  *          ranks as filled; a zero-size underline gradient does not count. A
  *          family that sets a visible h1 stays in typography.styles whatever
  *          its share of counted text, so it leaves sources.filteredFamilies.
- *          A colors.semantic.text that does not separate from the background
- *          gives way to the readable colour with the most visible non-link
- *          text. 14 of 16 measured sites unchanged against 0.42.0; the two that
- *          move had black text on black. dembrandt.com and stripe.com drift 0
- *          against 0.42.0.
+ *          When colors.semantic.text is unreadable on semantic.background
+ *          (contrast under 1.5), both are re-read from the visible text: the
+ *          full-width surface carrying the most readable text becomes the
+ *          background, its most used colour the text. Otherwise both are as in
+ *          0.42.0.
  *  1.22.0 — meta gains `readiness`: per wait (hydration, stabilization) its
  *          ms, networkIdle, fontsSettled and endedBy (quiet | cap | error). BEHAVIOR:
  *          inline style changes no longer hold the DOM-quiet window open, so

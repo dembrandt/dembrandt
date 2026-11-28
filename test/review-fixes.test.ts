@@ -170,3 +170,56 @@ test('an escaped backslash before a closing quote ends the quoted url', async (t
   const buttons = await withPage(html, (p) => extractButtonStyles(p));
   assert.ok(!buttons.some((b) => b.text === 'Escape link'));
 });
+
+test('a thin or transparent gradient on a link is not a fill', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const html = `<!doctype html><body style="margin:0;background:#fff"><main>` +
+    `<a href="/docs" style="display:inline-block;background-image:linear-gradient(currentColor,currentColor);background-size:100% 1px;background-position:0 100%;background-repeat:no-repeat;padding:6px 0;color:#111">our documentation</a> ` +
+    `<a href="/clear" style="display:inline-block;background-image:linear-gradient(transparent,transparent);padding:6px 0;color:#111">clear link</a> ` +
+    `<a href="/signup" style="display:inline-block;background:#1d4ed8;color:#fff;border-radius:8px;padding:12px 24px">Sign up</a>` +
+    `</main></body>`;
+  const buttons = await withPage(html, (p) => extractButtonStyles(p));
+  assert.equal(buttons[0]?.text, 'Sign up');
+  assert.ok(!buttons.some((b) => b.text === 'our documentation' || b.text === 'clear link'));
+});
+
+test('hidden and svg nodes do not use up the text budget', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const html = `<!doctype html><html style="background:#000"><body style="margin:0;color:#000">` +
+    `<div style="background:#fff">${Array.from({ length: 3 }, () => `<p style="color:#222">A light strip at the top with a little dark copy in it.</p>`).join('')}</div>` +
+    `<svg width="10" height="10">${'<path d="M0 0h1v1z"/>'.repeat(4200)}</svg>` +
+    `<main>${Array.from({ length: 40 }, () => `<p style="color:#fff">The main copy of the page, white on the black canvas.</p>`).join('')}</main></body></html>`;
+  const { semantic } = await withPage(html, (p) => extractColors(p));
+  assert.equal(semantic.background, 'rgb(0, 0, 0)');
+  assert.equal(semantic.text, 'rgb(255, 255, 255)');
+});
+
+test('a gradient or translucent wrapper is a surface, so its copy outweighs a cookie banner', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  for (const wrapper of ['background-image:linear-gradient(#0b1020,#111)', 'background:rgba(10,10,20,0.85)']) {
+    const html = `<!doctype html><body style="margin:0;color:#fff"><div style="${wrapper};min-height:100vh">` +
+      Array.from({ length: 8 }, () => `<p style="color:#eee">Copy on the dark wrapper that runs long enough to count.</p>`).join('') +
+      `<div style="position:fixed;bottom:0;left:0;right:0;background:#fff;color:#333"><p>We use cookies.</p><p>To improve your visit.</p><p>Accept or manage.</p></div></div></body>`;
+    const { semantic } = await withPage(html, (p) => extractColors(p));
+    assert.equal(semantic.text, 'rgb(238, 238, 238)', wrapper);
+  }
+});
+
+test('light cards on a dark page do not become the page background', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const html = `<!doctype html><html style="background:#0a0a0a"><body style="margin:0;color:#000"><main style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;padding:48px">` +
+    Array.from({ length: 6 }, () => `<article style="background:#fff;padding:16px"><p>Card copy that carries most of the text on this page.</p></article>`).join('') +
+    `</main></body></html>`;
+  const { semantic } = await withPage(html, (p) => extractColors(p));
+  assert.equal(semantic.background, 'rgb(10, 10, 10)');
+});
+
+test('light grey body text on white is left alone', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const html = `<!doctype html><body style="margin:0;background:#fff;color:#b3b3b3">` +
+    Array.from({ length: 8 }, () => `<p>Light grey copy on a white page, as some sites set it.</p>`).join('') +
+    `<footer style="background:#111;color:#ccc">${Array.from({ length: 4 }, () => `<p>${'Footer copy. '.repeat(8)}</p>`).join('')}</footer></body>`;
+  const { semantic } = await withPage(html, (p) => extractColors(p));
+  assert.equal(semantic.background, 'rgb(255, 255, 255)');
+  assert.equal(semantic.text, 'rgb(179, 179, 179)');
+});
