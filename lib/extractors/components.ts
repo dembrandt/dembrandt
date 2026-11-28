@@ -50,8 +50,27 @@ export async function extractButtonStyles(page) {
         const borderWidth = Math.max(...[computed.borderTopWidth, computed.borderRightWidth, computed.borderBottomWidth, computed.borderLeftWidth].map((w) => parseFloat(w) || 0));
         const layers = splitTopLevel(computed.backgroundImage, ',');
         const sizes = splitTopLevel(computed.backgroundSize, ',').map((l) => splitTopLevel(l, ' '));
-        const covers = (token, full) => token === 'auto' || (token.endsWith('%') ? parseFloat(token) >= 50 : parseFloat(token) >= full / 2);
-        const fillsBox = (size) => size.length === 1 && /^(cover|contain)$/.test(size[0]) || (covers(size[0] ?? 'auto', rect.width) && covers(size[1] ?? 'auto', rect.height));
+        const positions = splitTopLevel(computed.backgroundPosition, ',').map((l) => splitTopLevel(l, ' '));
+        const repeats = splitTopLevel(computed.backgroundRepeat, ',').map((l) => splitTopLevel(l, ' '));
+        const clips = splitTopLevel(computed.backgroundClip || (computed as any).webkitBackgroundClip || 'border-box', ',');
+        const KEYWORD = { left: '0%', top: '0%', center: '50%', right: '100%', bottom: '100%' };
+        const sizeOf = (token, full) => (token === 'auto' ? full : token.endsWith('%') ? full * parseFloat(token) / 100 : parseFloat(token));
+        const coversAxis = (sizeToken, posToken, repeats, full) => {
+          if (repeats) return true;
+          const size = sizeOf(sizeToken ?? 'auto', full);
+          const pos = KEYWORD[posToken] ?? posToken ?? '0%';
+          const start = pos.endsWith('%') ? (full - size) * parseFloat(pos) / 100 : parseFloat(pos);
+          return Math.min(start + size, full) - Math.max(start, 0) >= full / 2;
+        };
+        const fillsBox = (i) => {
+          if (/text/.test(clips[i % clips.length] ?? '')) return false;
+          const size = sizes[i % sizes.length] ?? ['auto'];
+          if (size.length === 1 && /^(cover|contain)$/.test(size[0])) return true;
+          const pos = positions[i % positions.length] ?? ['0%', '0%'];
+          const rep = repeats[i % repeats.length] ?? ['repeat'];
+          const [rx, ry] = rep.length === 2 ? rep.map((r) => r !== 'no-repeat') : [/^(repeat|repeat-x|space|round)$/.test(rep[0]), /^(repeat|repeat-y|space|round)$/.test(rep[0])];
+          return coversAxis(size[0], pos[0], rx, rect.width) && coversAxis(size[1] ?? 'auto', pos[1], ry, rect.height);
+        };
         const stopAlpha = (c) => {
           const parts = c.slice(c.indexOf('(') + 1, -1).split(/[\s,/]+/).filter(Boolean);
           const commaRgba = /^rgba\(/.test(c) && parts.length === 4;
@@ -60,7 +79,7 @@ export async function extractButtonStyles(page) {
           return a == null ? 1 : a.endsWith('%') ? parseFloat(a) / 100 : parseFloat(a);
         };
         const hasVisibleStop = (layer) => (layer.match(/(?:rgba?|hsla?|oklch|oklab|lch|lab|color)\([^()]*\)/g) ?? []).some((c) => stopAlpha(c) > 0.1);
-        const gradientShows = layers.some((l, i) => /gradient\(/.test(l) && hasVisibleStop(l) && fillsBox(sizes[i % sizes.length] ?? ['auto']));
+        const gradientShows = layers.some((l, i) => /gradient\(/.test(l) && hasVisibleStop(l) && fillsBox(i));
         const gradient = gradientShows ? computed.backgroundImage : undefined;
         const hasBackground = !isTransparent(bg) || Boolean(gradient);
         const hasBorder = borderWidth > 0 && !isTransparent(computed.borderColor);

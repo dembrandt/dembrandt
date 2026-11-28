@@ -419,7 +419,9 @@ export async function extractTypography(page) {
       }
 
       const h1Rect = el.tagName === "H1" ? el.getBoundingClientRect() : null;
-      const isH1 = Boolean(h1Rect && h1Rect.width > 1 && h1Rect.height > 1);
+      const isH1 = Boolean(h1Rect && h1Rect.width > 1 && h1Rect.height > 1 && h1Rect.right > 0 && h1Rect.left < document.documentElement.clientWidth
+        && !(() => { for (let n: Element | null = el; n; n = n.parentElement) if (/inset\(\s*50%/.test(getComputedStyle(n).clipPath || '')) return true; return false; })()
+        && (typeof el.checkVisibility !== 'function' || el.checkVisibility({ opacityProperty: true, visibilityProperty: true })));
       const key = `${family}|${size}|${weight}|${context}|${letterSpacing}|${textTransform}`;
       if (seen.has(key)) {
         // First occurrence still defines the style, but how often it recurs is

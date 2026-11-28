@@ -3,6 +3,7 @@ import { test, before, after } from 'node:test';
 import { chromium, type Browser } from 'playwright';
 import { extractColors } from '../lib/extractors/colors.js';
 import { extractButtonStyles } from '../lib/extractors/components.js';
+import { extractTypography } from '../lib/extractors/typography.js';
 
 let browser: Browser | null = null;
 let launchError: unknown = null;
@@ -106,4 +107,25 @@ test('warm and wide-gamut gradients are visible fills', async (t) => {
     `</main></body>`;
   const buttons = await withPage(html, (p) => extractButtonStyles(p));
   for (let i = 0; i < fills.length; i++) assert.ok(buttons.some((b) => b.text === `Fill ${i}` && b.states.default.backgroundImage), fills[i]);
+});
+
+test('a gradient parked outside the button or clipped to text is not a fill', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const html = `<!doctype html><body style="margin:0;background:#fff"><main>` +
+    `<a href="/g" style="display:inline-block;background-color:transparent;background-image:radial-gradient(circle closest-side,rgba(254,155,11,0.85),transparent);background-size:350px 350px;background-position:-350px 50%;background-repeat:no-repeat;border:0;padding:12px 24px;color:#111">Glow at rest</a> ` +
+    `<a href="/t" style="display:inline-block;background-image:linear-gradient(90deg,#f0f,#0ff);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:24px;padding:12px 0">Gradient text</a>` +
+    `</main></body>`;
+  const buttons = await withPage(html, (p) => extractButtonStyles(p));
+  assert.ok(!buttons.some((b) => b.text === 'Glow at rest'), 'off-box glow read as a fill');
+  assert.ok(!buttons.some((b) => b.text === 'Gradient text'), 'gradient text read as a fill');
+});
+
+test('an h1 a reader cannot see does not keep a rare face', async (t) => {
+  if (launchError) { t.skip(`chromium unavailable: ${launchError}`); return; }
+  const copy = Array.from({ length: 200 }, () => '<p style="font-family:Arial">Body copy set in Arial.</p>').join('');
+  for (const hide of ['position:absolute;left:-10000px', 'clip-path:inset(50%)', 'opacity:0']) {
+    const html = `<!doctype html><body style="margin:0"><div style="${hide}"><h1 style="font-family:Georgia;font-size:56px">Hidden headline</h1></div>${copy}</body>`;
+    const { sources } = await withPage(html, (p) => extractTypography(p));
+    assert.ok((sources.filteredFamilies ?? []).includes('Georgia'), hide);
+  }
 });
