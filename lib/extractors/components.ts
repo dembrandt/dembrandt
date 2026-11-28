@@ -13,7 +13,11 @@ export async function extractButtonStyles(page) {
       let depth = 0, quote = '', start = 0;
       for (let i = 0; i < value.length; i++) {
         const ch = value[i];
-        if (quote) { if (ch === quote && value[i - 1] !== '\\') quote = ''; continue; }
+        if (quote) {
+          if (ch === '\\') { i++; continue; }
+          if (ch === quote) quote = '';
+          continue;
+        }
         if (ch === '"' || ch === "'") quote = ch;
         else if (ch === '(') depth++;
         else if (ch === ')') depth = Math.max(0, depth - 1);

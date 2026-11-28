@@ -483,24 +483,30 @@ export async function extractColors(page) {
     const surfaceEl = document.body || document.documentElement;
     if (surfaceEl) {
       let bgNode: Element | null = surfaceEl;
-      let backgroundPainted = false;
       for (let hop = 0; hop < 5 && bgNode; hop++) {
         const bg = toLegacy(getComputedStyle(bgNode).backgroundColor);
-        if (bg && colorAlpha(bg) >= 0.9) { semanticColors.background = bg; backgroundPainted = true; break; }
+        if (bg && colorAlpha(bg) >= 0.9) { semanticColors.background = bg; break; }
         bgNode = bgNode.parentElement;
       }
       if (!semanticColors.background) semanticColors.background = 'rgb(255, 255, 255)';
       const txt = toLegacy(getComputedStyle(surfaceEl).color);
       if (txt && colorAlpha(txt) >= 0.5) semanticColors.text = txt;
-      const separates = (c) => Math.abs(colorLightness(c) - colorLightness(semanticColors.background)) >= 0.3;
-      if (backgroundPainted && semanticColors.text && !separates(semanticColors.text)) {
-        const byLength = new Map();
+      const separatesFrom = (c, bg) => Math.abs(colorLightness(c) - colorLightness(bg)) >= 0.3;
+      if (semanticColors.text && !separatesFrom(semanticColors.text, semanticColors.background)) {
+        const surfaceOf = (el) => {
+          for (let node = el; node && node !== document.documentElement; node = node.parentElement) {
+            const bg = toLegacy(getComputedStyle(node).backgroundColor);
+            if (bg && colorAlpha(bg) >= 0.9) return bg;
+          }
+          return semanticColors.background;
+        };
+        const textBySurface = new Map();
         const range = document.createRange();
         const onScreen = (r) => r.width > 1 && r.height > 1 && r.right > 0 && r.left < innerWidth && r.bottom + window.scrollY > 0;
         for (const el of Array.from(document.body?.querySelectorAll('*') ?? []).slice(0, 4000)) {
           if (el.closest('button, [role="button"]')) continue;
           const link = el.closest('a');
-          if (link && getComputedStyle(link).display.startsWith('inline')) continue;
+          if (link && !link.querySelector('div, p, li, h1, h2, h3, h4, h5, h6, section, article')) continue;
           const texts = Array.from(el.childNodes).filter((c) => c.nodeType === 3 && (c.textContent || '').trim());
           if (!texts.length) continue;
           if (typeof el.checkVisibility === 'function' && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
@@ -511,12 +517,20 @@ export async function extractColors(page) {
             if (Array.from(range.getClientRects()).some(onScreen)) own += (t.textContent || '').trim().length;
           }
           if (!own) continue;
-          const cs = getComputedStyle(el);
-          const c = toLegacy(cs.color);
-          if (c && colorAlpha(c) >= 0.5 && separates(c)) byLength.set(c, (byLength.get(c) || 0) + own);
+          const color = toLegacy(getComputedStyle(el).color);
+          const surface = surfaceOf(el);
+          if (!color || colorAlpha(color) < 0.5 || !separatesFrom(color, surface)) continue;
+          const entry = textBySurface.get(surface) ?? { total: 0, elements: 0, colors: new Map() };
+          entry.total += own;
+          entry.elements++;
+          entry.colors.set(color, (entry.colors.get(color) || 0) + own);
+          textBySurface.set(surface, entry);
         }
-        const shown = [...byLength.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-        if (shown) semanticColors.text = shown;
+        const [surface, read] = [...textBySurface.entries()].sort((x, y) => y[1].total - x[1].total)[0] ?? [];
+        if (read && read.total >= 200 && read.elements >= 3) {
+          semanticColors.background = surface;
+          semanticColors.text = [...read.colors.entries()].sort((x, y) => y[1] - x[1])[0][0];
+        }
       }
     }
 
