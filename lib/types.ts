@@ -281,6 +281,8 @@ export interface LinkStyle {
 export interface InputStyle {
   /** The input's type attribute, or its tag when it has none. */
   specificType?: string;
+  /** Every input type that shares this style, specificType first. */
+  types?: string[];
   type?: string;
   border?: string;
   borderRadius?: string;

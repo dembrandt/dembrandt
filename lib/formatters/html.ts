@@ -604,7 +604,7 @@ function inputsSection(result: BrandingResult): string {
       return `<input class="previewbtn" style="${esc(style)}" placeholder="${esc(i.specificType || i.type || "text")}" readonly>`;
     })
     .join(" ");
-  const all = list.map((i) => [i.specificType || i.type, i.states?.default?.border, i.states?.default?.borderRadius, boxHeight(i.box)].filter(Boolean).join(" / ")).join("\n");
+  const all = list.map((i) => [(i.types ?? []).join(', ') || i.specificType || i.type, i.states?.default?.border, i.states?.default?.borderRadius, boxHeight(i.box)].filter(Boolean).join(" / ")).join("\n");
   return section("Inputs", `<div class="row">${previews}</div>`, undefined, all);
 }
 

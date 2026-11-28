@@ -371,6 +371,8 @@ function buildComponentsSection(result) {
     if (hasVisibleBorder(inp.border)) parts.push(`${inp.border.split(' ').slice(0, 2).join(' ')} border`);
     if (inp.borderRadius) parts.push(`${inp.borderRadius} radius`);
     if (renderableHeight(input.box)) parts.push(`${renderableHeight(input.box)}px height`);
+    const types = input.types ?? (input.specificType ? [input.specificType] : []);
+    if (types.length) parts.push(`types ${types.join(', ')}`);
     if (parts.length) {
       lines.push(`- **Inputs**: Observed sample with ${parts.join(', ')}`);
     }

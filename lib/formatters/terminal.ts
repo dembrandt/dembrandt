@@ -815,7 +815,7 @@ function displayInputs(inputs, colorFormat: ColorFormat = 'hex') {
       const branch = isLast ? '└─' : '├─';
       const indent = isLast ? '   ' : '│  ';
 
-      console.log(chalk.dim(`│  ${groupIndent}${branch}`) + ' ' + color.info(input.specificType));
+      console.log(chalk.dim(`│  ${groupIndent}${branch}`) + ' ' + color.info((input.types ?? [input.specificType]).join(', ')));
 
       // Display default state
       const defaultState = input.states.default;
